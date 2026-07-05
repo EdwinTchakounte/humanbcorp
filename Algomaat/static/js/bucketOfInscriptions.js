@@ -260,7 +260,7 @@ function addContentsBucket(data)
 		content += '<input type="hidden" id="publicationPrice_' + data[key]["id"] + '"  name="publicationPrice_' + data[key]["id"] + '" value="' + data[key]['price'] + '" />';
 		
 			 content +='<div class="service">';
-				 	  		content +=' <img style="text-decoration:none;" src="/Algomaat/static/img/icon1.png" alt="">';
+				 	  		content +=' <img style="text-decoration:none;" src="/static/img/icon1.png" alt="">';
 				 	     		content += '<h5 style="" >'+ data[key]["title"]  +'</h5>';
 				 	     		
 				 	     		

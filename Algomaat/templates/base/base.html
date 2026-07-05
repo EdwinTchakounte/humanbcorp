@@ -233,78 +233,74 @@
         </aside>
         
          <!-- Modal -->
+    <!-- Modale de contact HBC-RH -->
     <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
+                <button type="button" class="btn-close position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Fermer"></button>
                 <div class="modal-body p-0">
                     <div class="container-fluid">
                         <div class="row gy-4">
-                            <div class="col-lg-4 col-sm-12 bg-cover"
-                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
-                                <div>
-                                    
-                                </div>
+                            <div class="col-lg-4 col-sm-12 d-flex flex-column justify-content-center align-items-center text-center p-4"
+                                style="background: linear-gradient(160deg,#0b1c33,#112848); min-height:300px;">
+                                <img src="{% static 'img/favicon-hbc.png' %}" alt="HBC-RH" style="width:90px;height:90px;margin-bottom:18px;background:#fff;border-radius:12px;padding:6px;">
+                                <h5 style="color:#fff;">Parlons de vos <span style="color:var(--brand-gold);">défis RH</span></h5>
+                                <p style="color:#cfd8e6;font-size:14px;">Nous vous recontactons sous 24h.</p>
+                                <p style="color:#fff;font-size:13px;margin-top:10px;">
+                                    <i class='bx bxs-phone'></i> +237 696 305 891<br>
+                                    <i class='bx bxs-envelope'></i> recrutementhbcrh@gmail.com
+                                </p>
                             </div>
                             <div class="col-lg-8">
-                                <form  method="post"  action="{% url 'registration:send_email' %}" class="p-lg-5 col-12 row g-3">
+                                <form method="post" action="{% url 'registration:send_email' %}" class="p-lg-5 col-12 row g-3">
                                   {% csrf_token %}
                                     <div>
-                                        <h4> RÉSERVEZ VOTRE PLACE POUR UN COURS D'ESSAI !  </h4>
-                                    <p style="text-align:center;color:var(--brand);">  ON VOUS RAPPEL EN 24H !</p>
+                                        <h4> CONTACTEZ HUMAN BRAIN CORPORATION-RH </h4>
+                                        <p style="color:var(--brand);">Transformez vos défis RH en opportunités — dites-nous votre besoin.</p>
                                     </div>
                                     <div class="col-lg-6">
-                                        <label for="userName" class="form-label">Nom</label>
-                                        <input type="text" name="first_name" class="form-control" placeholder="Jon"  id="id_search_content"
-                                            aria-describedby="emailHelp">
+                                        <label class="form-label">Nom</label>
+                                        <input type="text" name="first_name" class="form-control" placeholder="Nom" required>
                                     </div>
                                     <div class="col-lg-6">
-                                        <label for="userName" class="form-label">Prenom</label>
-                                        <input type="text" name="last_name" class="form-control" placeholder="Doe" id="userName"
-                                            aria-describedby="emailHelp">
+                                        <label class="form-label">Prénom</label>
+                                        <input type="text" name="last_name" class="form-control" placeholder="Prénom">
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label class="form-label">Entreprise</label>
+                                        <input type="text" name="company" class="form-control" placeholder="Nom de votre entreprise">
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" name="email" class="form-control" placeholder="vous@entreprise.com" required>
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label class="form-label">Téléphone</label>
+                                        <input type="tel" name="phone" class="form-control" placeholder="+237 6XX XXX XXX">
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label class="form-label">Service souhaité</label>
+                                        <select name="service" class="form-control">
+                                            <option value="">— Sélectionnez —</option>
+                                            <option>Recrutement local &amp; international</option>
+                                            <option>Management des talents</option>
+                                            <option>Formation &amp; coaching</option>
+                                            <option>Externalisation RH</option>
+                                            <option>Autre</option>
+                                        </select>
                                     </div>
                                     <div class="col-12">
-                                        <label for="userName" class="form-label">Email</label>
-                                        <input type="email" name="email" class="form-control"  placeholder="Johndoe@example.com" id="userName"
-                                            aria-describedby="emailHelp">
+                                        <label class="form-label">Votre besoin</label>
+                                        <textarea name="message" placeholder="Décrivez votre besoin RH..." class="form-control" rows="4"></textarea>
                                     </div>
-                                    
-                                     <!-- ✅ Champ Téléphone ajouté -->
-				    <div class="col-lg-6">
-					<label for="id_phone" class="form-label">Téléphone</label>
-					<input type="tel" name="phone" class="form-control" placeholder="06 12 34 56 78" id="id_phone">
-				    </div>
-
-				    <!-- ✅ Champ Âge ajouté -->
-				    <div class="col-lg-6">
-					<label for="id_age" class="form-label">Âge</label>
-					<input type="number" name="age" class="form-control" placeholder="Votre âge" min="1" max="99" id="id_age">
-				    </div>
-				    
-                                    
-                                    <div class="col-12">
-                                        <label for="exampleInputEmail1" class="form-label">Message</label>
-                                        <textarea name="message" placeholder="Ecrivez-nous!" class="form-control" id=""  rows="4"></textarea>
-                                    </div>
-                                    
-                                    
-                                      <!-- Checkbox consentement parent/légal -->
-				    <div class="col-12 form-check">
-					<input class="form-check-input" type="checkbox" value="1" id="id_parent_consent" name="parent_consent" required>
-					<label class="form-check-label" for="id_parent_consent">
-					    Je certifie être le parent ou le représentant légal
-					</label>
-				    </div>
-
                                     <div class="col-12" style="margin-bottom:10px;">
-                                        <button type="submit" class="btn btn-brand">ENVOYER</button>
+                                        <button type="submit" class="btn btn-brand">ENVOYER MA DEMANDE</button>
                                     </div>
-                                    
                                 </form>
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>

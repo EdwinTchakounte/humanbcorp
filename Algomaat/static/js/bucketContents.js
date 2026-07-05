@@ -128,7 +128,7 @@ function addContentsBucket(Data, spaceId)
 		
 		
    content +='<div class="service" style="border-radius:10px;" >';
-				 	  		content +=' <img style="text-decoration:none;" src="/Algomaat/static/img/icon1.png" alt="">';
+				 	  		content +=' <img style="text-decoration:none;" src="/static/img/icon1.png" alt="">';
 				 	     		content += '<h5 style="">'+ Data2[key3]["title"]  +'</h5>';
 				 	     		
 				 content += '<div  class="container" style="background-color: #DAD7CD; border-radius:10px; padding:10px; font-size:15px; font-weight:normal;  margin-bottom:10px;" >';

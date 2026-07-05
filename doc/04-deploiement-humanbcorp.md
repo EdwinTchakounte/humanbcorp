@@ -13,9 +13,9 @@ On avance phase par phase ; cocher au fur et à mesure (`[x]`).
 |:---:|-------|--------|--------|
 | [x] | 0 — DNS | toi | ✅ propagé sur résolveurs publics (8.8.8.8 / 1.1.1.1 → 81.0.246.144) |
 | [x] | 1 — Utilisateur `humanbcorp` | admin | ✅ créé, groupe docker OK (`docker ps` fonctionne) |
-| [ ] | 2 — Clé SSH CI | admin | paire dédiée, publique dans `authorized_keys` |
+| [x] | 2 — Clé SSH CI | admin | ✅ paire dédiée, test `ssh humanbcorp@81.0.246.144` OK |
 | [ ] | 3 — Config GitHub | toi | secrets SSH_* + variables DEPLOY_* |
-| [ ] | 4 — Dépôt stack + `.env` | humanbcorp | fichiers + valeurs de prod |
+| [ ] | 4 — Dépôt stack + `.env` | humanbcorp | bundle `ok_serveur/` → `/home/humanbcorp/humanbcorp/` |
 | [ ] | 5 — Premier `up -d` | humanbcorp | après 1er build GHCR |
 | [ ] | 6 — Certificat TLS | admin | certbot mutualisé |
 | [ ] | 7 — HTTPS actif | admin | bloc :443 dans nginx central |
@@ -59,6 +59,7 @@ On s'y branche **au lieu** d'embarquer notre propre nginx.
 | `deploy/nginx/humanbcorp.conf` | Bloc `server {}` à coller dans la config du nginx central. |
 | `.env.example` | Modèle des variables de prod (durcissement HTTPS activé). |
 | `.github/workflows/deploy.yml` | CI : build+push GHCR, puis job deploy SSH (si `DEPLOY_ENABLED=true`). |
+| `ok_serveur/` | **Bundle prêt à copier sur le VPS** : `docker-compose.prod.yml`, `.env` (généré, non versionné), `humanbcorp-nginx.conf`, `README.md`. |
 
 ## Qui fait quoi
 

@@ -1,9 +1,13 @@
-# Déploiement — ALGOMAAT
+# Déploiement — humanbcorp
+
+> ⚠️ **Doc générique / historique.** Pour la mise en production réelle sur le VPS
+> (proxy nginx mutualisé, utilisateur `humanbcorp`, `docker-compose.prod.yml`),
+> la référence à suivre est **[doc/04-deploiement-humanbcorp.md](doc/04-deploiement-humanbcorp.md)**.
 
 Chaîne : **GitHub Actions build l'image Docker → push sur GHCR → le serveur pull l'image** via `docker-compose.yml`.
 
 ```
- git push main ──► GitHub Actions ──► ghcr.io/fokamfekam/algomaat:latest
+ git push main ──► GitHub Actions ──► ghcr.io/edwintchakounte/humanbcorp:latest
                                               │
                                      (serveur) docker compose pull && up -d
                                               │
@@ -23,7 +27,7 @@ le workflow a la permission `packages: write`.
 
 Après le premier push, rendre le package lisible pour le pull serveur :
 - soit garder le package **privé** et utiliser un token pour se logger sur le serveur (voir §2) ;
-- soit le passer **public** : GitHub → repo → *Packages* → `algomaat` → *Package settings* → *Change visibility*.
+- soit le passer **public** : GitHub → repo → *Packages* → `humanbcorp` → *Package settings* → *Change visibility*.
 
 ---
 

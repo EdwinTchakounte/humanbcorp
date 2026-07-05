@@ -11,8 +11,8 @@ On avance phase par phase ; cocher au fur et à mesure (`[x]`).
 
 | État | Phase | Acteur | Détail |
 |:---:|-------|--------|--------|
-| [ ] | 0 — DNS | toi | A record `humanbcorp.com` + `www` → VPS |
-| [ ] | 1 — Utilisateur `humanbcorp` | admin | user + groupe docker + dossier stack |
+| [~] | 0 — DNS | toi | ✅ corrigé chez LWS (source = 81.0.246.144) ; propagation cache résolveurs en cours |
+| [x] | 1 — Utilisateur `humanbcorp` | admin | ✅ créé, groupe docker OK (`docker ps` fonctionne) |
 | [ ] | 2 — Clé SSH CI | admin | paire dédiée, publique dans `authorized_keys` |
 | [ ] | 3 — Config GitHub | toi | secrets SSH_* + variables DEPLOY_* |
 | [ ] | 4 — Dépôt stack + `.env` | humanbcorp | fichiers + valeurs de prod |
@@ -71,8 +71,15 @@ On s'y branche **au lieu** d'embarquer notre propre nginx.
 ---
 
 ## Étape 0 — DNS (préalable)
-Créer les enregistrements **A** `humanbcorp.com` **et** `www.humanbcorp.com` → IP du VPS.
-Vérifier : `dig +short humanbcorp.com`.
+DNS géré chez **LWS** (`ns2x.lwsdns.com`). Au départ, `humanbcorp.com` pointait vers
+`91.216.107.201` (parking LWS) au lieu du VPS. **Correction (voie A) :** dans l'espace
+client LWS → Zone DNS de `humanbcorp.com` :
+- **A** `humanbcorp.com` → **`81.0.246.144`** (IP du VPS)
+- **A** `www` → `81.0.246.144` (ou **CNAME** `www` → `humanbcorp.com`)
+
+Vérifier après propagation (TTL ~2 h) : `dig +short humanbcorp.com` doit renvoyer `81.0.246.144`.
+Les phases 1→5 peuvent avancer **en parallèle** de la propagation ; les phases 6→7 (TLS)
+attendent que le DNS résolve vers le VPS.
 
 ## Étape 1 — Créer l'utilisateur de déploiement `humanbcorp` *(admin, root)*
 ```bash
@@ -127,7 +134,7 @@ nano .env               # renseigner SECRET_KEY, POSTGRES_PASSWORD, WEB_IMAGE, E
 - `ALLOWED_HOSTS=humanbcorp.com,www.humanbcorp.com`
 - `CSRF_TRUSTED_ORIGINS=https://humanbcorp.com,https://www.humanbcorp.com`
 - `POSTGRES_DB/USER/PASSWORD` (mot de passe fort)
-- `WEB_IMAGE=ghcr.io/<owner>/<repo>:latest` (le vrai dépôt qui build l'image)
+- `WEB_IMAGE=ghcr.io/edwintchakounte/humanbcorp:latest` (dépôt `EdwinTchakounte/humanbcorp`)
 - `SECURE_SSL_REDIRECT=True`, `SECURE_HSTS_SECONDS=31536000`
 
 ## Étape 5 — Premier démarrage du stack *(utilisateur `humanbcorp`)*
@@ -146,9 +153,9 @@ Ajouter **d'abord uniquement le bloc port 80** de `deploy/nginx/humanbcorp.conf`
 `/home/deploy/afrikamode/backend/deploy/nginx/default.conf`, puis :
 ```bash
 docker exec backend-nginx-1 nginx -t && docker exec backend-nginx-1 nginx -s reload
-# émettre le cert via le certbot mutualisé (ADAPTER le nom du service certbot) :
-docker compose -f /home/deploy/afrikamode/backend/docker-compose.prod.yml run --rm certbot \
-  certonly --webroot -w /var/www/certbot -d humanbcorp.com -d www.humanbcorp.com
+# émettre le cert via le certbot mutualisé (conteneur backend-certbot-1, déjà en service) :
+docker exec backend-certbot-1 certbot certonly --webroot -w /var/www/certbot \
+  -d humanbcorp.com -d www.humanbcorp.com
 ```
 
 ## Étape 7 — Activer le HTTPS *(admin)*

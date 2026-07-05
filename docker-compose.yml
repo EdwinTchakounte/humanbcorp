@@ -25,7 +25,7 @@ services:
 
   web:
     # Image built and pushed by GitHub Actions to GHCR.
-    image: ${WEB_IMAGE:-ghcr.io/fokamfekam/algomaat:latest}
+    image: ${WEB_IMAGE:-ghcr.io/edwintchakounte/humanbcorp:latest}
     restart: unless-stopped
     env_file:
       - .env

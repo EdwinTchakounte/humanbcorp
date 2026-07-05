@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block search_input %}
+	<input name="q" type="text" class="span5" value="{{query}}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+	<div class="row" style="height:auto;  margin-bottom:0px;">
+		        <div class="col-12">
+		            <div class="intro">
+		                <h6 style="color:var(--brand);">Search</h6>
+		                <h2>Results</h2>
+		                <p class="mx-auto"> Here you can see the results of your Search</p> 
+		            </div>
+		        </div>
+	 </div>
+	 <section id="spaceContents"  class="text-center" style="background-color: #efefef;  margin-bottom:50px;">
+	     
+	      <h3>Your Search: {{object_list.query}}</h3>
+	      
+	 	<div id="" style=" padding:3%;" class="row g-4">
+	 	
+	 		
+	 		
+	 	{% for publication in object_list.results %}
+	       
+	        <div id="" class="col-lg-4 col-md-6">
+	       		
+	       		<div   id=""  style="border-radius:10px;"  class="service container">
+	       		      {% if publication.categorie.id == 1 %}
+				       	<img  style="width:80px;"  src="{% static 'img/iconeG.png' %}" alt="">
+				      {% elif publication.categorie.id == 2 %}
+				      		<img  style="width:80px;"  src="{% static 'img/iconeI.png' %}" alt=""> 
+				      {% elif publication.categorie.id == 3 %}
+				      		<img  style="width:80px;"  src="{% static 'img/iconeR.png' %}" alt=""> 
+				      {% elif publication.categorie.id == 4 %}
+				      		<img  style="width:80px;"  src="{% static 'img/iconeD.png' %}" alt=""> 
+				      {% elif publication.categorie.id == 5 %}
+				      		<img  style="width:80px;"  src="{% static 'img/iconeG.png' %}" alt=""> 
+				      {% else %}
+				      		<img  style="width:80px;"  src="{% static 'img/iconeG.png' %}" alt="">
+				      {% endif %}
+				      
+	       			<h5 id=""   style="" > <a  style="text-decoration: none;" href="/publications/{{ publication.id}}"> {{publication.title}} </a> </h5>
+	       			<div id="" class="container" style="background-color:#DAD7CD; border-radius:10px; padding:10px; font-size:15px; font-weight:normal;  margin-bottom:10px;" >
+	       				{% for tag in publication.liste_tags.all %}
+	       				   <span style="" > &nbsp; {{tag.name}} </span> 
+	       					<!--
+	       					{% if tag.name in query.split %}
+							  	<a href="/publications/search/?q={{query.split|join:'+'}}">
+							{% else %}
+							  	<a href="/publications/search/?q={{query.split|join:'+'}}{{tag}}">
+							{%endif%} 
+							-->
+	       				
+	       				{% endfor %}
+	       				<div id="" class="" style="background-color:#fff; color:var(--brand); border-radius:30px; font-size:17px; font-weight:normal; border-radius:0px; width:90%; margin:10px; padding:10px;">
+	       					<p  id="" style="font-family:Helvetica; font-size:15px; font-weight:lighter; color: #46494B;" class="mx-auto"> {{publication.description }} </p>      					
+	       				
+	       				</div>
+	       				<!--
+	       				<a  style="text-decoration: none; color:var(--brand);" href="/publications/{{ publication.id}}"><span id=""  style="margin:1px;" > Plus infos...  </span></a>
+	       				-->
+	       			
+	       			</div>
+	       			
+	       			<div id="content_buy_'+ {{ publication.id}} +'" data-bs-toggle="modal" data-bs-target="#modal-participant-to-add"  class="container" style="background-color:#DAD7CD; border-radius:10px; padding:10px;   margin-bottom:10px;" >
+	       				<div id="price_content_'+ {{ publication.id}} +'"class="" style="background-color:#fff; border-radius:30px; width:90%; margin:10px; padding:10px; font-size:20px; font-weight:normal; color:var(--brand); font-family:Helvetica;">
+	       					
+	       					<span  id="" class="" style="font-size:17px; " > {{publication.price }} EUR </span>
+	       					<i  class="bx bxs-cart" style="float:right; font-size:20px; font-weight:normal; margin:1px;"  >  </i>
+	       				
+	       				</div>
+	       			</div>
+	       			
+	       			<div style="" margin:5 auto">
+	       				
+	       				<a href="/publications/{{ publication.id}}" style="color:#fff; margin:2px; padding:4px;  padding-bottom:7px; width:10%; background-color:var(--brand); text-decoration:none;  text-align:center; border-radius:5px;"> &nbsp; plus d infos... &nbsp; </a>
+	       			
+	       			</div>
+	       			
+	       		</div>
+	 		</div>
+	 	{% endfor %}
+	 	</div>
+	</section>
+
+</div>
+
+
+
+<div class="modal hide fade" id="modal-relation">
+	<div class="modal-header">
+	  <!--a class="close" href="#">X</a-->
+	  <h3>Relation Created</h3>
+	</div>
+	<div class="modal-body">
+	  <p>The Relation between your documents has been created</p>
+	</div>
+	<div class="modal-footer">
+	  <a class="btn close primary" style="opacity:1" href="#">Close</a>
+	</div>
+</div>
+		  
+<div class="modal hide fade" id="modal-relation-false">
+	<div class="modal-header">
+	  <!--a class="close" href="#">X</a-->
+	  <h3>Relation Not Created</h3>
+	</div>
+	<div class="modal-body">
+	  <p>The Relation between your documents already exists</p>
+	</div>
+	<div class="modal-footer">
+	  <a class="btn close primary" style="opacity:1" href="#">Close</a>
+	</div>
+</div>	
+
+{% endblock %}

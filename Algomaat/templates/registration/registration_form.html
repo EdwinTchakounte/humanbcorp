@@ -1,0 +1,89 @@
+
+{% load socialaccount %}
+{% load static %}
+{% block scripts %}
+ 
+    <link rel="stylesheet" href="{% static 'css/register.css' %}" type="text/css">
+
+{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid">
+	
+	 <section  class="text-center" style=" margin-top:-30px;">
+        
+        <div class="register-card">
+
+            <h4>  
+                <a href="/"><img width="200" height="60" src="{% static 'img/LOGO.png' %}" alt=""></a>
+
+            </h4>   
+
+            <h1>Créer un compte</h1>
+        
+            {% if form.non_field_errors %}
+              <div class="error-box">{{ form.non_field_errors }}</div>
+            {% endif %}
+        
+            <form method="post" action="/registration/new_user/" enctype="multipart/form-data"  novalidate>
+              {% csrf_token %}
+                
+              <div>
+                <label for="{{ form.firstname.id_for_label }}">Prénom </label>
+                {{ form.firstname }}
+                {% if form.firstname.errors %}
+                  <p class="error-box">{{ form.firstname.errors|striptags }}</p>
+                {% endif %}
+              </div>
+        
+
+              <div>
+                <label for="{{ form.username.id_for_label }}">Nom d'utilisateur</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                  <p class="error-box">{{ form.username.errors|striptags }}</p>
+                {% endif %}
+              </div>
+        
+              <div>
+                <label for="{{ form.email.id_for_label }}">Adresse email</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                  <p class="error-box">{{ form.email.errors|striptags }}</p>
+                {% endif %}
+              </div>
+              
+             
+              <div>
+                <label for="{{ form.password1.id_for_label }}">Mot de passe</label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                  <p class="error-box">{{ form.password1.errors|striptags }}</p>
+                {% endif %}
+              </div>
+        
+              <div>
+                <label for="{{ form.password2.id_for_label }}">Confirmation du mot de passe</label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                  <p class="error-box">{{ form.password2.errors|striptags }}</p>
+                {% endif %}
+              </div>
+        
+              <button type="submit">S’inscrire</button>
+            </form>
+        
+            <p class="footer-text">
+              Déjà un compte ?
+              <a href="{% url 'registration:login' %}">Se connecter</a>
+            </p>
+        </div>
+      
+
+	 </section>
+
+</div>
+{% endblock %}
+
+

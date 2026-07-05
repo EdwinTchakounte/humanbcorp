@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+
+
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                       <!-- <h6>My Spaces</h6>   /lessonapp/sequence/edit/{{sequence.id}}
+                         <h3 style="color:var(--brand);"><i class='bx bxs-save'></i></h3> -->
+                        <h1 style="color:var(--brand);" > 🛠 {% if form.instance.pk %}Modify{% else %}Create{% endif %} new Project </h1>
+                        
+                        
+                       <p class="mx-auto"> Here you can {% if form.instance.pk %}Modify{% else %}Create{% endif %} new GeekSeek's project.</p>
+                       
+                    </div>
+                </div>
+                
+               		 
+	
+		  
+ </div>
+ <div id=""   class="container" style="padding:10px; margin-bottom:50px; background-color:#efefef;" >
+ 	   
+
+             
+                           <div style=" padding-bottom:10px; background-color:#fff;" class="row g-1 text-center">
+                              	
+                              	<div class="card shadow-sm p-4">
+						<form method="post">
+						    {% csrf_token %}
+						    {{ form.as_p }}
+						    <button type="submit" class="btn btn-brand w-100 mt-3">
+							<i class="fas fa-save"></i> {% if form.instance.pk %}save{% else %}Create{% endif %}
+						    </button>
+						    <a href="{% url 'chat:project_list' %}" class="btn btn-secondary w-100 mt-2">Cancel</a>
+						</form>
+				 </div>
+                              
+                            </div>
+                    
+ 
+ 
+ </div>
+{% endblock %}

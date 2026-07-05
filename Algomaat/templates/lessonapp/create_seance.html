@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                       <!-- <h6>My Spaces</h6>   /lessonapp/sequence/edit/{{sequence.id}}
+                         <h3 style="color:var(--brand);"><i class='bx bxs-save'></i></h3> -->
+                        <h1 style="color:var(--brand);" >Create Seance </h1>
+                        <h4> of Theme: {{ theme.title}}    </h4>
+                        <h4>from  <a href="{% url 'lessonapp:sequence_edit'  sequence_id=sequence_id  %}"> sequence {{ sequence.numero}}    </a></h4>
+                       <p class="mx-auto"> Here you can create new theme's seance .</p>
+                    </div>
+                </div>
+                
+               		 
+	
+		  <div style="display:none;" class="container">
+				    <div class="row text-center justify-content-center gy-4">
+					<div class="col-lg-2 col-sm-6">
+					    <!--<h1 class="display-4">90K+</h1>
+					    <p class="mb-0">Happy Clients</p> -->
+					    <button id="detail1-button"  type="button" class="btn btn-brand bx bxs-save"> Sequence </button>
+					</div>
+					<div class="col-lg-2 col-sm-6">
+					   <!-- <h1 class="display-4">45M</h1>
+					    <p class="mb-0">Lines of code</p> -->
+					    <button id="detail2-button"  type="button" class="btn btn-brand bx bxs-save">  Categorie </button>
+					    
+					</div>
+					<div class="col-lg-2 col-sm-6">
+					   <!-- <h1 class="display-4">190</h1>
+					    <p class="mb-0">Total Downloads</p> -->
+					    <button id="detail3-button"  type="button" class="btn btn-brand bx bxs-save">  Chapter </button>
+					</div>
+					<div class="col-lg-2 col-sm-6">
+					   <!-- <h1 class="display-4">380K</h1>
+					    <p class="mb-0">YouTube Subscribers</p> -->
+					     <button id="detail4-button"  type="button" class="btn btn-brand bx bxs-save"> Classe </button>
+					</div>
+		                  </div>
+                   </div> 
+                 
+ </div>
+ <div id=""   class="container" style="padding:10px; margin-bottom:50px; background-color:#efefef;" >
+ 	   
+ 	   	 
+	 
+        
+       
+            
+            <!-- Seance Form -->
+             
+                           <div style=" padding-bottom:10px; background-color:#fff;" class="row g-1 text-center">
+                               <form method="post" action="/lessonapp/seance/create/{{theme.id}}/{{sequence_id}}" enctype="multipart/form-data" class="p-lg-5 col-12 row g-3">
+                                     {% csrf_token %}
+                                    <div>
+                                        <h4>Create new Seance</h4>
+                                    <p>Here you can create your Seance </p>
+                                    </div>
+                                    {% for field in form %}
+                                             {% if field.field.widget.input_type == "checkbox" %}
+						    <div class="col-lg-6 form-check">
+							{{ field }}
+							{{ field.label_tag }}
+							{% if field.errors %}
+							    <span class="help-inline">{{ field.errors|join:", " }}</span>
+							{% endif %}
+						    </div>
+						{% else %}
+						    <div class="col-lg-6">
+							<label class="form-label">{{ field.label_tag }}</label>
+							{{ field }}
+							{% if field.errors %}
+							    <span class="help-inline">{{ field.errors|join:", " }}</span>
+							{% endif %}
+						    </div>
+						{% endif %}
+
+
+                                    
+                                    {% endfor %}
+                                     
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Create</button>
+                                    </div>
+                                    
+                                  </form>
+                            </div>
+                    
+ 							
+	
+           <!-- end Theme Form -->
+           
+          
+           
+           
+           
+           
+           
+           
+ 
+ 
+ </div>
+
+
+{% endblock %}

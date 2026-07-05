@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Create new meeting's Link Material</h2>
+
+<div class="span9">
+  <!-- Form begin --> 
+    {% if form.non_field_errors %}
+    {% for err in form.non_field_errors %}
+    <div class="alert-message error">
+        <p>{{ err }}</p>
+    </div>{% if not forloop.last %}<br/>{% endif %}
+    {% endfor %}
+    {% endif %}
+    <form action="{% url 'materials:event_new_link'  event_id  %}"  enctype="multipart/form-data" method="post">{% csrf_token %}
+        {% for field in form %}
+          {% if field.errors %}
+            <div class="clearfix error">
+                {{ field.label_tag }}
+                <div class="input">
+                  {{ field }}
+                  <span class="help-inline">{{ field.errors|join:", " }}</span>
+                </div>
+            </div>
+          {% else %}
+            <div class="clearfix">
+                {{ field.label_tag }}
+                <div class="input">
+                  {{ field }}
+                </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+        <div class="clearfix">
+          <div class="input"><input class="btn primary" type="submit" value="Create"/></div>
+        </div>
+    </form>
+  <!-- Form end --> 
+</div>
+{% endblock %}

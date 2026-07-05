@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+
+ 
+<script>
+ var before_s = 0;
+ var before_a = 0;
+ 
+ function loadQuizz(s2, a2, a_counts)
+ {  //alert(s2); alert(a_counts);
+ 	var current_a = a2;
+ 	
+ 	if ( before_s > 0 )
+ 	{
+ 		$('#s_'+before_s).hide();
+ 		$('#s_'+before_s+'_next').hide();
+		$('#s_'+before_s+'_prev').hide();
+		$('#s_'+before_s+'_check').hide();
+ 	
+	 	if ( before_a > 0 )
+	 	{
+	 		$('#s_'+before_s+'_a_'+before_a).hide();
+	 		
+	 	}
+ 	}
+ 	
+ 	$('.corr').hide();
+ 	$('#s_'+s2+'_check').hide();
+ 	$('#s_'+s2).show();
+ 	$('#s_'+s2+'_a_'+current_a).show();
+ 	
+ 	if( a_counts > 0 )
+ 	{
+ 		$('#s_'+s2+'_next').show();
+ 	}
+ 	else
+ 	{
+ 		$('#s_'+s2+'_next').hide();
+ 	}
+ 	
+ 	
+ 	$('#s_'+s2+'_prev').hide();
+ 	
+ 	
+ 	
+ 	before_s = s2;
+ 	before_a = current_a;
+ 	
+ 	
+ 	$('#s_'+s2+'_next').click(function () { 
+
+ 		$('#s_'+s2+'_a_'+current_a).hide();
+		
+		current_a++; 
+		
+		before_s = s2;
+ 		before_a = current_a;
+			
+		$('#s_'+s2+'_a_'+current_a).show();
+		
+				
+		if(current_a < a_counts )
+		{	
+			 $('#s_'+s2+'_next').show();
+			$('#s_'+s2+'_prev').show();
+		}
+		else
+		{
+			$('#s_'+s2+'_next').hide();
+			$('#s_'+s2+'_prev').hide();
+			$('#s_'+s2+'_check').show();
+		}
+		
+		
+		
+	});
+	
+	
+	
+	
+	
+ 	$('#s_'+s2+'_prev').click(function () { 
+
+ 		if(current_a > 1  )
+ 		{
+ 			$('#s_'+s2+'_a_'+current_a).hide();
+ 			$('#s_'+s2+'_check').hide();
+			
+			current_a--;
+			before_s = s2;
+ 			before_a = current_a;
+ 			
+ 			$('#s_'+s2+'_a_'+current_a).show();
+			$('#s_'+s2+'_next').show();
+			if( current_a == a2 )
+			{
+				$('#s_'+s2+'_prev').hide();
+			}
+			else
+			{
+				$('#s_'+s2+'_prev').show();
+			}
+			
+ 			
+ 		}
+ 		
+		
+		
+		
+	});
+		
+        
+        
+        
+        $('#s_'+s2+'_check').click(function () { 
+        
+        	$('.corr').show();
+        	current_a = a2;
+		before_s = s2;
+ 		before_a = current_a;
+        	
+        	$('#s_'+s2+'_check').hide();
+        });	
+			
+ 	
+ 
+ }
+     
+
+  function save_input( input_id, s, a, q, i )
+  {  
+
+   	var checked = 0;
+
+   	if( document.getElementById('s_'+ s +'_a_'+ a +'_q_'+ q +'_i_'+ i).checked )
+   	{
+   		checked = 1;
+   	
+   	}
+   	$.ajax({
+		    url:'/lessonapp/reponse/input/create/'+input_id+'/'+checked,
+		    data: {
+		      
+		    },
+		    type: 'POST', 
+		    success: function (data) 
+		    {
+		       alert(data.success);			
+		         
+		       
+		    }
+		});   
+   	
+   	
+  }   
+  
+  
+  
+  
+  function check_question(s, a, q, i_counts )
+  {
+  	for( j=1; j<= i_counts; j++ )
+  	{
+  		$('#s_'+s+'_a_'+a+'_q_'+q+'_l_'+j).show();
+  	}  
+  }
+   
+  
+  function redirect_file_answer(url)
+  {
+ 	window.location = url;
+     
+  }
+  
+</script> 
+<link href="{% static 'css/read_Theme.css' %}" rel="stylesheet" type="text/css">
+{% endblock %}
+{% block content %}
+
+ <input type="hidden" id="theme_id" name="theme_id" value="{{theme_id}}">
+ <div id="theme_content" class="container" style="height:auto; margin-bottom:400px; " >
+ 	
+ 	 <div class="text-center">
+ 	 	<br/><h2 style="color:var(--brand);" class="title"> {{theme.title}} </h2>
+ 	 	<p>Here you can read Theme </p>
+ 	 </div>
+ 	 
+ 	 
+ 	 <section id="about">
+ 	 	<div class="container">
+ 	 		<div class="row justify-content-center">
+ 	 			<div class="col-lg-4 py-5">
+ 	 				<div class="row">
+ 	 				
+ 	 					<div class="col-12">
+ 	 						<div class="info-box">
+ 	 							<div class="ms-4">
+ 	 								<h5 style="color:var(--brand);">Objectifs</h5>
+ 	 								<ul id="" style="" >
+ 	 								{% for objectif in objectifs  %}
+ 	 									<li> {{ objectif.name }}</li>
+ 	 								{% endfor %}
+ 	 								</ul>
+ 	 							</div>
+ 	 						</div>
+ 	 					</div>
+ 	 				
+ 	 					
+ 	 					<div class="col-12 mt-4">
+ 	 						<div class="info-box">
+ 	 							<div class="ms-4">
+ 	 								<h5 style="color:var(--brand);">Type</h5>
+ 	 								<p> Cours </p>
+ 	 							</div>
+ 	 						</div>
+ 	 					</div>
+ 	 					
+ 	 					
+ 	 					<div class="col-12 mt-4">
+ 	 						<div class="info-box">
+ 	 							<div class="ms-4">
+ 	 								<h5 style="color:var(--brand);" >Seances</h5>
+ 	 								<ul id="" style="" >
+ 	 								{% for seance in seances  %}
+ 	 									<li> {{ seance.title }}</li>
+ 	 								{% endfor %}
+ 	 								</ul>
+ 	 							</div>
+ 	 						</div>
+ 	 					</div>
+ 	 					
+ 	 					
+ 	 				</div>
+ 	 			</div>
+ 	 			
+ 	 			
+ 	 				
+ 	 			<div class="col-lg-5">	
+ 	 				<img src="{% get_static_prefix %}{{theme.image}}" alt="">
+ 	 			</div>	
+ 	 			
+ 	 		</div>
+ 	 	</div>
+ 	 	 
+ 	 </section>
+ 	 
+ 	 
+ 	<b style="color:var(--brand);" class="title">Seances</b>
+	<hr />
+	 {% for seance in seances_dicts  %}
+		<div  class="container" style="background-color: #DAD7CD; padding:10px;   margin-bottom:30px;" >
+		  
+		     {% if  seance.children %}
+			<button id="" style="float:right; width:100px; margin-top:-9px; margin-right:0px;" class="btn btn-brand" data-bs-toggle='modal' data-bs-target='#modal-show-quizz-link' onClick="loadQuizz({{seance.index}}, 1 , {{seance.children_count}});" > 
+				<b>Show</b> 
+			</button>	
+		    {% endif %}    	
+			<h5 style="color:var(--brand);" > 
+				{{ seance.title}}
+			       	   
+			      	{% if seance.type == 0 %}
+				       <span> ( Theorie )   <span>
+				{% elif seance.type == 1 %}
+				       <span> ( Pratique )   <span>
+				{% else %}
+				        <span> ( Exercice )   <span>
+				              
+				{% endif %}
+			 </h5>
+			 
+			 {% for activity in seance.children  %}
+			 <div id="" style="background-color:#fff; width:95%; margin:10px; padding:10px; " class=" ">
+			 	  <b> 
+			 	    {% if activity.control == 1 %}
+					 <span style="color:var(--brand);" >Controle:</span> {{ activity.title}}  
+	        		    {% else %}
+					  <span style="color:var(--brand);" >Activite:</span> {{ activity.title}}  
+				    {% endif %}
+				    
+				    
+				     {% if activity.type == 1 %}
+				     
+				              {% if activity.state == 3 %}   
+				      		 <a href=""  data-bs-toggle='modal' data-bs-target='#modal-show-quizz-link' onClick="loadQuizz({{seance.index}}, {{activity.index}} , {{seance.children_count}});" >
+				      		 	<span style="float:right; color:var(--brand);" > [ Correction Quizz ] </span>
+				      		 </a>
+				      	       {% else %}
+				      	        <a href=""  data-bs-toggle='modal' data-bs-target='#modal-show-quizz-link' onClick="loadQuizz({{seance.index}}, {{activity.index}} , {{seance.children_count}});" >
+				      	         <span style="float:right; color:var(--brand);" > [ Quizz ] </span>
+				      	        </a>
+				      	       {% endif %}
+				     	
+				     
+				     {% else %}
+				     
+				     		 <span style="float:right; color:var(--brand);" > [ &nbsp;PDF&nbsp; ] </span>
+				     
+			 	     {% endif %}
+			 	  </b>  
+			 </div>
+ 			{% endfor %}
+ 		</div>
+ 	 {% endfor %}
+  </div>
+  
+     	
+  
+  
+  
+ <!-- show Quizz Modal -->
+        <div class="modal fade" id="modal-show-quizz-link" tabindex="-1" aria-labelledby="modalQuizzLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                           <!-- <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/c2.jpg' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div> -->
+                            <div  id="activity_contents" class="col-lg-20 text-center">
+                         <h2><span> Theme: </span> <span style="color:var(--brand);">{{ theme.title }}</span></h2>
+                         <br/>
+                        
+                            		 {% for seance in seances_dicts  %}
+                     <div id="s_{{seance.index}}" class="container" style="display:none; background-color: #DAD7CD;  margin-bottom:30px;" >
+                          <h3 ><span> {{seance.index}}- Seance: &nbsp; </span> <span style="color:var(--brand);">{{ seance.title }}</span></h3>
+			   <br/>
+			      	      <div id="" style=" padding-bottom:20px;" class="row g-4">  
+			      	      	
+                                   		{% for activity in seance.children  %}
+                                  	   <div id="s_{{seance.index}}_a_{{activity.index}}" class="container corr" style="display:none; background-color:#fff; width:97%; margin:10px; padding-bottom:15px;" >
+                                   		<h4 style=""> {{seance.index}}.{{activity.index}}- Activity: &nbsp; <span style="color:var(--brand); "> {{activity.title}} </span></h4>
+                                   			
+                                   		 {% if activity.children_components_count   %}
+                                   		 
+                                   		   <div id="s_{{seance.index}}_a_{{activity.index}}_c" class="container" style="background-color:#efefef; width:97%; margin:10px; padding:10px;" >
+                                   		      
+                                   		     
+                                   	               {% for component in activity.children_components  %}	
+                                   	               	{% if component.title %}	
+		                           			<h5 style="color:var(--brand);" > {{component.title}}  </h5>	
+		                           			{% elif component.paragraph %}
+		                           			<p style="color:black; font-size:18px;"> {{component.paragraph}}   </p>
+		                           			{% elif component.image %}
+		                           			
+		                           			<img style="width:{{component.img_width}}px; height:{{component.img_height}}px;"   src="{{component.image}}" />	
+		                           			{% endif %}
+
+                                   			{% endfor %}
+                                   		     
+                                   		     
+                                   		   </div>
+                                   		   
+                                   		{% endif %}	
+                                   		      
+                                   		     <!-- <p>below you can answer Questions</p> -->
+                                   		      
+                                   	 {% if activity.type == 1 %}  
+                                   		   {% for question in activity.children_questions  %}
+                                   		   <div id="s_{{seance.index}}_a_{{activity.index}}_q_{{question.index}}" class="container row g-4" style="background-color:#efefef; width:97%; margin:10px; margin-bottom:20px;" >
+                                   		   
+                                   		  
+                                   			<h6> <span style="color:var(--brand);">{{question.index}}- Question: &nbsp; </span>{{question.title}}</h6>
+                                   			{% if question.description %}
+                                   			<p> {{question.description}}   </p>
+                                   			{% endif %}
+                                   			<b style="margin-top:20px; color:var(--brand);"> Choisir la bonne reponse </b>
+                                   			
+                                   			
+                                   			<div id="" class="row" style="text-align:center; width:90%; margin:5%; margin-top:5px; margin-bottom:10px; padding:10px; background-color:#fff;">
+                                   			   	
+                                   		  	 	{% for input in question.children %}
+		                           			<div id="s_{{seance.index}}_a_{{activity.index}}_q_{{question.index}}_i_{{input.index}}_div" >
+		                           				
+		                           		                  		 
+		                           				{% if input.input_type == 1 %}
+		                           				
+		                           				<input type="checkbox" id="s_{{seance_index}}_a_{{activity.index}}_q_{{question.index}}_i_{{input.index}}"  onclick="save_input( {{input.id}}, {{seance.index}}, {{activity.index}}, {{question.index}}, {{input.index}}  );" name="" value="">
+		                           			        
+		                           				{% elif input.input_type == 2 %}
+		                           				
+		                           				<input type="radio" id="s_{{seance.index}}_a_{{activity.index}}_q_{{question.index}}_i_{{input.index}}" name="" value=""> 
+		                           				 
+		                           				{% endif %}
+		                           				<label style="color:black;" for=""> {{input.title}} </label>
+		                           			               {% if input.is_answer %}
+           <span class="corr" id="s_{{seance_index}}_a_{{activity.index}}_q_{{question.index}}_l_{{input.index}}" style="display:none; color:var(--brand); font-weight: 900; font-size:18px;"> + </span>                      			        	        			       {% else %}
+		      <span class="corr" id="s_{{seance_index}}_a_{{activity.index}}_q_{{question.index}}_l_{{input.index}}" style="display:none;color:var(--brand); font-weight: 900; font-size:18px;"> - </span> 
+		                           			               {% endif %}
+		                           			</div>	 
+		
+                                   		 	 	{% endfor %}
+                                   		 	    	
+                                   		 	    
+                                   		 	 </div>
+                                   		  {% if activity.control == 0 %}	 
+                                   		 	 <div id="" class="container check" style="width:90%; height:60px; margin-top:10px; "> 		
+                                                                         	
+                                   				 <button id="s_{{seance.index}}_a_{{activity.index}}_q_{{question.index}}_check" onclick="check_question({{seance.index}}, {{activity.index}}, {{question.index}}, {{question.children_count}} );" style="width:135px; height:40px; margin-top:1px;" class="btn btn-brand" >
+                                        				<b><i class="bx bxs-analyse"> check</i></b>
+                                        				
+                                        			</button>
+                                   	
+                                  			</div>
+                                  		 {% endif %}	 	
+                                  			  
+                                   		 	 
+                                   		   </div>
+
+                                   		  {% endfor %}
+                                   		  
+                                   		  
+                                   	 {% elif activity.type == 2 %}
+                                   	 	      
+                                   		    {% for doc in activity.children_docs  %}
+                                   		    
+                                   	 <div id="s_{{seance.index}}_a_{{activity.index}}_d_{{doc.index}}" class="container row g-4" style="background-color:#efefef; width:97%; margin:10px; margin-bottom:20px;" >	  
+                                   		
+                                   		 <h6> <span style="color:var(--brand);">{{doc.index}}- Document: &nbsp; </span>{{doc.title}}</h6>
+                                   			{% if doc.description %}
+                                   			<p> {{doc.description}}   </p>
+                                   			{% endif %}
+                                   	
+                                   		<div id="" class="container" style="width:90%; margin:5%; margin-top:5px; margin-bottom:10px; padding:10px; background-color:#fff;">
+                                   		    	{% if doc.m_type == 2 %}
+                                   		    	
+                                   		    	  <a class="btn btn-brand" style=" width:150px; " href="{{ doc.url }}" target="_blank" > <b> Exercice PDF</b> </a>
+                                   		    	 
+                                   		    	{% elif doc.m_type == 1 %}
+                                   		    	
+                                   		    	  <a class="btn btn-brand" style="width:150px; " href="{{ doc.url }}" target="_blank" > <b> Cours PDF</b> </a>
+                                   		    	  
+                                   		  	{% endif %}
+                                   		  	
+                                   		  	
+                                   		  	{% if doc.has_answer %}
+	
+		<button class="btn btn-brand" style="width:150px;  margin-left:5px;"  onClick="redirect_file_answer('/lessonapp/file/create/'+ {{doc.id}} +'/'+ {{seance.id}} + '/'+  {{theme.id}} +'/'+ {{theme.sequence.pk}} + '/' + 41)" target="_blank" > <b> Your Answer</b> </button>
+	
+							{% endif %}		
+                                   		  
+                                   		 </div>
+                                   	</div>	  
+                                       	    {% endfor %}
+                                   	{% endif %}	  
+                                	
+                                	
+                                   	<span style="display:block;" > Page &nbsp; {{ activity.index}} / {{seance.children_count}} </span>
+
+                                  	   </div>
+                                  		
+                                    		{% endfor %}
+                                   
+                                     </div>		
+                                    		
+                                 <div id="" class="container" style="width:90%; height:60px; margin-top:10px; "> 		
+                                       <button id="s_{{seance.index}}_next" onclick="" style=" float:right; width:65px; height:40px; margin-top:1px;  margin-right:10px;" class="btn btn-brand" >
+                                        	<i class="bx bxs-right-arrow"></i> 
+                                        </button>
+                                   	<button id="s_{{seance.index}}_prev" onclick="" style="float:left; width:65px; height:40px; margin-top:1px;  margin-left:10px;" class="btn btn-brand" > 
+                                   		<i class="bx bxs-left-arrow"></i> 
+                                   	</button>
+
+                                   	 <button id="s_{{seance.index}}_check" onclick="" style="  width:150px; height:40px; margin-top:1px;  " class="btn btn-brand" >
+                                        	<b><i class="bx bxs-analyse"> check all </i></b>
+                                        </button>
+
+                                  </div>  		
+                                    		
+                    </div>
+                    			
+
+                               	{% endfor %}
+                         
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+ 
+  
+     	
+  
+{% endblock %}
+

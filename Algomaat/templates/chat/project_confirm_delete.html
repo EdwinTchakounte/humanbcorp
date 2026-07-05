@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                       <!-- <h6>My Spaces</h6>   /lessonapp/sequence/edit/{{sequence.id}}
+                         <h3 style="color:var(--brand);"><i class='bx bxs-save'></i></h3> -->
+                        <h1 style="color:var(--brand);" > ⚠️ Delete Project </h1>
+                        
+                        
+                       <p class="mx-auto"> Are you sure to delete <strong>{{ project.name }}</strong> ?</p>
+                       
+                    </div>
+                </div>
+                
+               		 
+	
+		  
+ </div>
+ <div id=""   class="container" style="padding:40px; margin-bottom:50px; background-color:#efefef;" >
+ 	   
+
+             
+                           <div style="  background-color:#fff;" class="row g-1 text-center">
+                              	
+                              	<div class="card shadow-sm p-4">
+						 <form method="post">
+						    {% csrf_token %}
+						    <button type="submit" class="btn btn-danger">
+							<i class="fas fa-trash"></i> Delete
+						    </button>
+						    <a href="{% url 'chat:project_list' %}" class="btn btn-secondary">Cancel</a>
+						</form>
+				 </div>
+                              
+                            </div>
+                    
+ 
+ 
+ </div>
+{% endblock %}

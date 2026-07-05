@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+
+{% block title %}
+	Human Brain Corporation-RH | Libérer le potentiel humain
+{% endblock %}
+
+{% block content %}
+{% load static %}
+  <!-- SLIDER -->
+    <div class="owl-carousel owl-theme hero-slider">
+
+        <div class="slide slide1">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12 text-center text-white">
+                        <h6 class="text-white text-uppercase">Recrutement · Management des talents · Formation · Externalisation RH</h6>
+                        <h1 class="display-3 my-4">Libérer le<br />potentiel humain</h1>
+                        <p class="lead mb-4">Votre partenaire stratégique en ressources humaines, à Douala et à l'international.</p>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-brand">Contactez-nous</a>
+                        <a href="#services" class="btn btn-outline-light ms-3">Nos services</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="slide slide2">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12 col-lg-10 offset-lg-1 text-white text-center">
+                        <h6 class="text-white text-uppercase">Recrutement local &amp; international</h6>
+                        <h1 class="display-3 my-4">Nous dénichons<br />les profils rares</h1>
+                        <p class="lead mb-4">Un réseau mondial de talents au service de votre performance.</p>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-brand">Trouver un talent</a>
+                        <a href="#services" class="btn btn-outline-light ms-3">Nos services</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         <div class="slide slide3">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12 col-lg-10 offset-lg-1 text-white text-center">
+                        <h6 class="text-white text-uppercase">Formation · Coaching · Conformité RH</h6>
+                        <h1 class="display-3 my-4">Des équipes qui<br />performent durablement</h1>
+                        <p class="lead mb-4">Des résultats tangibles au quotidien.</p>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-brand">Parlons-en</a>
+                        <a href="#pourquoi" class="btn btn-outline-light ms-3">Pourquoi nous</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- ABOUT -->
+    <section id="about">
+        <div class="container">
+            <div class="row justify-content-center align-items-center">
+                <div class="col-lg-6 py-5">
+                    <h6 class="text-gold text-uppercase" style="letter-spacing:2px;font-weight:600;">À propos de nous</h6>
+                    <h2 class="text-brand mb-4">Votre partenaire stratégique RH</h2>
+                    <p>Pionnier dans l'accompagnement RH, <strong>HBC-RH</strong> est votre partenaire stratégique.
+                    Nous dénichons les profils rares à travers le monde, formons vos équipes à performer
+                    durablement, et sécurisons votre conformité RH. Des résultats tangibles au quotidien.</p>
+                    <hr class="hbc-rule">
+                    <div class="row mt-4">
+                        <div class="col-12 mb-3">
+                            <div class="info-box d-flex">
+                                <i class='bx bx-globe' style="font-size:34px;color:var(--brand-gold);"></i>
+                                <div class="ms-3">
+                                    <h5>Un réseau mondial de talents</h5>
+                                    <p>Sourcing local ou international pour dénicher les meilleurs profils.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <div class="info-box d-flex">
+                                <i class='bx bx-cog' style="font-size:34px;color:var(--brand-gold);"></i>
+                                <div class="ms-3">
+                                    <h5>Des solutions RH sur mesure</h5>
+                                    <p>Un accompagnement adapté à la réalité et aux enjeux de votre entreprise.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <div class="info-box d-flex">
+                                <i class='bx bx-shield-quarter' style="font-size:34px;color:var(--brand-gold);"></i>
+                                <div class="ms-3">
+                                    <h5>Un accompagnement juridique complet</h5>
+                                    <p>Conseil en droit social et sécurisation de votre conformité RH.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="https://wa.me/237696305891" style="margin-bottom:10px;" class="whatsapp-link btn btn-brand" target="_blank" aria-label="WhatsApp">
+			  <svg viewBox="0 0 24 24" class="whatsapp-icon">
+			    <path d="M12 0C5.372 0 0 5.372 0 12c0 2.114.548 4.092 1.507 5.821L0 24l6.33-1.507A11.95 11.95 0 0012 24c6.628 0 12-5.372 12-12S18.628 0 12 0zm0 22.05c-1.861 0-3.618-.487-5.17-1.338l-.37-.21-3.755.893.8-3.65-.24-.38A9.98 9.98 0 012.05 12C2.05 6.48 6.48 2.05 12 2.05S21.95 6.48 21.95 12 17.52 21.95 12 21.95zm5.248-7.338c-.284-.142-1.675-.83-1.934-.925-.26-.095-.45-.142-.64.142-.19.284-.735.925-.9 1.115-.166.19-.333.213-.617.071-.284-.142-1.2-.443-2.286-1.414-.845-.753-1.415-1.68-1.58-1.964-.166-.284-.018-.438.124-.58.128-.128.284-.333.425-.5.142-.166.19-.284.284-.474.095-.19.047-.355-.024-.497-.07-.142-.64-1.542-.875-2.11-.23-.553-.465-.478-.64-.487-.166-.007-.355-.009-.545-.009a1.05 1.05 0 00-.76.355c-.26.284-.994.97-.994 2.363 0 1.393 1.02 2.741 1.162 2.927.142.19 2.01 3.067 4.874 4.302.681.294 1.212.47 1.626.603.683.217 1.305.187 1.796.113.548-.082 1.675-.684 1.91-1.345s.236-1.226.166-1.345c-.07-.118-.26-.19-.545-.333z"/>
+			  </svg>
+			  Discuter sur WhatsApp
+			</a>
+                    <span style="margin-bottom:10px;" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-outline-dark ms-2">Demander un devis</span>
+                </div>
+                <div class="col-lg-5 offset-lg-1 text-center">
+                    <img src="{% static 'img/logo-hbc.png' %}" alt="Human Brain Corporation-RH" style="max-width:100%;height:auto;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- SERVICES -->
+    <section id="services" class="text-center bg-light">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="intro">
+                        <h6>Nos expertises</h6>
+                        <h1>Nos services</h1>
+                        <p class="mx-auto">Quatre pôles d'expertise pour transformer vos défis RH en opportunités d'amélioration et de performance.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-4">
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="service">
+                        <i class='bx bx-target-lock' style="font-size:48px;color:var(--brand-gold);"></i>
+                        <h5>Recrutement local &amp; international</h5>
+                        <p>Sourcing local ou international, onboarding et outboarding pour attirer et intégrer les meilleurs profils.</p>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="service">
+                        <i class='bx bx-group' style="font-size:48px;color:var(--brand-gold);"></i>
+                        <h5>Management des talents</h5>
+                        <p>Diagnostic RH, évaluation des compétences et plans de développement pour faire grandir vos équipes.</p>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="service">
+                        <i class='bx bx-book-reader' style="font-size:48px;color:var(--brand-gold);"></i>
+                        <h5>Formation &amp; coaching</h5>
+                        <p>Évaluation des besoins, coaching individuel et collectif, suivi des progrès sur la durée.</p>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="service">
+                        <i class='bx bx-briefcase-alt-2' style="font-size:48px;color:var(--brand-gold);"></i>
+                        <h5>Externalisation RH</h5>
+                        <p>Conseil en droit social et conformité RH, administration du personnel et gestion de la paie.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+
+    <!-- MILESTONE -->
+    <section id="milestone">
+        <div class="container">
+            <div class="row text-center justify-content-center gy-4">
+                <div class="col-lg-3 col-sm-6">
+                    <h1 class="display-4">RH</h1>
+                    <p class="mb-0">Partenaire stratégique</p>
+                </div>
+                <div class="col-lg-3 col-sm-6">
+                    <h1 class="display-4">4</h1>
+                    <p class="mb-0">Pôles d'expertise</p>
+                </div>
+                <div class="col-lg-3 col-sm-6">
+                    <h1 class="display-4">24H</h1>
+                    <p class="mb-0">Délai de réponse</p>
+                </div>
+                <div class="col-lg-3 col-sm-6">
+                    <h1 class="display-4">100%</h1>
+                    <p class="mb-0">Conformité RH visée</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- POURQUOI NOUS -->
+    <section id="pourquoi">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="intro">
+                        <h6>Pourquoi nous ?</h6>
+                        <h1>Ce qui fait la différence</h1>
+                        <p class="mx-auto">Nous vous offrons un réseau mondial de talents, des solutions RH sur mesure et un accompagnement juridique complet.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="service text-center">
+                        <i class='bx bxs-badge-check' style="font-size:40px;color:var(--brand-gold);"></i>
+                        <h5>Expertise éprouvée</h5>
+                        <p>Un savoir-faire RH reconnu et des méthodes structurées.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="service text-center">
+                        <i class='bx bx-bulb' style="font-size:40px;color:var(--brand-gold);"></i>
+                        <h5>Solutions innovantes &amp; sur mesure</h5>
+                        <p>Des réponses adaptées à chaque contexte d'entreprise.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="service text-center">
+                        <i class='bx bx-support' style="font-size:40px;color:var(--brand-gold);"></i>
+                        <h5>Engagement &amp; accompagnement complet</h5>
+                        <p>Un partenaire disponible, de l'analyse du besoin au suivi des résultats.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- CONTACT CTA -->
+    <section id="contact" class="text-center" style="background:linear-gradient(120deg,#0b1c33,#112848);color:#fff;padding:70px 0;">
+        <div class="container">
+            <h2 class="mb-3">Transformez vos défis RH en opportunités</h2>
+            <p class="mb-4" style="color:#cfd8e6;">Grâce à notre expertise RH, vos défis deviennent des opportunités d'amélioration et de performance.</p>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="row gy-3 justify-content-center">
+                        <div class="col-md-4 hbc-contact-item">
+                            <i class='bx bxs-map'></i>
+                            <p class="mb-0">300, Rue Foucault<br>Akwa-Douala</p>
+                        </div>
+                        <div class="col-md-4 hbc-contact-item">
+                            <i class='bx bxs-phone'></i>
+                            <p class="mb-0">+237 696 305 891<br>+237 678 623 424</p>
+                        </div>
+                        <div class="col-md-4 hbc-contact-item">
+                            <i class='bx bxs-envelope'></i>
+                            <p class="mb-0">recrutementhbcrh@gmail.com</p>
+                        </div>
+                    </div>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-brand mt-4" style="background:var(--brand-gold);border-color:var(--brand-gold);">Demander un rendez-vous</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+{% endblock %}

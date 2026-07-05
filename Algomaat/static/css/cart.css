@@ -1,0 +1,101 @@
+article {
+  overflow: hidden;
+}
+
+#loader {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 5px;
+  margin-left: -8px;
+}
+
+#container1 {
+  display: none;
+}
+
+
+.title{
+
+    color:var(--brand);
+}
+.ui-state-default{
+
+   text-align: center;
+     background: #DAD7CD; color:black;
+}
+
+#categoriesGrid0, #categoriesGrid1 {
+  display: none;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  
+}
+
+#categoriesGrid0 li, #categoriesGrid1 li {
+  cursor: pointer;
+  margin: 3px;
+  padding-top: 20px;
+  float: left;
+  width: 388px;
+  height: 60px;
+  text-align: center;
+  vertical-align: middle;
+  
+}
+
+#categoriesGrid0 li:hover, #categoriesGrid1 li:hover {
+  background: var(--brand); color: white;
+}
+
+#categoriesGrid0 li:active, #categoriesGrid1 li:active {
+  background: var(--brand);  color: white;
+}
+
+
+
+
+
+#classesGrid0, #classesGrid1 {
+  display: none;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  
+}
+
+#classesGrid0 li, #classesGrid1 li {
+  cursor: pointer;
+  margin: 3px;
+  padding-top: 20px;
+  float: left;
+  width: 388px;
+  height: 60px;
+  text-align: center;
+  vertical-align: middle;
+  
+}
+
+#classesGrid0 li:hover, #classesGrid1 li:hover {
+
+  background: var(--brand); color: white;
+}
+
+#classesGrid0 li:active, #classesGrid1 li:active {
+  background: var(--brand);  color: white;
+}
+
+
+
+
+
+
+#recipesList0, #recipesList1 {
+   
+ list-style: none;
+  margin: 2px;
+  padding: 4px;
+  position: relative;
+  white-space: nowrap;
+}

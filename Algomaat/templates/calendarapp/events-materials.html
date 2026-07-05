@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+<!--<script src="{% static 'js/show_PAIEMEnts.js' %}" type="text/javascript"></script> -->
+<!-- <link href="{% static 'css/show_paiements.css' %}" rel="stylesheet" type="text/css"> -->
+
+
+	<script>
+
+
+	 	function loadDocument( doc_id )
+	 	{
+	 	
+	 	
+	 	}
+	 	
+	 	function limitToWords(text, maxWords = 3) 
+	 	{ 
+	 	    if (!text) return '';
+		    const words = text.split(/\s+/); 
+		    return words.length > maxWords ? words.slice(0, maxWords).join(' ') + '…' : text;
+		}
+
+
+		function addMaterialToSelect( event_id, id, title, description, has_answer,m_type,owner, doc_id, doc_link )
+		{
+		 
+			materialLine = '<tr id="select_material_' + id + '"  role="row">';
+			materialLine += '<td><span style="color:black;">'+ title +'</span></td>';
+			materialLine += '<td><span style="color:black;">'+  limitToWords(description, 3) +'</span></td>';
+			if( m_type == 1 )
+			{
+				materialLine += '<td><span style="color:black;"> Cours </span></td>';
+
+			}
+			else if( m_type == 2 )
+			{
+				materialLine += '<td><span style="color:black;"> Exercice </span></td>';
+
+			}
+			else if( m_type == 3 )
+			{
+				materialLine += '<td><span style="color:black;"> Reponse Exercice </span></td>';
+
+			}
+			else
+			{
+				materialLine += '<td><span style="color:black;"> Correction </span></td>';
+
+			}
+			materialLine += '<td><span style="color:black;">'+ owner +'</span></td>';
+			if (doc_link) {
+			    materialLine += ' <td><a target="_blank" rel="noopener noreferrer" href="' + doc_link + '" style="color:var(--brand);">show</a></td>';
+			}
+			else 
+			{
+			    materialLine += ' <td> </td>';  
+			}
+			materialLine  += '</tr>'; 
+
+			$('#list_my_materials_'+ event_id).append(materialLine);
+		
+			//participant_ids.push(id.toString());
+			//$('#select_addMaterial_' + id).click(addMaterialClick);
+			/*$('#select_addMaterial_' + id).click(function(){
+
+				$.getJSON('/calendarapp/add_material_to_event/'+ event_id +'/'+ id +'/', function(result){
+					if(result.success)
+					{
+						alert("Material added");
+						window.location.reload();
+
+					}
+				});
+                      
+
+			});  */
+										  
+		
+
+
+		}
+
+
+		function loadMyMaterials(event_id)
+		{
+			
+			$.ajax({
+				url:'/calendarapp/ajax_get_my_materials/'+ event_id,
+				data: {},
+				dataType: 'json',
+				success: function (data) 
+				{
+					$('#list_my_materials_'+ event_id).empty();
+					$('#list_my_materials_'+ event_id).hide();
+					
+					$.each(data, function(key, value) {
+					
+			addMaterialToSelect( event_id, data[key]["id"],data[key]["title"], data[key]["description"],data[key]["has_answer"],data[key]["m_type"],data[key]["owner"],data[key]["doc_id"], data[key]["doc_link"]);
+						
+					
+					});
+					
+					$('#list_my_materials_'+ event_id).show();
+					
+								
+				
+				
+				}
+			});   
+
+
+		}
+
+		function removeMaterial(event_id, material_id)
+		{
+			
+			
+			$.getJSON('/calendarapp/remove_material_from_event/'+ event_id +'/'+ material_id +'/', function(result){
+				if(result.success)
+				{
+					alert("Material removed");
+					window.location.reload();
+
+				}
+			});
+
+		}
+
+	</script>
+
+
+
+
+{% endblock %}
+{% block content %}
+
+<div class="container" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                        <h3 style="color:var(--brand);"><i class='bx bxs-file'></i></h3>
+                        {% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Parent' %}
+                        	<h2> My Materials </h2>
+                        {%  else %}	
+                        	<h2> My Materials </h2>
+                        {%  endif %}	
+                        <p class="mx-auto"> Here you can read all your materials.</p>
+                    </div>
+                </div>
+ </div>
+ <div id="contentsOfPaiements"  class="text-center" style=" margin-top:-30px;">
+  	
+ 		{% for data in  results %}
+       		<div id="paiement" class="container" style="background-color: #DAD7CD;  margin-bottom:50px;" >
+       		{% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Parent' %}
+       			<span class="btn btn-brand bx bxs-cart"  style="background-color:var(--brand); margin-bottom:5px;  margin-top:10px; padding:5px 5px; width:180px;  text-align:center; border-radius: 100px; font-size:14px; color: #fff; font-family:Verdana, sans-serif;" ><b> {{data.price}} EUR</b></span>
+       		{%  endif %}	
+       			
+       			<h3 style="color:var(--brand);"> {{data.title}}</h3>
+       			
+       			<div id="allContents" style=" padding-bottom:20px; margin-top:10px;" class="row g-4">
+       				
+       				{% for event in  data.events %}
+       				<div id="" class="container" style="background-color:#fff; width:80%; margin-left:8%; margin-rigth:8%; margin-top:20px;" >
+       					<a  style="float:right;" class="btn btn-brand"   onclick="event.preventDefault(); loadMyMaterials({{event.id}});" href="#"> Show Materials</a>
+       					<h4 style=""> {{event.title}} </h4>
+       					<span style="color:var(--brand); ">[ {{event.start}}  &nbsp;&nbsp; to &nbsp;&nbsp; {{event.end}}  ]</span>
+						
+						<table style="background-color:#efefef; width:97%; margin:10px;" class="bordered-table zebra-striped">
+       						<thead>
+       							<tr>
+       								<th> Document  </th>
+       								<th> Description  </th>
+       								<th> Type  </th>
+       								<th> Posted by </th>
+       								<th> Show </th>
+       							</tr>
+       						</thead>
+       						<thead>
+       						     						
+       						<tbody id="list_my_materials_{{event.id}}">		
+       							
+       						</tbody>
+       					</table>
+       				</div>
+       				{% endfor %}
+       			</div>
+       		
+       		
+       		</div>
+ 		{% endfor %}
+ 
+ </div>
+
+
+
+
+
+{% endblock %}

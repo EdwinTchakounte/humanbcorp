@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block scripts %}
+<script src="{% static 'js/jit.js' %}" type="text/javascript"></script>
+<script src="{% static 'js/SPacetrEe.js' %}" type="text/javascript"></script>
+
+
+<link href="{% static 'css/spaceTree.css' %}" rel="stylesheet" type="text/css">
+
+
+{% endblock %}
+
+{% block content %}
+<div class="row" style="height:auto;  margin-bottom:10px;">
+ 		 <div class="col-12">
+ 			 {% if sequence.pk %}	
+ 		<!-- 
+ 		<a class="btn btn-brand bx bxs-left-arrow" style="margin:10px; color:#fff;text-decoration:none;"  href="{{request.META.HTTP_REFERER}}">        
+                           <b>back</b>
+               </a>
+                -->
+                       {% else %}  
+                       
+                       {% endif %} 
+                      <!-- <button id="" style="float:right; margin:10px; height:40px;" class="btn btn-brand" > <b>?</b> </button>-->
+                </div>
+                
+                <div class="col-12">
+                  
+                   <div class="intro">
+                      
+                        <input type="hidden" id="sequenceId" name="sequenceId" value="{{sequence.id}}">
+                        <h3> Edit sequence {{sequence.numero}} </h3>
+                        <p class="mx-auto"> here you can edit sequence {{sequence.numero}}  </p>
+                        
+                        			
+                    </div>
+                </div>
+ </div>
+ 
+ 
+ <input type="hidden" id="treeType" name="treeType" value="2">
+ <section id=""  class="text-center" style=" margin-top:-30px;">
+ 	<div  class="container" style="background-color: #efefef;  margin-bottom:0px;" >
+       		
+       	<h4 style="color:var(--brand);" > Related modules: </h4>
+       	<h4 style="color:var(--brand);" > <i class='bx bxs-hand-down'></i></h4>
+       	
+       	<div id="infovis" style=" padding-bottom:20px; width:100%; height:800px;" class="row ">
+       		
+       		
+			
+       	
+       	
+       	</div>
+               <div id="log" style="visibility:hidden"></div>
+               
+ 	</div>
+ 	<div class='container' style="margin-left:3%; width:80%; height:30px;">
+               <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:var(--brand); text-decoration:none;  text-align:center; border-radius:5px;"> 
+               	Sequence
+               </span>
+               
+               <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#78290F; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Theme
+               </span>
+                <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#F35B04; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Seance
+               </span>
+                 <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#CA6702; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Objectif
+               </span>
+                <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#590D22; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Activity
+               </span>
+                <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#3D2C2E; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Question
+               </span>
+               <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#D90429; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Component
+               </span>
+                <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#A63446; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Checkbox
+               </span>
+                
+                 <span  style="color:#fff; margin:2px; padding:4px; width:10%; background-color:#710000; text-decoration:none;  text-align:center; border-radius:5px;"> 
+                	Radio
+               </span>
+                
+        </div>
+ 	
+ 
+ </section>
+
+
+
+
+
+
+<!-- Add Objectif Modal -->
+   <div class="modal fade"   id="modal-add-objectif-link" tabindex="-1" aria-labelledby="modalAddObjectifLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl" style="width:500px; height:300px;" >
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid" >
+                        <div class="row" style="padding-top:20px;" >
+                                   
+                                 <div>
+                                        <h4> create Objectif</h4>
+                                    	 <p>Here you can create your new objectif </p>
+                                 </div>
+                                 <form method="post" action="/lessonapp/objectif/create/" id="make-new-objectif" class="">
+                                    	{% csrf_token %}
+                                    	     <input type="hidden" id="theme_id" name="theme_id" value="1">
+                                    	     <input type="hidden" id="t_sequence_id" name="sequence_id" value="{{sequence.id}}">
+		                            <div class="">
+		                                <label for="objectif_name" style="color:black;" class="form-label"> Objectif name:</label>
+		                                <input type="text" class="text-center" style="width:300px;" name="name" class="form-control" placeholder="Enter the Objectif name ..." id="new_objectif_name"
+		                                    aria-describedby="emailHelp">
+		                            </div>
+		                            <br /> <br />                                  
+		                            <div class="text-center" style="margin-bottom:20px;">
+		                                <button type="submit" class="btn btn-brand">Create</button>
+		                            </div>
+		                         
+                                  </form>     
+                          
+                           
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+    
+    
+    
+
+
+
+<!-- Add Note Modal -->
+   <div class="modal fade"   id="modal-add-points-number-link" tabindex="-1" aria-labelledby="modalAddNoteLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl" style="width:500px; height:300px;" >
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid" >
+                        <div class="row" style="padding-top:20px;" >
+                                   
+                                 <div>
+                                        <h4 id="update_value_title">  Update Point</h4>
+                                    	 <p> select the correspondant activity and then update the question's point </p>
+                                    	 <hr/>
+                                    	  <div id="selectActivity" class="row" style="display:none; overflow-y:scroll; margin:30px; padding:5px; background-color:#EDF2F4;  width:90%; height:200px;"> 
+                                            
+                                            
+                                         </div>
+                                    	 
+                                    	 
+                                 </div>
+                                 <form method="post" action="/lessonapp/question/update_value/" id="make-new-value" style="display:none;">
+                                    	{% csrf_token %}
+                                    	     <input type="hidden" id="form_question_id" name="question_id" value="">
+                                    	     <input type="hidden" id="form_activity_id" name="activity_id" value="">
+                                    	      <input type="hidden"  name="sequence_id" value="{{sequence.id}}">
+                                    	      <input type="hidden" id="form_case" name="case" value="">
+		                            <div class="">
+		                                <label for="new_value" style="color:black;" class="form-label" id="label_value_title" > new Point:</label>
+		                                <input type="text" class="text-center" style="width:300px;" name="value" class="form-control" placeholder="Enter the new value ..." id="new_value"
+		                                    aria-describedby="emailHelp">
+		                            </div>
+		                            <br /> <br />                                  
+		                            <div class="text-center" style="margin-bottom:20px;">
+		                                <button type="submit" class="btn btn-brand">update</button>
+		                            </div>
+		                         
+                                  </form>     
+                          
+                           
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+      
+    
+ 
+    
+    
+    
+    
+    
+   
+    
+
+
+
+
+
+
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                       <!-- <h6>My Spaces</h6>   /lessonapp/sequence/edit/{{sequence.id}}
+                         <h3 style="color:var(--brand);"><i class='bx bxs-save'></i></h3> -->
+                        <h1 style="color:var(--brand);" >Create Examen </h1>
+                        <h4>for  <a href="{% url 'lessonapp:sequence_edit'  sequence_id=sequence.id  %}"> sequence {{ sequence.numero}}    </a></h4>
+                       <p class="mx-auto"> Here you can create new sequence's examen .</p>
+                    </div>
+                </div>
+                
+		 
+ </div>
+ <div id=""   class="container" style="padding:10px; margin-bottom:50px; background-color:#efefef;" >
+ 	   
+ 	   	 
+	 
+        
+       
+            
+            <!-- Theme Form -->
+             
+                           <div style=" padding-bottom:10px; background-color:#fff;" class="row g-1 text-center">
+                               <form method="post" action="/lessonapp/examen/create/{{sequence.id}}" enctype="multipart/form-data" class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div>
+                                        <h4>Create new Examen</h4>
+                                    <p>Here you can create your examen </p>
+                                    </div>
+                                    {% for field in form %}
+                                      {% if field.errors %}
+		                            <div class="col-lg-6">
+		                                <label for="" class="form-label">{{ field.label_tag }}</label>
+		                                <div class="form-control">
+		                                	{{ field }}
+		                                	<span class="help-inline">{{ field.errors|join:", " }}</span>
+		                                </div>
+		                                
+		                            </div>
+                                    	{% else %}
+		                            		                             
+		                              <div class="col-lg-6">
+		                                <label for="" class="form-label">{{ field.label_tag }}</label>
+		                                <div class="form-control">
+		                                	{{ field }}
+		                                </div>
+		                             </div>
+		                             
+		                       {% endif %}
+                                    {% endfor %}
+                                     
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Create</button>
+                                    </div>
+                                </form>
+                            </div>
+                    
+ 							
+	
+           <!-- end Theme Form -->
+           
+          
+           
+           
+           
+           
+           
+           
+ 
+ 
+ </div>
+
+
+{% endblock %}

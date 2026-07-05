@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+<!--<script src="{% static 'js/show_PAIEMEnts.js' %}" type="text/javascript"></script> -->
+<!-- <link href="{% static 'css/show_paiements.css' %}" rel="stylesheet" type="text/css"> -->
+
+
+
+
+
+
+
+<script>
+
+
+function from_reseravtion_make_order( reservation_id )
+{
+	url = '/bucket/from_reseravtion_make_order/'+ reservation_id;
+	$.getJSON(url, function(json) {
+	if( json.success )
+	{
+	  window.location.reload();
+	
+	 
+	}
+	
+	
+	});
+
+
+
+}
+
+
+
+
+
+  function  addReservation( publication_id, publication_title, publication_price, events, list_attente, email_parent, telephone_parent, admin, reservation_id, selector )
+  {
+     reservationLine ='<div class="container" style="background-color: #DAD7CD;  margin-bottom:50px;" >';
+        if( admin && !list_attente)
+        {
+        	 reservationLine +='<button onclick="from_reseravtion_make_order('+ reservation_id +');" class="btn btn-brand bx bxs-cart"  style="float:right; background-color:var(--brand); margin-bottom:5px;  margin-top:10px; padding:5px 5px; width:30px;  text-align:center; border-radius: 100px; font-size:14px; color: #fff; font-family:Verdana, sans-serif;" ></button>';
+        }
+  	
+  	if( list_attente)
+  	{
+  	     reservationLine += '<span class="btn btn-brand" ' +
+                   'style="background-color:var(--brand); margin:10px 0 5px 0; padding:5px; width:400px; text-align:center; border-radius:100px; font-size:14px; color:#fff; font-family:Verdana, sans-serif;">' +
+                   '<b>Dans la liste d\'attente pour la séance de test gratuite</b>' +
+                   '</span>';
+
+  	}
+  	else
+  	{
+  	    reservationLine +='<span class="btn btn-brand bx bxs-cart"  style="background-color:var(--brand); margin-bottom:5px;  margin-top:10px; padding:5px 5px; width:250px;  text-align:center; border-radius: 100px; font-size:14px; color: #fff; font-family:Verdana, sans-serif;" ><b> Séance de Test Gratuite </b></span>';
+  	}
+  	
+  	    reservationLine +=' <h3 style="color:var(--brand);">'+ publication_title +'</h3>';
+  	    reservationLine +='<div id="allContents" style=" padding-bottom:20px; margin-top:10px;" class="row g-4">';
+  	    	       data2 = events;
+  		       $.each(data2, function(key2, value2) {
+  			reservationLine +='<div id="" class="container" style="background-color:#fff; width:80%; margin-left:8%; margin-rigth:8%; margin-top:20px;" > ';
+  			  	reservationLine +='<h4 style=""> '+ data2[key2]["title"] +' </h4>';
+  			  	reservationLine += ' <span style="color:var(--brand);">[ Du &nbsp;&nbsp; ' 
+                  + data2[key2]["start_time"] 
+                  + ' &nbsp;&nbsp; au &nbsp;&nbsp; ' 
+                  + data2[key2]["end_time"] 
+                  + ' ]</span>';
+
+  			  	
+  			  	
+  		      if( admin)
+  		      {
+  		      	  	    reservationLine +=' <h6><span style="color:var(--brand);" >Email du Parent: &nbsp;</span>'+ email_parent +'</h6>';
+  		      		   reservationLine +=' <h6><span style="color:var(--brand);" >Telephone du Parent: &nbsp;</span>'+ telephone_parent +'</h6>';
+  		      }
+  			  	reservationLine +='<table style="background-color:#efefef; width:97%; margin:10px;" class="bordered-table zebra-striped"> ';	
+  					reservationLine +=' <thead><tr> <th> Theme  </th> <th> Type  </th>  <th> Classes  </th> <th> Url  </th>  </tr></thead>';
+  					reservationLine +='<tbody>';
+  					reservationLine +='</tbody>';
+  				
+  				reservationLine +='</table>';
+  	
+  			reservationLine +='</div>';
+  			});
+  	    reservationLine +='</div>';
+  
+     reservationLine +='</div>';
+     $(selector).append(reservationLine);
+      //$('#select_addParticipant_' + id).click(addParticipantClick);
+  
+  }
+  
+  
+
+   url= "/bucket/ajax_get_reservations";
+	$.getJSON(url, function(data) {
+	$('#contentsOfreservations').empty();
+	if( data.length > 0 )
+	{
+		$.each(data, function(key, value) {
+			  addReservation( data[key]["id"],data[key]["title"],data[key]["price"],data[key]["events"], data[key]["list_attente"], data[key]["email_parent"], data[key]["telephone_parent"],data[key]["admin"], data[key]["reservation_id"], '#contentsOfreservations' );
+	        });
+	        
+		$('#contentsOfreservations').show();	
+	}
+	else
+	{	
+	 	$('#contentsOfreservations').hide();	
+	}
+	
+	
+	});
+
+</script>
+{% endblock %}
+{% block content %}
+
+<div class="container" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                        <h3 style="color:var(--brand);"><i class='bx bxs-pencil'></i></h3>
+                        {% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Parent' %}
+                        	<h2> My children's course dates </h2>
+                        {%  else %}	
+                        	<h2> My lessons </h2>
+                        {%  endif %}	
+                        <p class="mx-auto"> Here you can read all your children's course dates.</p>
+                    </div>
+                </div>
+ </div>
+ <div id="contentsOfPaiements"  class="text-center" style=" margin-top:-30px;">
+ 
+ 		<div id="contentsOfreservations"  class="text-center" style="display:none; width:100%;">
+ 		
+ 		
+ 		</div>
+ 	
+ 		{% for event_themes in  results %}
+       		<div id="paiement" class="container" style="background-color: #DAD7CD;  margin-bottom:50px;" >
+       		{% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Parent' %}
+       			<span class="btn btn-brand bx bxs-cart"  style="background-color:var(--brand); margin-bottom:5px;  margin-top:10px; padding:5px 5px; width:180px;  text-align:center; border-radius: 100px; font-size:14px; color: #fff; font-family:Verdana, sans-serif;" ><b> {{event_themes.price}} EUR</b></span>
+       		{%  endif %}	
+       			
+       			<h3 style="color:var(--brand);"> {{event_themes.title}}</h3>
+       			
+       			<div id="allContents" style=" padding-bottom:20px; margin-top:10px;" class="row g-4">
+       				
+       				{% for event in  event_themes.events %}
+       				<div id="" class="container" style="background-color:#fff; width:80%; margin-left:8%; margin-rigth:8%; margin-top:20px;" >
+       					<h4 style=""> {{event.title}} </h4>
+       					<span style="color:var(--brand); ">[ {{event.start_time}}  &nbsp;&nbsp; to &nbsp;&nbsp; {{event.end_time}}  ]</span>
+						
+						<table style="background-color:#efefef; width:97%; margin:10px;" class="bordered-table zebra-striped">
+       						<thead>
+       							<tr>
+       								<th> Theme  </th>
+       								<th> Type  </th>
+       								<th> Classes  </th>
+       								<th> Url  </th>
+       							</tr>
+       						</thead>
+       						<thead>
+       						     						
+       						<tbody>		
+       							{% for event_theme_objects in event.eventthemes %}
+       							     {% for event_theme in event_theme_objects %}
+       								<tr>
+	       								<th style="color:var(--brand);" > {{event_theme.theme.title}}  </th>
+	       								{%  if event_theme.theme.t_type == 1  %} 
+	       									<th style="color:var(--brand);"> Cours </th>
+	       								{% else %} 
+	       									<th style="color:var(--brand);" > Examen </th>
+	       								 {% endif %} 
+	       								 
+	       								 <th style="color:var(--brand);" > 
+	       								  {% for classe in event_theme.theme.classes.all %}
+	       								  
+	       								 	<span> {{classe.name}}   </span><br/>
+	       								
+										  {% endfor %}
+	       								 </th>
+	       								  
+	       								 
+	       								 
+	       								<th> <a target="_blank" rel="noopener noreferrer" href="{{event_theme.link_url}}"  style="color:var(--brand);" > show </a>  </th>
+       								</tr>
+       							      {% endfor %}
+       							{% endfor %}
+       						</tbody>
+       					</table>
+       				</div>
+       				{% endfor %}
+       			</div>
+       		
+       		
+       		</div>
+ 		{% endfor %}
+ 
+ </div>
+
+
+
+
+
+{% endblock %}

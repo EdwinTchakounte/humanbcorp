@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+<script src="{% static 'js/show_lessons.js' %}" type="text/javascript"></script> 
+<link href="{% static 'css/show_All_Lessons.css' %}" rel="stylesheet" type="text/css">
+{% endblock %}
+{% block content %}
+
+<div class="container" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                       <!-- <h6>My Spaces</h6>   /lessonapp/sequence/edit/{{sequence.id}}
+                         <h3 style="color:var(--brand);"><i class='bx bxs-save'></i></h3> -->
+                        <h1 style="color:var(--brand);" >Read lessons </h1>
+                         <p class="mx-auto"> Here you can read the lessons.</p>
+                    </div>
+                </div>
+                 
+ </div>
+ <div id=""   class="container" style="width:900px; padding:10px; margin-bottom:50px; background-color:#efefef;" >
+ 	   
+ 	               <div style=" width:95%; margin:18px; padding-bottom:10px; background-color:#fff;" class="row text-center">
+ 	                        <div class="row text-center">
+	 	                          <b>  
+	 	                               <span id="session_title" class="title"> Session </span>  
+	 	                                 <i id="session_icon" style="display:none;" class='bx bxs-right-arrow'></i> 
+	 	                             
+	 	                               <span id="sequence_title" style="display:none;" class="title">  Sequences  </span>
+	 	                                  <i id="sequence_icon" style="display:none;" class='bx bxs-right-arrow'></i>
+	 	                               <span id="sequence_theme" style="display:none;" class="title">  Themes  </span>
+	 	                           </b> 
+	 	                        	
+	 	                       
+ 	                          </div>
+ 	                        
+			            
+                                   <div id="container0" style="" class="">
+                                       	
+                                       
+			            </div>
+
+			            <div id="container1" class="" >
+					
+					
+					
+				     </div>
+                        </div>
+                    
+ 							
+
+ </div>
+
+
+{% endblock %}

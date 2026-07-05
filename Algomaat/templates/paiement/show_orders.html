@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+<link href="{% static 'css/cart.css' %}" rel="stylesheet" type="text/css"> 
+<script src="{% static 'js/show_MY_ORDers.js' %}" type="text/javascript"></script> 
+
+<script  type="text/javascript" >
+  
+ var currentDiv = 0; 
+  	 
+ function getContent(choice, reverse)
+{   
+
+
+	if( choice == 1 ) 
+	{  
+
+	              $('#options_title2').text("");
+	              $('#options_title2').hide();
+	              $('#options_icon').hide();	                
+		      $('#paiment_manuel_div').hide();
+	              $('#container' +  currentDiv).empty();
+	              $('#container' +  currentDiv).show();
+		      
+		       /* create category list */
+		       $('<ul />', {id: 'categoriesGrid' + currentDiv}).appendTo('#container' + currentDiv);
+		      
+			 $('<li />', {
+			   class: 'ui-state-default',
+			   id: 'pay_paypal',
+			   text:" Paiement by PayPal "
+			 }).appendTo('#categoriesGrid' + currentDiv);
+			 
+			  $('<li />', {
+			   class: 'ui-state-default',
+			   id: 'pay_mobile',
+			   text:"Paiement by Mobile Money"
+			 }).appendTo('#categoriesGrid' + currentDiv);
+			 
+			  $('<li />', {
+			   class: 'ui-state-default',
+			   id: 'Pay_bankcart',
+			   text:"Pay by Bank Cart"
+			 }).appendTo('#categoriesGrid' + currentDiv);
+			 
+			  $('<li />', {
+			   class: 'ui-state-default',
+			   id: 'pay_manuel',
+			   text:"Manual Paiement"
+			 }).appendTo('#categoriesGrid' + currentDiv);
+
+
+
+
+			 /* add click event */
+			 $('#pay_paypal').click(function() {
+			     //window.location = '/lessonapp/read_lessons/';
+			 });
+		        $('#pay_mobile').click(function() {
+			      //slideTo(2, false);
+			 });
+			 
+			  $('#Pay_bankcart').click(function() {
+			      //slideTo(3, false);
+			 });
+			 
+			 $('#pay_manuel').click(function() {
+			      
+			       slideTo(4, false);
+
+			 });
+			 
+			
+
+		     /* show list */
+		     $('#categoriesGrid' + currentDiv).show();
+ 		
+ 		        /* hide loader */
+			 $('#loader').fadeOut('fast');
+		
+		   
+			      	
+	      
+	      
+	}
+	else if( choice == 2 ) 
+	{
+	}
+	else if( choice == 3 ) 
+	{
+	     
+	}
+	else if( choice == 4 ) 
+	{          
+	              var montant = $('#totalPrice').text();
+	       
+	              $('#paiment_manuel_div').show();
+	               $('#montant_form').val(montant);
+	                $('#options_icon').show();
+	                $('#options_title2').text("Paiement manuel");
+	                $('#options_title2').show();
+	                
+	}
+	
+	
+
+
+}
+ 
+ 
+ 
+ 
+ 
+ function slideTo( choice, reverse) 
+ {
+	  prevDiv    = currentDiv;
+	  currentDiv = (currentDiv + 1) % 2;
+
+	  /* show loader */
+	  $('#loader').fadeIn('fast');
+
+	  /* decide which direction to move */
+	  d1 = 'left'; d2 = 'right';
+	  if( reverse == true ) {
+	    d1 = 'right'; d2 = 'left';
+	  }
+
+	  /* clear containers */
+	 // $('#container' + currentDiv).empty();
+	  
+	 
+	  /* update content */
+
+	  	getContent(choice, !reverse);
+	  
+
+	  /* slide-move */
+	  $('#container' + prevDiv).hide('drop', {direction: d1}, 200, function() {
+	    $('#container' + currentDiv).show('drop', {direction: d2}, 200);
+	    //$('#container' + prevDiv).empty();
+	  });
+  
+  }
+ 
+   
+ function show_paiement( orderId )
+ {
+	var montant = $('#total_price_order_'+orderId).val();
+	$('#totalPrice2').text(montant);
+	$('#totalPrice2').show();
+	$('#order_id_form').val(orderId);
+	$('#montant_tranche_form').hide();
+	currentDiv = 0;
+	getContent(1, true);
+ }
+	
+	  
+  </script> 
+
+<!-- <link href="{% static 'css/show_paiements.css' %}" rel="stylesheet" type="text/css"> -->
+
+{% endblock %}
+{% block content %}
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                        <h3 style="color:var(--brand);"><i class='bx bxs-purchase-tag'></i></h3>
+                        <h2> List of Orders </h2>
+                        <p class="mx-auto"> Here you can read my orders.</p>
+                    </div>
+                </div>
+ </div>
+ <div id="contentsOfOrders"  class="text-center" style=" margin-top:-30px;">
+ 	
+       
+       
+       
+ 
+ 
+ </div>
+
+
+
+
+
+
+<!-- paiement Modal -->
+   <div class="modal fade" id="modal-paiement" tabindex="-1" aria-labelledby="modalPubToLinkLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                          
+                            <div class="col-lg-20 text-center">
+                               
+                                    <div>
+                                        <h1>Paiement</h1>
+                                    <p>Here you can pay your Order</p>
+                                        <h2 style="color:var(--brand);"> Total: <span id="totalPrice2" style="display:none;"> </span></h2>
+                                    </div>
+                                    <hr/>
+                                    
+                                     <div id=""   class="container" style="width:80%; padding:10px; margin-bottom:30px; background-color:#ef;" >
+ 	   
+       					<div style=" padding-bottom:10px; background-color:#fff;" class="row g-1 text-center"> 
+                                  
+				                 	<div class="row text-center">
+			 	                          	<b>  
+				 	                               <a href="#" id="options_title" class="title"> Options </a>  
+				 	                                 <i id="options_icon" style="display:none;" class='bx bxs-right-arrow'></i> 
+				 	                             
+				 	                               <span id="options_title2" style="display:none;" class="title"> 
+				 	                                </span>
+				 	                           
+				 	                           	
+				 	                        </b> 
+			 	                        	
+			 	                       
+		 	                         	 </div> 
+		 	                         	 
+		 	                         	 <div id="container0" style="" class="">
+                                       	
+                                       
+	  						 </div>
+	  						 
+	  						 <div id="container1" style="" class="">
+	  						 
+		  						        <div id="paiment_manuel_div" style=" display:none;padding-bottom:10px; background-color:#fff;" class="row g-1 text-center">
+				         
+										  <div>
+											  <h4>Paiement Manuel </h4>
+											  <p style="color:var(--brand);">Please, choose your payment type and payer </p>
+										  </div>
+										  
+										  <form method="post" action="/paiement/entrant/" id="paiement_manually_form" class="">
+											    	{% csrf_token %}
+						    <input type="hidden" id="order_id_form" name="orderId" value="">
+						    
+						    
+						
+						
+						  <!-- SELECT PAYER -->
+    <label for="payeur_form">Payer</label>
+    <select name="payerId" id="payeur_form" required>
+        <option value="" selected disabled hidden>Choose payer</option>
+        {% for payeur in payeurs %}
+            <option value="{{ payeur.id }}">
+                {{ payeur.first_name }} {{ payeur.last_name }} ({{ payeur.username }})
+            </option>
+        {% endfor %}
+    </select>
+
+    <br/><br/>
+						
+						
+						<!-- PAiement Option -->
+						   				  
+						                       							    			  							<div id="options_paiement_div" style="">
+				 <label for="tranche_name_form">Type</label>		                        							    			  		<select name="tranche_name" id="tranche_name_form">
+						                        							    			  			  <option value="" selected disabled hidden>Choose Paiement type</option>
+					  <option id="tranche_1" value="1">first Tranche</option>
+					 <!-- 
+					  <option id="tranche_2" value="2">second Tranche</option>
+					  <option id="tranche_3" value="3">third Tranche</option> 
+					 -->
+					  <option id="tranche_4" value="4">Entier</option>
+
+				</select>
+				<br/><br/>								
+		         <input type="text" id="montant_tranche_form" name="montant_tranche" placeholder="Enter your amount" value=""/>
+		        	<br/><br/>
+		        	                                    </div>						
+			<button type="submit" id="button_form" style="" class="btn btn-brand">manually Paiement</button>
+												  
+										  </form>          
+										       
+				               
+			    						</div> 
+	  						           
+	  						           
+                                       	
+                                       
+	   						  </div>
+
+  	
+				                    
+				                    
+				                    
+				                    
+				                 </div>
+                                     </div>
+                               
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+
+
+{% endblock %}

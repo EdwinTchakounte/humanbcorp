@@ -1,0 +1,44 @@
+#contentContainer {
+  width: 100%;
+   
+}
+
+.title{
+color: var(--brand);
+}
+#leftContainer {
+  float: left;
+  width: 80%;
+  margin-right: 5px;
+  position: relative;
+  padding: 5px;
+}
+
+#rightContainer {
+  float: left;
+  width: 180px;
+  padding-top: 10px;
+  text-align: center;
+  
+}
+
+#ingredientsList {
+  list-style: circle;
+}
+
+/* use a semi-transparent image for the overlay */
+#contentOverlay {
+  background-color: #eceadf;
+  color: #1f1f1f;
+  border-color: #d9d6c4;
+
+  width:820px;
+  height:600px;
+}
+
+/* container for external content. uses vertical scrollbar, if needed */
+div.contentWrap {
+  height: 600px;
+  overflow-y: auto;
+}
+

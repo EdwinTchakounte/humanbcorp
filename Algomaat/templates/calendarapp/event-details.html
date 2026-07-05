@@ -1,0 +1,865 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+
+{% block title %}Event Details{% endblock title %}
+
+{% block breadcrumb %}
+    <div>
+        <h1><i class="fa fa-th-list"></i> Event Details </h1>
+        <p>All informations about this event.</p>
+    </div>
+    <ul class="app-breadcrumb breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'contents:all_public_spaces' %}"> <i class="fa fa-home fa-lg"></i></a></li>
+        <li class="breadcrumb-item"><a href="#">Details</a></li>
+    </ul>
+{% endblock breadcrumb %}
+
+
+
+{% block content %}
+<div class="container">
+
+
+    		<div class="row text-center justify-content-center gy-4">
+
+			  <div class="col-6 col-md-4 col-lg-2 mb-3">
+			    <button id="detail1-button" type="button" class="btn btn-brand bx bxs-info-circle">Details</button>
+			  </div>
+
+			  <div class="col-6 col-md-4 col-lg-2 mb-3">
+			    <button id="detail2-button" type="button" class="btn btn-brand bx bxl-zoom">Meetings</button>
+			  </div>
+
+			  <div class="col-6 col-md-4 col-lg-2 mb-3">
+			    <button id="detail3-button" type="button" class="btn btn-brand bx bxs-user">Members</button>
+			  </div>
+
+			  <div class="col-6 col-md-4 col-lg-2 mb-3">
+			    <button id="detail4-button" type="button" class="btn btn-brand bx bxs-archive-in">Materials</button>
+			  </div>
+
+			  <div class="col-6 col-md-4 col-lg-2 mb-3">
+			    <button id="detail5-button" type="button" class="btn btn-brand bx bxs-book-reader">Lessons</button>
+			  </div>
+
+		</div>
+
+		                  
+		                  
+
+
+    <div class="col-md-12" style="margin-top:20px;">
+        <div class="tile">
+            <div class="tile-body">
+                <div class="table-responsive">
+                    <div id="sampleTable_wrapper" class="dataTables_wrapper container-fluid dt-bootstrap4 no-footer">
+                        <div class="row">
+                            <div class="col-sm-12">
+                                
+                                
+                                    <div id="detail1" class="clearfix">
+					    <h3 style="color:var(--brand);">Event Name: <span style="color:black;">{{ event.title }}</span></h3>
+					    <p style="color:var(--brand);">From <span style="color:black;">{{ event.start_time }}</span> To <span style="color:black;">{{ event.end_time }}</span></p>
+					    
+					    <p style="color:var(--brand);">Description:  <span style="color:black;">{{ event.description }}</span></p>
+				     </div>
+				     
+				     
+				      <div id="detail2" style="display:none;" class="clearfix">
+					    <h3 style="color:var(--brand);"> Meetings of this Event</span></h3>
+					  					   
+				      </div>
+				      
+				      
+				      <div id="detail21" style="margin:10px; display:none;" class="row">
+						<table class="table table-bordered">
+						    <thead>
+							<tr>
+							  <th style="width: 10px">#</th>
+							  <th>Meeting</th>
+							  <th>Url</th>
+							  {% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Teacher' or  user.groups.all.0.name == 'Second_Admin' %}
+							  <th>Edit</th>
+							  <th>Add</th>
+							  {% endif %} 
+							 
+							</tr>
+						      </thead>
+						      <tbody>
+							{% for meeting in meetings %}
+							<tr role="row text-center">
+								    <td> <span style="color:black;">{{ forloop.counter }}</span></td>
+								    <td>
+								      	      {%  if meeting.m_type == 0 %}
+								      		   <span style="color:black;">  GOOGLE MEET </span>
+								      		
+								      	      {% elif meeting.m_type == 1 %} 
+								      	      
+								      	           <span style="color:black;">  ZOOM </span>
+								      	        
+								      	      {% else %}
+								      	      
+								      	      	    <span style="color:black;">  FACE_TO_FACE </span>
+								      	      
+								     	      {% endif %} 
+								    </td>
+								    <td>
+								{%  if meeting.link_url  %} 
+		
+ <a target="_blank" rel="noopener noreferrer" href="https://{{meeting.link_url}}"  class="btn btn-brand " > {{ meeting.link_url }} </a> 
+                                  {% else %} 
+  					<span   class="btn btn-brand " > en attente ... </span> 
+		    		 		      {% endif %} 
+								    </td>
+
+							{% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Teacher' or  user.groups.all.0.name == 'Second_Admin' %}
+					   
+								    <td>
+		   <span data-bs-toggle="modal" data-bs-target="#modal-edit-meeting" class="btn btn-brand " onclick="update_meeting_link( {{meeting.id}} )">edit</span> 
+								    </td>
+								    
+								     <td>
+		   <span class="btn btn-brand " onclick="duplicated_meeting( {{meeting.id}} )">add </span> 
+								    </td>
+							{% endif %}	
+
+							</tr>
+							{% endfor %}
+							
+													
+						      </tbody>
+						   
+						</table>
+				     	     </div>
+				     	     
+				      
+				      
+				      
+				      
+				     
+				     
+				     
+				       <div id="detail3" style="margin-bottom:20px; display:none;"  class="clearfix">
+					    <h4  style="color:var(--brand);" > Members of this Event</h4>
+						{% if user.groups.all.0.name == 'Admin' or  user.groups.all.0.name == 'Second_Admin' %}	
+					    <a class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#new-member-modal" href="#"> Add Member </a>
+						{% endif %} 
+					</div>
+					
+					
+					<div id="detail31" style="margin:10px; display:none;" class="row">
+						<table class="table table-bordered">
+						    <thead>
+							<tr>
+							  <th style="width: 10px">#</th>
+							  <th>Name</th>
+							  <th>Username</th>
+							 
+							   <th>Email</th>
+							  
+							  <th> Type </th>
+							 
+							  <th>Action</th>
+							  
+							</tr>
+						      </thead>
+						      <tbody>
+							{% for member in eventmember %}
+							<tr role="row">
+							    <td> <span style="color:black;">{{ forloop.counter }}</span></td>
+							    <td><span style="color:black;"> {{ member.user.firstname }}</span></td>
+							    <td><span style="color:black;">{{ member.user.username }}</span></td>
+							     <td>
+							     {% if user.groups.all.0.name == 'Admin' or  user.groups.all.0.name == 'Second_Admin'%}	
+							   	<span style="color:black;">{{ member.user.email }}</span>
+							     {% endif %} 
+							    </td>
+							    <td><span style="color:black;"> Algomaat </span></td>
+								
+							    <td>
+								{% if user.groups.all.0.name == 'Admin' or  user.groups.all.0.name == 'Second_Admin'%}	
+									
+						 <a class="btn btn-brand" href="{% url 'calendarapp:remove_event' member.id %}">Remove</a> 
+								{% endif %} 
+							    </td>
+								
+							</tr>
+							{% endfor %}
+							
+							
+							{% for user1 in users %}
+							<tr role="row">
+							    <td> <span style="color:black;">{{ forloop.counter }}</span></td>
+							    <td><span style="color:black;"> {{ user1.firstname }}</span></td>
+							    <td><span style="color:black;">{{  user1.username }}</span></td>
+							     <td>
+							     {% if user.groups.all.0.name == 'Admin' %}
+							  	<span style="color:black;">{{  user1.email }}</span>
+							     {% endif %} 
+							    </td>
+							    <td><span style="color:black;">Participant</span></td>
+								
+							    <td> </td>
+								
+							</tr>
+							
+							{% endfor %}
+						      </tbody>
+						   
+						</table>
+				     	     </div>
+				     	     
+				     	     
+				     	     
+				     	     
+				     	<div id="detail4"  style="margin-bottom:20px; display:none;"  class="clearfix">
+							<h4 style="color:var(--brand);" > Materials of this Event</h4>
+							<a  style="margin-bottom:10px;" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#new-file-modal" href="#"> Add new File </a>
+							<a  style="margin-bottom:10px;" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#new-link-modal" href="#"> Add new Link </a>
+							
+							<a  style="margin-bottom:10px;" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#modal-message-material" href="#"> Add new Message </a>
+							
+							<a  style="margin-bottom:10px;" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#existing-materials-modal" onclick="loadMyMaterials({{event.id}});" href="#"> Add existing Material</a>
+						</div>
+						<div id="detail41" style="margin:10px; display:none; " class="row">
+							 <table class="table table-bordered">
+							    <thead>
+								<tr>
+								  <th style="width: 10px">#</th>
+								  <th>Title</th>
+								  <th>Description</th>
+								  <th> Type </th>
+								  <th> Posted by </th>
+								  <th> Show </th>
+								  <th> Remove </th>
+								</tr>
+							      </thead>
+							      <tbody>
+								{% for material in materials %}
+								<tr role="row">
+								    <td><span style="color:black;">{{ forloop.counter }}</span></td>
+								    <td><span style="color:var(--brand);">{{ material.title }}</span> </td>
+								    <td><span style="color:black;">{{ material.description }}</span></td>
+								    <td>
+								    	
+								    	 {% if material.m_type == 1 %}
+								     		<span style="color:var(--brand);"> Cours</span>
+								     	 {% elif material.m_type == 2 %}
+								     		<span style="color:var(--brand);"> Exercice</span>
+								     	 {% elif material.m_type == 3 %}
+								     		<span style="color:var(--brand);"> Reponse Exercice </span>
+								      	 {% else %}
+								      		<span style="color:var(--brand);"> Correction</span>
+								     	 {% endif %}
+								    
+								    
+								    </td>
+								     <td>
+								      {% if material.owner.groups.all.0.name == 'Simple_Customer' %}
+								     	<span style="color:black;">  {{ material.owner }} </span>
+								      {% else %}
+								      	<span style="color:black;">  Algomaat </span>
+								      {% endif %}
+								     </td>
+								    <td> 
+							 {% if material.doc_link != None %}
+			 <a class="btn btn-brand" href="{{ material.doc_link }}" target="_blank" > Show </a>
+							{% endif %}	    
+								    </td>
+								    <td>
+								      {% if material.owner == user %}
+								            {% if material.doc_link != None %}
+			<a class="btn btn-brand" onclick="removeMaterial( {{event.id}} , {{material.id}} )" href="">Remove</a>
+									     {% endif %}	    
+									
+								      {% endif %}
+								    </td>
+								</tr>
+								{% endfor %}
+							      </tbody>
+							</table>
+				     		    </div>
+				     		    
+				     		    
+				     		    
+				     		    
+				     		    
+				     		    	     
+				     	       <div id="detail5"  style="margin-bottom:20px; display:none;"  class="clearfix">
+							<h4 style="color:var(--brand);" > Themes of this Event</h4>
+							<a class="btn btn-brand" onclick="loadSessions()" data-bs-toggle="modal" data-bs-target="#new-theme-modal" href="#"> Add Theme </a>
+					       </div>
+					       <div id="detail51" style="margin:10px; display:none; " class="row">
+							 <table class="table table-bordered">
+							    <thead>
+								<tr>
+								  <th style="width: 10px">#</th>
+								  <th>Title</th>
+								  <th> Url</th>
+								  </tr>
+							      </thead>
+							      <tbody>
+								{% for eventtheme in eventthemes %}
+								<tr role="row">
+								    <td><span style="color:black;">{{ forloop.counter }}</span></td>
+								    <td><span style="color:black;">{{ eventtheme.theme.title }}</span> </td>
+								    
+								    <td> <a class="btn btn-brand" href="{{ eventtheme.link_url }}" target="_blank" > show </a></td>
+								  
+								</tr>
+								{% endfor %}
+							      </tbody>
+							</table>
+				     		    </div>
+				     
+				     
+                                
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+
+
+			<!-- Add Member Form-->
+                     
+                      <div class="modal fade" id="new-member-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                                <form method="post" action="{% url 'calendarapp:add_eventmember'  event.id  %}"   class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div>
+                                        <h3>Add New Member to this Event</h3>
+                                    	  <p>Here you can add a new member to this meeting. </p>
+                                    </div>
+                                      {% for field in form_member %}
+		                            <div class="col-lg-6">
+		                                <label for="title" class="form-label">{{ field.label_tag }}</label>
+		                                {{ field }}
+		                            </div>
+                                   
+                                     {% endfor %}
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Add</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+	   <!-- Add new File Form-->                     
+      <div class="modal fade" id="new-file-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                            
+                                 {% if form_file.non_field_errors %}
+				    {% for err in form_file.non_field_errors %}
+					    <div class="alert-message error">
+						<p>{{ err }}</p>
+					    </div>{% if not forloop.last %}<br/>{% endif %}
+				    {% endfor %}
+				  {% endif %}
+                                <form method="post" action="{% url 'calendarapp:event_create_file'  event.id  11 %}"  enctype="multipart/form-data"  class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div  class="col-lg-6">
+                                        <h3>Add New File to this Material</h3>
+                                    	  <p>Here you can add a new file to this material. </p>
+                                    </div>
+                                      {% for field in form_file %}
+                                      
+                                           {% if field.errors %}
+						    <div class="col-lg-6 error">
+							{{ field.label_tag }}
+							<div class="col-lg-6">
+							  {{ field }}
+							  <span class="help-inline">{{ field.errors|join:", " }}</span>
+							</div>
+						    </div>
+					    {% else %}
+				                    <div class="col-lg-6">
+				                        <label for="title" class="form-label">{{ field.label_tag }}</label>
+				                        {{ field }}
+				                    </div>
+                                          {% endif %}
+                                     {% endfor %}
+                                    <div style="margin-top:20px;" class="col-12">
+                                        <button type="submit" class="btn btn-brand">Add</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+    
+    
+    
+    
+       <!-- Add new Link Form-->                     
+      <div class="modal fade" id="new-link-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                            
+                                 {% if form_link.non_field_errors %}
+				    {% for err in form_link.non_field_errors %}
+					    <div class="alert-message error">
+						<p>{{ err }}</p>
+					    </div>{% if not forloop.last %}<br/>{% endif %}
+				    {% endfor %}
+				  {% endif %}
+                                <form method="post" action="{% url 'calendarapp:event_create_link'  event.id  11 %}"  enctype="multipart/form-data"  class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div  class="col-lg-6">
+                                        <h3>Add New Link to this Material</h3>
+                                    	  <p>Here you can add a new link to this material. </p>
+                                    </div>
+                                      {% for field in form_link %}
+                                      
+                                           {% if field.errors %}
+						    <div class="col-lg-6 error">
+							{{ field.label_tag }}
+							<div class="col-lg-6">
+							  {{ field }}
+							  <span class="help-inline">{{ field.errors|join:", " }}</span>
+							</div>
+						    </div>
+					    {% else %}
+				                    <div class="col-lg-6">
+				                        <label for="title" class="form-label">{{ field.label_tag }}</label>
+				                        {{ field }}
+				                    </div>
+                                          {% endif %}
+                                     {% endfor %}
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Add</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+
+
+	  <!-- Add existing Material-->                     
+      <div class="modal fade"  id="existing-materials-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div style="width:65%; height:350px;"  class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0" >
+                    <div class="container-fluid"  >
+                        <div  class="row gy-2">
+                        <!--
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div> 
+                         -->
+
+                            <div id="selectMaterials"  class="col-lg-8 text-center container">
+	 	                          
+ 	                        
+			    </div>
+ 	                               
+			        
+                               
+                               
+                         
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+
+
+
+
+
+<!-- Update meeting Link-->                     
+      <div class="modal fade" id="modal-edit-meeting" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                            
+                                
+                                <form method="post" action="{% url 'calendarapp:update_meeting_link' %}"  enctype="multipart/form-data"  class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div  class="col-lg-6">
+                                        <h3>Update the meeting's url</h3>
+                                    	  <p>Here you can update the url of this meeting </p>
+                                    </div>
+                                     
+                                                <input type="hidden" id="meeting_id_form" name="meeting_id" value="">
+                                                <input type="hidden" name="event_id" value="{{event.id}}">
+                                         
+						    <div class="col-lg-6 error">
+							<label class="help-inline"> URL </label>
+							<div class="col-lg-6">
+							  <input  type="text" id="link_url" name="link_url" value=""/>
+							 
+							</div>
+						    </div>
+					  
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Add</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    
+    
+    
+    
+    
+<!-- add message material-->                     
+      <div class="modal fade" id="modal-message-material" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                            
+                                
+                                <form method="post" action="{% url 'calendarapp:event_create_message' %}"  enctype="multipart/form-data"  class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div  class="col-lg-6">
+                                        <h3>Add the message's material</h3>
+                                    	  <p>Here you can add the message's material of this event </p>
+                                    </div>
+                                     
+                                               
+                                                <input type="hidden" name="event_id" value="{{event.id}}">
+                                                
+                                                  <div class="col-lg-6 error">
+							<label class="help-inline"> Title </label>
+							<div class="col-lg-6">
+							  <input  type="text"  name="title" value=""/>
+							</div>
+						    </div>
+                                         
+						    <div class="col-lg-6 error">
+							<label class="help-inline"> Message </label>
+							<div class="col-lg-6">
+							  <textarea id="message" name="message" rows="5" cols="40" ></textarea>
+							 
+							</div>
+						    </div>
+						    
+					
+						    
+						<div class="col-lg-6 error">
+						    <label>
+							<input type="radio" name="m_type" value="1"> Cours
+						    </label>
+						    <label>
+							<input type="radio" name="m_type" value="2"> Exercices
+						    </label>
+						    <label>
+							<input type="radio" name="m_type" value="4"> Correction
+						    </label>
+						</div>
+												    
+						    
+				  
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Add</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    
+    
+    
+    
+    
+       <!-- Add Theme to Lesson-->                     
+      <div class="modal fade"  id="new-theme-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div style="width:65%; height:350px;"  class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0" >
+                    <div class="container-fluid"  >
+                        <div  class="row gy-2">
+                        <!--
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div> 
+                         -->
+                                   <div class="col-lg-8 text-center container">
+	 	                          <b>  
+	 	                               <span id="session_title" class="title"> Session </span>  
+	 	                                 <i id="session_icon" style="display:none;" class='bx bxs-right-arrow'></i> 
+	 	                             
+	 	                               <span id="sequence_title" style="display:none;" class="title">  Sequences  </span>
+	 	                                  <i id="sequence_icon" style="display:none;" class='bx bxs-right-arrow'></i>
+	 	                               <span id="sequence_theme" style="display:none;" class="title">  Themes  </span>
+	 	                           </b> 
+ 	                           </div>
+ 	                           <input type="hidden" id="eventId" value="{{event.id}}" />
+                            
+                                    <div id="container0" style="margin-bottom:50px;" class="">
+                                       	
+                                       
+			            </div>
+
+			            <div id="container1" style="margin-bottom:50px;" class="" >
+					
+					
+					
+				     </div>
+                               
+                               
+                         
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    
+
+
+
+{% endblock content %}
+
+
+
+
+
+
+
+{% block extrascripts %}
+    <script type="text/javascript" src="{% static 'js/plugins/jquery.dataTables.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plugins/dataTables.bootstrap.min.js' %}"></script>
+    <script type="text/javascript">$('#sampleTable').DataTable();</script>
+    <script type="text/javascript" src="{% static 'js/event_DETAILs.js' %}"></script>
+    <link href="{% static 'css/show_All_Lessons.css' %}" rel="stylesheet" type="text/css">
+
+
+	<script>
+		function duplicated_meeting( meeting_id )
+		{
+			
+			$.getJSON('/calendarapp/duplicate_meeting/'+ meeting_id , function(result){
+					if(result.success)
+					{
+						alert("Meeting duplicated");
+						window.location.reload();
+
+					}
+				});
+		
+		
+		}
+
+		function addMaterialToSelect( event_id, id, title, description, has_answer,m_type,owner,selector )
+		{
+		 
+			materialLine = '<tr id="select_material_' + id + '"  role="row">';
+			materialLine += '<td><span style="color:black;">'+ title +'</span></td>';
+			materialLine += '<td><span style="color:black;">'+ description +'</span></td>';
+			if( m_type == 1 )
+			{
+				materialLine += '<td><span style="color:black;"> Cours </span></td>';
+
+			}
+			else if( m_type == 2 )
+			{
+				materialLine += '<td><span style="color:black;"> Exercice </span></td>';
+
+			}
+			else if( m_type == 3 )
+			{
+				materialLine += '<td><span style="color:black;"> Reponse Exercice </span></td>';
+
+			}
+			else
+			{
+				materialLine += '<td><span style="color:black;"> Correction </span></td>';
+
+			}
+			
+			materialLine += '<td><button type="button" id="select_addMaterial_'+ id +'" class="btn btn-brand bx bxs-plus-circle" style="">  </button></td>';
+			materialLine  += '</tr>'; 
+
+			$(selector).append(materialLine);
+		
+			//participant_ids.push(id.toString());
+			//$('#select_addMaterial_' + id).click(addMaterialClick);
+			$('#select_addMaterial_' + id).click(function(){
+
+				$.getJSON('/calendarapp/add_material_to_event/'+ event_id +'/'+ id +'/', function(result){
+					if(result.success)
+					{
+						alert("Material added");
+						window.location.reload();
+
+					}
+				});
+
+
+			});
+										  
+		
+
+
+		}
+
+
+		function loadMyMaterials(event_id)
+		{
+			
+			$.ajax({
+				url:'/calendarapp/ajax_get_materials/',
+				data: {},
+				dataType: 'json',
+				success: function (data) 
+				{
+					$('#selectMaterials').empty();
+					$('#selectMaterials').append('<br/><br /><h5 style="color:var(--brand);">  Select the material(s) </h5>');
+					$('#selectMaterials').append('<hr/>');
+
+					$('#selectMaterials').append('<table class="table table-bordered"><thead><tr style="color:var(--brand);"><th> Title </th><th> Description </th><th> Type </th><th>  </th></tr></thead><tbody id="list_my_materials" >  </tbody></table>');
+				
+							  
+				
+					$('#selectMaterials').show();
+								  
+							
+
+					$.each(data, function(key, value) {
+					
+			addMaterialToSelect( event_id, data[key]["id"],data[key]["title"], data[key]["description"],data[key]["has_answer"],data[key]["m_type"],data[key]["owner"],'#list_my_materials' );
+						
+					
+					});
+					
+								
+				
+				
+				}
+			});   
+
+
+		}
+
+		function removeMaterial(event_id, material_id)
+		{
+			
+			
+			$.getJSON('/calendarapp/remove_material_from_event/'+ event_id +'/'+ material_id +'/', function(result){
+				if(result.success)
+				{
+					alert("Material removed");
+					window.location.reload();
+
+				}
+			});
+
+		}
+
+	</script>
+
+
+{% endblock extrascripts %}
+
+

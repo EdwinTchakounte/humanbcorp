@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+<h2> Add EventMember </h2>
+<hr/>
+<div style=" height:50px"  class="clearfix">
+  <a style="float:right;" class="btn btn-info right" href="{% url 'calendarapp:calendar' %}"> Calendar </a>
+</div>
+
+<div class="span9">
+	<form method="post">
+	  {% csrf_token %}
+	   {% for field in form %}
+		  <div class="clearfix">
+                	{{ field.label_tag }}
+		        <div class="input">
+		         	{{ field }}
+		        </div>	
+            	  </div>
+	   {% endfor %}	  
+		  <div class="clearfix">
+			<div style="text-align:center;" class="input"><button type="submit" style="margin-left:50px;" class="btn btn-info right"> Submit </button></div>
+		  </div>
+	  </form>
+
+</div>
+
+
+{% endblock %}

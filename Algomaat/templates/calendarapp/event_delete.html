@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+      
+    <div class="container" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                        <h3 style="color:var(--brand);"><i class='bx bxs-trash'></i></h3>
+                       
+                        	<h2> Delete Member of Event </h2>
+                      
+                        <p class="mx-auto"> Here you can delete this event'member.</p>
+                    </div>
+                </div>
+ </div>
+ 
+ 
+ <div   class="text-center" style=" margin-top:-30px;">
+ 	
+ 	<div  class="container" style="background-color: #DAD7CD;  margin-bottom:50px;" >
+ 	
+ 		<h3 style="color:var(--brand);"> Are you sure you want to delete this event? </h3>
+ 		
+ 		<div  style=" padding-bottom:20px; margin-top:10px;" class="row g-4">
+ 			<div  class="container" style="background-color:#fff; width:80%; padding-bottom:15px; margin-left:8%; margin-rigth:8%; margin-top:20px;" >
+ 					 <form action="" method="post">{% csrf_token %}
+						<p>Are you sure you want to delete this event?</p>
+						<button class="btn btn-danger ml-2" type="submit">Confirm</button>
+					  </form>
+ 	
+ 			</div>
+ 	
+ 		</div>
+ 	</div>
+ 
+ 
+ </div>
+{% endblock content %}

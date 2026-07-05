@@ -1,0 +1,163 @@
+/* =========================================================================
+   Human Brain Corporation-RH — charte de marque (surcharge de STYle2.css)
+   Chargé APRÈS STYle2.css pour surcharger l'ancienne identité "Algomaat".
+   Bleu marine : #112848  |  Or : #C49640
+   ========================================================================= */
+
+:root {
+    --brand: #112848;        /* bleu marine HBC */
+    --brand-dark: #0b1c33;
+    --brand-gold: #C49640;   /* or HBC */
+    --brand-gold-dark: #a97f31;
+}
+
+/* ---- Boutons de marque ---------------------------------------------------- */
+.btn-brand {
+    border-color: var(--brand);
+    background-color: var(--brand);
+    color: #fff;
+}
+.btn-brand:hover {
+    background-color: var(--brand-gold);
+    border-color: var(--brand-gold);
+    color: #fff;
+}
+
+/* Bouton "outline" clair sur fond marine -> accent or au survol */
+.btn-outline-light:hover {
+    background-color: var(--brand-gold);
+    border-color: var(--brand-gold);
+    color: #fff;
+}
+
+/* ---- Hero slider : dégradés de marque au lieu des photos "enfants" -------- */
+.slide1,
+.slide2,
+.slide3 {
+    background: linear-gradient(120deg, rgba(11, 28, 51, 0.92), rgba(17, 40, 72, 0.86)),
+                radial-gradient(circle at 80% 20%, rgba(196, 150, 64, 0.35), transparent 45%);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Accent or sur le sur-titre du hero */
+.slide h6.text-uppercase {
+    color: var(--brand-gold) !important;
+    letter-spacing: 1px;
+}
+
+/* ---- Titres de section : filet doré sous les intros ---------------------- */
+.intro h6 {
+    color: var(--brand-gold);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 600;
+}
+.intro h1 {
+    color: var(--brand);
+}
+.intro h1::after {
+    content: "";
+    display: block;
+    width: 70px;
+    height: 3px;
+    background: var(--brand-gold);
+    margin: 14px auto 0;
+    border-radius: 3px;
+}
+
+/* ---- Overlays / éléments qui étaient rouge-orangé ------------------------ */
+#portfolio .overlay,
+.project .overlay {
+    background-color: rgba(17, 40, 72, 0.72) !important;
+}
+
+/* Cartes services : liseré doré au survol */
+.service {
+    border: 1px solid transparent;
+    transition: 0.3s ease;
+    border-radius: 8px;
+    background: #fff;
+    padding: 24px;
+    height: 100%;
+}
+.service:hover {
+    border-color: var(--brand-gold);
+    box-shadow: 0 10px 30px rgba(17, 40, 72, 0.12);
+    transform: translateY(-4px);
+}
+.service h5 {
+    color: var(--brand) !important;
+}
+.service .icon,
+.service i {
+    color: var(--brand-gold);
+}
+
+/* ---- Barre de navigation ------------------------------------------------- */
+.navbar-brand img {
+    width: auto !important;
+    height: 52px !important;
+}
+.top-nav {
+    background-color: var(--brand);
+}
+.top-nav a,
+.top-nav p {
+    color: #fff;
+}
+.top-nav .social-icons a:hover {
+    color: var(--brand-gold);
+}
+.nav-link:hover {
+    color: var(--brand-gold) !important;
+}
+
+/* ---- Chiffres clés (milestone) ------------------------------------------- */
+#milestone {
+    background: var(--brand);
+    color: #fff;
+}
+#milestone .display-4 {
+    color: var(--brand-gold);
+    font-weight: 700;
+}
+
+/* ---- Pied de page -------------------------------------------------------- */
+footer {
+    background: var(--brand-dark);
+    color: #e7ecf3;
+}
+footer .navbar-brand,
+footer h4 {
+    color: #fff;
+}
+footer .dot {
+    color: var(--brand-gold);
+}
+footer .social-icons a {
+    color: #fff;
+}
+footer .social-icons a:hover {
+    color: var(--brand-gold);
+}
+footer a {
+    color: var(--brand-gold);
+}
+
+/* ---- Divers rouges résiduels -------------------------------------------- */
+.text-brand { color: var(--brand) !important; }
+.text-gold { color: var(--brand-gold) !important; }
+.bg-brand { background-color: var(--brand) !important; color:#fff; }
+
+/* Filet doré décoratif réutilisable */
+.hbc-rule {
+    width: 60px; height: 3px; background: var(--brand-gold);
+    border: 0; border-radius: 3px; margin: 12px 0;
+}
+
+/* ---- Section "À propos" & contact --------------------------------------- */
+.info-box h5 { color: var(--brand); }
+#about .display-6, #contact .display-6 { color: var(--brand); }
+.hbc-contact-item i { color: var(--brand-gold); font-size: 22px; }

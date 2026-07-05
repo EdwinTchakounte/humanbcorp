@@ -1,0 +1,512 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block scripts %}
+
+
+    <script>
+    
+                            
+               
+               var index = 0;
+		participant_ids=[];
+		$('#search_participants').empty();
+                $('#button_new').show();
+                $('#button_exist').show();
+               
+    		const form = document.getElementById("register_participant_form");
+    		form.addEventListener("submit", submitHandler);
+    		
+    		function submitHandler(e)
+    		{
+    		  
+    		    e.preventDefault();			
+    		    post_ajax_form('#register_participant_form', '/registration/new_participant/', $(this).serialize() , 0);
+    		    
+    		   
+    		        
+    		}
+    		
+    	     
+    		const form2 = document.getElementById("add_participant_form");
+    		form2.addEventListener("submit", submitBucketHandler);
+    		
+    		function submitBucketHandler(e)
+    		{
+    		        addNumberOfParticipants( index, '#participants')
+    			e.preventDefault();
+    			
+    		//post_ajax_form('#add_participant_form', '/bucket/add_reservations_of_inscriptions/', $(this).serialize() , 1);
+    		
+    		 $.ajax({
+			    type: 'POST',
+			    url: '/bucket/add_reservations_of_inscriptions/',
+			    data: $(this).serialize(),
+			    dataType: 'json',
+			    success: function (json) {
+				
+					// Si succès, redirection
+					if (json.success === true) 
+					{
+					    window.location.href = "/calendarapp/event/themes/";
+					}
+					
+				
+			    },
+			    error: function (xhr, errmsg, err) {
+				console.error("Erreur AJAX :", xhr.status + " → " + xhr.responseText);
+			    }
+			});
+			
+    		          
+    		         
+    		   
+    		}
+    		
+    		 //panier_show_spaces = {};
+    		 //localStorage.setItem('panier', JSON.stringify(panier_show_spaces));
+                 //document.getElementById("panier").innerHTML ="Cart("+ Object.keys(panier_show_spaces).length+")";
+                 
+                 
+        
+        
+
+                 
+	function show_add_user_form()
+	{
+
+		
+		$('#selectParticipants').hide();
+		 
+		$('#add_new_participant_div').slideDown();
+
+	}
+	
+	
+	
+	function addParticipantToSelect( id, name , selector )
+	{
+   
+        		 userLine ='<div class="" style="background-color: #DAD7CD; width:95%; height:40px; padding-top:5px;   margin-bottom:20px; border-radius: 100px;" >';
+        		  userLine += '<input type="hidden" id="select_participant_name_' + id + '" value="' + name + '" />';
+			 userLine += '<input type="hidden" id="select_participantId_' + id + '" name="select_participantId_' + id + '" value="' + id + '" />';
+			  userLine += '<span  style="float:right; width:20px; margin-top:5px;cursor:pointer; border-radius: 100px;" id="select_addParticipant_'+ id  +'" class=" btn-brand bx bx-plus-circle"></span>';
+        		 userLine  += '<h4> <span  style="color:var(--brand);"> Username:</span> <span style="">'+name +'</span></h4>'; 
+        		
+        		 userLine  += '</div>'; 
+        		 
+        		 
+			
+			$(selector).append(userLine);
+		    	
+		    	//participant_ids.push(id.toString());
+		       $('#select_addParticipant_' + id).click(addParticipantClick);
+				 	     						
+       
+         
+	}
+
+	
+	
+	function show_selected_users()
+	{
+		$.ajax({
+		    url:'/bucket/ajax_get_reservated_users',
+		    data: {  },
+		    dataType: 'json',
+		    success: function (data) 
+		    {
+		          $('#selectParticipants').empty();
+		          if(data.length > 0 )
+		          {
+				  $('#selectParticipants').append('<h6>  Choisir le(s) participant(s) </h6>');
+				  $.each(data, function(key, value) {
+				  
+			   addParticipantToSelect( data[key]["id"],data[key]["username"],'#selectParticipants' )
+				  	
+				  
+				  });
+			   }
+			   else
+			   {
+			   	 $('#selectParticipants').append('<h6>  Veuillez ajouter un nouveau participant! </h6>');
+			   }
+				
+		          $('#add_new_participant_div').hide();
+		          $('#selectParticipants').slideDown();
+		       
+		       
+		    }
+		});   
+	 
+	 
+	 
+	}
+	
+	
+	
+	
+	function inscription(pub_id, pub_title)
+	{
+	  
+	    $('#publication_id').val(pub_id);
+	    $('#search_participants').val('');
+	    $('#inscription_title').text(pub_title);
+	    $('#participants').empty();
+				 	     		          
+	    $('#selectParticipants').empty();
+	    $('#selectParticipants').hide();
+	    // reset array of participants declared in common.js
+				 	 
+	    participants = [];
+	    participant_ids=[];
+	    index = 0;
+	
+	
+	
+	}
+	
+	
+	
+	
+	// remove item from array
+function remove(array, item)
+{
+    let ind = array.indexOf(item);
+    if(ind !== -1)
+        array.splice(ind, 1);
+}
+
+
+
+
+function loadTest(publication_id, selector, index)
+{
+   url= "/bucket/ajax_get_test_events/"+ publication_id;
+	$.getJSON(url, function(data) {
+	
+		 $(selector).empty();
+		 if(data.length > 0)
+		 {
+	        
+			$(selector).append('<label for="reserved_event_' + index + '" style="color:var(--brand);" class="form-label">Choisir la date du Test gratuit:</label>');
+			 $.each(data, function(key, value) {
+			 
+			 const id = value.id;
+	    		 const start = value.start_time;
+				  
+			    $(selector).append('<input type="radio" id="radio_'+ id +'" name="reserved_event_'+ index +'" value="'+ id +'">');
+			    $(selector).append('<label class="form-check-label" for="radio_'+ id +'">'+ start +'</label>');   
+			    $(selector).append('<br/> <br/>');	
+				  
+			 });
+			 $('#btn_add_participants_to_list_attente_' + index).hide();
+			 $('#btn_add_participants_to_reservations_' + index).show();
+		 }
+		 else
+		 {
+		 	$(selector).append('<label for="reserved_event_' + index + '" style="color:var(--brand);" class="form-label">Désolé, actuellement, toutes les dates du test disponibles sont déjà réservées.<br/><br/>Veuillez patienter dans la liste d’attente !</label>');
+		 	$(selector).append('<input style="display:none;" type="radio" id="radio_0" name="reserved_event_'+ index +'" value="0">');
+		 	
+		 	$('#btn_add_participants_to_list_attente_' + index).show();
+			$('#btn_add_participants_to_reservations_' + index).hide();
+		 	
+
+		 }
+		
+	
+	});
+	
+
+}
+
+
+
+
+function addParticipantClick(eventObject) 
+{
+   id = eventObject.currentTarget.id.substr(22);
+   
+        var username = $('#select_participant_name_' + id).val();
+ 	if ( $.inArray(id.toString(), participant_ids) == -1 )
+		      {
+		      	  		      	  
+   			  addParticipantLine( id, username, '#participants' );
+		      	  //participants.push(username);
+		      	  $('#add_new_participant_div').hide();
+		         $('#selectParticipants').slideUp();
+		         $('#selectParticipants').empty();
+                         $('#button_new').hide();
+                         $('#button_exist').hide();
+                        
+		      	 
+		      }
+		     
+  return false;
+}
+
+
+function addParticipantLine( id, name , selector )
+{
+   
+     url= "/bucket/check_inscription_exist/"+ id +"/"+ $('#publication_id').val();
+	$.getJSON(url, function(json) {
+				     					
+		if(json.success == false)
+		{
+			
+						 
+		         index = index + 1;   
+		       
+			 userLine  = '<div id="participant_line_' + id + '" style="background-color:#DAD7CD; border-radius:10px; padding:10px;   margin-bottom:10px; width:90%; " class="container text-center" >'; 
+			 userLine += '<input type="hidden" name="participant_name_' + index + '" value="' + name + '" />';
+			 userLine += '<input type="hidden" id="participantId_' + index + '" name="participantId_' + index + '" value="' + id + '" />';
+			  userLine += '<button type="button" id="deleteParticipant_'+ id +'_'+ name +'" class="btn btn-brand bx bxs-trash" style="float:right; border-radius:10px; "></button>';
+			 userLine += '<h4><span style="color:var(--brand);" > Participant: </span>'+ name +'</h4>';
+			 
+				 userLine +='<div  class="container" style=" width:95%; margin-left:2.5%; background-color:#fff; border-radius:30px;  padding:10px;">';
+				 				 
+				 	userLine +=' <div style="width:80%; margin-left:10%;" class="row">';
+				 	
+				 		userLine +='<label for="email_' + index + '" style="color:var(--brand);" class="form-label">Email du Parent:</label>';
+				 		userLine  +=' <input type="text"  required="true" class="form-control" placeholder="Email..." name="email_' + index + '" id="parent_email_' + index + '" aria-describedby="email">';
+				 
+				  	userLine += '</div>'; 
+				  	
+				  	
+				  	userLine +='<div style="width:80%; margin-left:10%;" class="row">';
+						userLine +='<label for="parent_tel_' + index + '" style="color:var(--brand);" class="form-label">Téléphone du Parent:</label>';
+						userLine +='<input type="tel" id="parent_tel_' + index + '" name="telephone_' + index + '" class="form-control"  placeholder="Ex: 6 12 34 56 78"  required="true" />';
+					userLine +='</div>';
+					
+					
+					userLine +='<div id="test_events" style="width:80%; margin-left:10%;" class="row">';
+					
+					loadTest( $('#publication_id').val() , "#test_events" , index);
+						
+					userLine +='</div>';
+					
+					
+					
+				  	
+				  	
+			      userLine  += '</div>'; 
+
+
+			      userLine +='<button type="submit" id="btn_add_participants_to_reservations_' + index + '" style=" display:none;" margin-top:10px; " class="btn btn-brand"> Réserver une séance test gratuite  </button>';
+			      
+			       userLine += '<button type="submit" id="btn_add_participants_to_list_attente_' + index + '" style="display:none; margin-top:10px;" class="btn btn-brand">Entrer dans la liste d’attente</button>';
+
+
+			
+			 userLine  += '</div>'; 
+			$(selector).prepend(userLine);
+		    	
+		    	participant_ids.push(id.toString());
+		       $('#deleteParticipant_' + id +'_'+ name).click(deleteParticipantClick);
+				 	     						
+		}
+		else
+	        {
+								  
+		} 
+				 	     				
+				 	     				
+	});				 	  
+      
+        
+         
+}
+
+
+function deleteParticipantClick(eventObject) 
+{
+  
+  divObj = $('#' + eventObject.currentTarget.id).parent();
+  parentId = divObj.attr('id');
+  //id =  $('#participantId_' + parentId).val()
+  id = parentId.substr(17);
+
+  divObj.hide('fast', function(){ $(this).remove();  remove(participant_ids, id.toString());  $('#button_new').show();
+                         $('#button_exist').show(); });
+  
+  return false;
+}
+
+
+
+function addNumberOfParticipants( index, selector )
+{
+   userLine = '<input type="hidden" name="index" value="' + index + '" />';
+   $(selector).prepend(userLine);
+   index = 0;
+}
+
+	
+	       
+                
+    </script>
+      
+         
+    
+   <style>
+  /* --- Styles de base (écrans de bureau) --- */
+  #add_new_participant_div {
+    width: 40%;
+    margin: 10px auto 0 auto;
+    padding: 5px;
+    height: auto;
+    display: none;
+  }
+
+  #selectParticipants {
+    display: none;
+    overflow-y: scroll;
+    margin-top: 10px;
+    padding: 5px;
+    background-color: #EDF2F4;
+    width: 60%;
+    margin-left: 18%;
+    height: 200px;
+  }
+
+  #participants {
+    width: 80%;
+    margin: 50px auto 0 auto;
+    padding: 10px;
+  }
+
+  /* --- Styles responsives (mobile/tablette ≤ 768px) --- */
+  @media (max-width: 768px) {
+    #add_new_participant_div {
+      width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #selectParticipants {
+      width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+      height: auto; /* adapte la hauteur au contenu */
+    }
+
+    #participants {
+      width: 98%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+</style>
+
+
+
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style=" margin-bottom:0px;">
+ 		     
+        <div class="row" style="height:auto;   margin-bottom:0px;">  
+        
+        	<div class="col-12">
+		            <div class="intro">
+		           	 	
+                        		<br/>
+                        		<h2> Réservation d'une <span style="color:var(--brand);">séance Test gratuite</span> de {{publication.title}} </h2>
+                       	        <p class="mx-auto"> Ici, vous pouvez ajouter le(s) participant(s) à la séance Test gratuite </p>
+                       	        
+                       	        
+                       	        
+                       	         <button id="button_new" type="button" onclick="show_add_user_form()" style="margin-left:10px; margin-top:10px;" class="btn btn-brand">Ajouter un nouveau participant?</button>
+                       	        
+                       	        <button id="button_exist"  type="button" onclick="show_selected_users()" style=" margin-top:10px; " class="btn btn-brand"> Selectionner un participant déja existant </button>
+  
+                            <hr />             
+                            </div>
+                                    
+                                        
+                             <div id="selectParticipants" class="row intro" > 
+                                            
+                                            
+                             </div>
+                                             
+                                             
+                             <div id="add_new_participant_div" class="container intro" >
+                                	 <form method="post"  id="register_participant_form" class="">
+                                    {% csrf_token %}
+                                    <div>
+                                        <h6>Ajouter un nouveau participant</h6>
+                                    	 <hr/>
+                                    </div>
+                                    <div class="row">
+                                        <label for="username" class="form-label">Username:</label>
+                                        <input type="text" class="form-control" placeholder="Username..." name="username" id="p_username"
+                                            aria-describedby="username">
+                                    </div>
+                                    <div class="row">
+                                       <label for="email" class="form-label">Email:</label>
+                                        <input type="text"  class="form-control" placeholder="Email..." name="email" id="p_email"
+                                            aria-describedby="email">
+                                    </div>
+                                    
+                                    <div class="row">
+                                       <label for="password" class="form-label">Password:</label>
+                                        <input type="text"  class="form-control" placeholder="Password..." name="password" id="p_password"
+                                            aria-describedby="password">
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <button type="submit" style="margin-top:10px;" class="btn btn-brand">Ajouter participant</button>
+                                    </div>
+                                </form>
+                                
+                                
+                            </div>  
+             
+                       
+                           
+                               <form method="post"  width="100%;" id="add_participant_form">
+			    		 {% csrf_token %}
+			    		 <input type="hidden" id="publication_id" name="publication_id" value="{{publication.id}}" />
+		       		 <input type="hidden" id="space_to_buy_id" name="space_to_buy_id" value="" />
+		       		     
+		                            <div  id="participants"  class="container">
+
+		                               
+		                               	
+		                               
+		                            </div>
+		                           <!-- <div style="margin-bottom:30px;" class="col-lg-10 text-center">
+				                         <button type="submit" id="btn_add_participants_to_bucket" style=" margin-top:10px; " class="btn btn-brand">Add to bucket
+				                         </button>
+		                            </div> -->
+		                            
+                                 </form>        
+                       	        
+                       	        
+                       	        
+                       	    
+                       	        
+                       	        
+                       	     
+                        
+		            
+		</div>
+       
+                  
+	</div>
+	
+	
+	
+ 
+ 
+ 
+
+   	
+	
+
+</div>
+
+
+
+
+{% endblock %}

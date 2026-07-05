@@ -1,0 +1,90 @@
+
+{% load static %}
+{% block scripts %}
+ 	<script>
+	  document.addEventListener("DOMContentLoaded", function() {
+	  const togglePassword = document.querySelector(".toggle-password");
+	  const passwordInput = document.querySelector("input[type='password'], input[name='password']");
+	  
+	  if (togglePassword && passwordInput) {
+	    togglePassword.addEventListener("click", function() {
+	      const isPassword = passwordInput.getAttribute("type") === "password";
+	      passwordInput.setAttribute("type", isPassword ? "text" : "password");
+	      this.textContent = isPassword ? "🙈" : "👁️";
+	    });
+	  }
+	  
+	 
+	  
+	 
+	  
+	});
+   </script>
+
+    
+    <link rel="stylesheet" href="{% static 'css/login.css' %}" type="text/css">
+    
+  
+
+{% endblock %}
+
+{% load socialaccount %}
+
+{% block content %}
+
+
+
+
+        <div class="login-card" >
+			    
+            <h4>  
+                <a href="/"><img width="200" height="60" src="{% static 'img/LOGO.png' %}" alt=""></a>
+
+            </h4>       
+		            
+            
+            <h1>Connexion</h1>
+        
+            {% if form.non_field_errors %}
+              <div class="error-box">{{ form.non_field_errors }}</div>
+            {% endif %}
+        
+            <form method="post" action="/registration/login/" enctype="multipart/form-data" novalidate>
+              {% csrf_token %}
+                
+              <input type="hidden" name="page_id" value="{{ page_id }}">
+              <input type="hidden" name="page_type" value="{{ page_type }}">
+
+              <div>
+                <label for="{{ form.username.id_for_label }}">Nom d'utilisateur</label>
+                {{ form.username }}
+              </div>
+        
+              <div >
+                  <label>Mot de passe</label>
+                {{ form.password }}
+                
+                 <button type="button"  class="toggle-password" aria-label="Afficher le mot de passe">
+		      👁️
+		  </button>
+                   
+              </div>
+        
+              <div class="form-row">
+                <label>
+                  {{ form.remember_me }} Se souvenir de moi
+                </label>
+                <a href="">Mot de passe oublié ?</a>
+              </div>
+        
+              <button type="submit">Se connecter</button>
+            </form>
+        
+            <p class="footer-text">
+              Pas encore de compte ?
+              <a href="{% url 'registration:new_user' %}">Inscription</a>
+            </p>
+        </div>
+
+</div>
+{% endblock %}

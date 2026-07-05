@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                       <!-- <h6>My Spaces</h6>   /lessonapp/sequence/edit/{{sequence.id}}
+                         <h3 style="color:var(--brand);"><i class='bx bxs-save'></i></h3> -->
+                        <h1 style="color:var(--brand);" >Create Radio </h1>
+                        <h4> of Question: {{ question.title}}    </h4>
+                        <h5 style="color:var(--brand);"> from Activity: {{ activity.title}}    </h5>
+                        <h6>from  <a href="{% url 'lessonapp:sequence_edit'  sequence_id=sequence.id  %}"> sequence {{ sequence.numero}}    </a></h6>
+                       <p class="mx-auto"> Here you can create new question's radio .</p>
+                    </div>
+                </div>
+                 
+ </div>
+ <div id=""   class="container" style="padding:10px; margin-bottom:50px; background-color:#efefef;" >
+ 	   
+ 	   	 
+	 
+        
+       
+            
+            <!-- File Form -->
+             
+                           <div style=" padding-bottom:10px; background-color:#fff;" class="row g-1 text-center">
+                               <form method="post" action="/lessonapp/radio/create/{{question.id}}/{{sequence.id}}" enctype="multipart/form-data" class="p-lg-5 col-12 row g-3">
+                                     {% csrf_token %}
+                                    <div>
+                                        <h4>Create new Radio</h4>
+                                    <p>Here you can create your Radio </p>
+                                    </div>
+                                    {% for field in form %}
+                                      {% if field.errors %}
+		                            <div class="col-lg-6">
+		                                <label for="" class="form-label">{{ field.label_tag }}</label>
+		                                <div class="form-control">
+		                                	{{ field }}
+		                                	<span class="help-inline">{{ field.errors|join:", " }}</span>
+		                                </div>
+		                                
+		                            </div>
+                                    	{% else %}
+		                            		                             
+		                              <div class="col-lg-6">
+		                                <label for="" class="form-label">{{ field.label_tag }}</label>
+		                                <div class="form-control">
+		                                	{{ field }}
+		                                </div>
+		                             </div>
+		                             
+		                       {% endif %}
+                                    {% endfor %}
+                                     
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Create</button>
+                                    </div>
+                                  </form>
+                            </div>
+                    
+ 							
+	
+           <!-- end File Form -->
+           
+          
+           
+           
+           
+           
+           
+           
+ 
+ 
+ </div>
+
+
+{% endblock %}

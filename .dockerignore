@@ -1,0 +1,33 @@
+# Version control / CI
+.git
+.github
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Local dev artifacts
+db.sqlite3
+staticfiles/
+mediafiles/
+*.log
+
+# Secrets (never bake into the image)
+.env
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Docs / design assets not needed in the image
+Relation_model/
+ChatGPT_model_files/
+*.drawio.png
+DEPLOYMENT.md
+README.md

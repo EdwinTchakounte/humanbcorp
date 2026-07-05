@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Account Activation</title>
+</head>
+<body>
+    <p> Welcome {{ user.pseudo }},</p>
+    <p>Please click on the link below to activate your account :</p>
+    <a href="http://{{ domain }}{% url 'registration:activate' token %}">Activate My Account</a>
+</body>
+</html>

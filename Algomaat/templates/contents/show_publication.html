@@ -1,0 +1,710 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block scripts %}
+<script src="{% static 'js/jit.js' %}" type="text/javascript"></script>
+<script src="{% static 'js/SPacetrEe.js' %}" type="text/javascript"></script>
+
+<link href="{% static 'css/spaceTree.css' %}" rel="stylesheet" type="text/css">
+
+
+
+    <script>
+    
+             
+    			var panier_show_spaces= {};
+      			if( localStorage.getItem('panier') == null )
+    		        {
+    		        	 panier_show_spaces= {};
+    		        
+    		        }
+    		        else
+    		        {
+    		        	 panier_show_spaces = JSON.parse(localStorage.getItem('panier'));
+    		           		        
+    		        }
+                    
+      
+               
+               
+            
+	
+	
+	function reservation(publication_id)
+	{
+	    window.location = '/bucket/create/reservation/'+ publication_id;
+	
+	
+	}
+	
+	
+	
+
+                
+    </script>
+    
+    
+    
+    
+    <script>
+    
+             
+    			var panier_show_spaces= {};
+      			if( localStorage.getItem('panier') == null )
+    		        {
+    		        	 panier_show_spaces= {};
+    		        
+    		        }
+    		        else
+    		        {
+    		        	 panier_show_spaces = JSON.parse(localStorage.getItem('panier'));
+    		           		        
+    		        }
+                    
+      
+               
+               
+               var index = 0;
+		participant_ids=[];
+		$('#search_participants').empty();
+               
+               
+    		const form = document.getElementById("register_participant_form");
+    		form.addEventListener("submit", submitHandler);
+    		
+    		function submitHandler(e)
+    		{
+    		  
+    		    e.preventDefault();			
+    		    post_ajax_form('#register_participant_form', '/registration/new_participant/', $(this).serialize() , 0);
+    		   
+    		        
+    		}
+    		
+    	     
+    		const form2 = document.getElementById("add_participant_form");
+    		form2.addEventListener("submit", submitBucketHandler);
+    		
+    		function submitBucketHandler(e)
+    		{
+    		        addNumberOfParticipants( index, '#participants')
+    			e.preventDefault();
+    			
+    		post_ajax_form('#add_participant_form', '/bucket/add_publications_to_bucket_of_inscriptions/', $(this).serialize() , 4);
+    		          
+    		          
+	    		   for( p=1; p<=index; p++ )
+	    		   {
+	    		      
+	    		   	participe_id = $('#participantId_'+p).val().toString();
+	    		   	pub_id = $('#publication_id').val().toString();
+	    		   	
+	    		   	if( Array.isArray(panier_show_spaces[pub_id]) )
+		                {
+		               	if( panier_show_spaces[pub_id].includes(participe_id) == false )
+		               	{
+		               		panier_show_spaces[pub_id].push(participe_id); 
+		               	}
+		                }
+		                else
+		                {
+		               				
+		               	panier_show_spaces[pub_id] = [participe_id];		
+		                }
+		               			
+	    		   	
+	    		   	
+	    		   	//panier[pub_id] = participant_ids;
+	    		   	
+	    		   	
+	    		   	
+	    		   	console.log("ajouter");
+	    		   
+	    		   }
+	    		   console.log(panier_show_spaces);
+	    		    
+	    		   localStorage.setItem('panier', JSON.stringify(panier_show_spaces));
+	    		   document.getElementById("panier").innerHTML ="Cart("+ Object.keys(panier_show_spaces).length+")";
+	    		   AfficherList();
+    		        
+    		   
+    		}
+    		
+    		 //panier_show_spaces = {};
+    		 //localStorage.setItem('panier', JSON.stringify(panier_show_spaces));
+                 //document.getElementById("panier").innerHTML ="Cart("+ Object.keys(panier_show_spaces).length+")";
+                 
+                 
+        
+        
+
+                 
+	function show_add_user_form()
+	{
+
+		
+		$('#selectParticipants').hide();
+		 
+		$('#add_new_participant_div').slideDown();
+
+	}
+	
+	
+	
+	function addParticipantToSelect( id, name , selector )
+	{
+   
+        	
+			 userLine  = '<div id="select_participant_' + id + '" style="margin:15px; width:90%; height:30px;" >'; 
+			 userLine += '<input type="hidden" id="select_participant_name_' + id + '" value="' + name + '" />';
+			 userLine += '<input type="hidden" id="select_participantId_' + id + '" name="select_participantId_' + id + '" value="' + id + '" />';
+			 //userLine += '<span class="" style="float:left; padding:5px; font-size:20px; color:black;" id="select_text_' + id + '">' + name + '</span>';
+			// userLine += '<button type="button" style="float:right; margin-left:5px;" id="select_deleteParticipant_'+ name  +'" class="btn btn-brand bx bxs-trash" style="">  </button>';
+			  userLine += '<button type="button" style="" id="select_addParticipant_'+ id  +'" class="btn btn-brand bx bx-plus-circle" style=""> ' + name + ' </button>';
+			 
+			 userLine  += '</div>'; 
+			$(selector).append(userLine);
+		    	
+		    	//participant_ids.push(id.toString());
+		       $('#select_addParticipant_' + id).click(addParticipantClick);
+				 	     						
+       
+         
+	}
+
+	
+	
+	function show_selected_users()
+	{
+		$.ajax({
+		    url:'/registration/ajax_get_users',
+		    data: {
+		      'username_query':  $('#search_participants').val()
+		    },
+		    dataType: 'json',
+		    success: function (data) 
+		    {
+		          $('#selectParticipants').empty();
+		          $('#selectParticipants').append('<h6>  Select the participant(s) </h6>');
+		          $.each(data, function(key, value) {
+		          
+		   addParticipantToSelect( data[key]["id"],data[key]["username"],'#selectParticipants' )
+		          	
+		          
+		          });
+				
+		          $('#add_new_participant_div').hide();
+		          $('#selectParticipants').slideDown();
+		       
+		       
+		    }
+		});   
+	 
+	 
+	 
+	}
+	
+	
+	
+	
+	function inscription(pub_id, pub_title)
+	{
+	  
+	    $('#publication_id').val(pub_id);
+	    $('#search_participants').val('');
+	    $('#inscription_title').text(pub_title);
+	    $('#participants').empty();
+				 	     		          
+	    $('#selectParticipants').empty();
+	    $('#selectParticipants').hide();
+	    // reset array of participants declared in common.js
+				 	 
+	    participants = [];
+	    participant_ids=[];
+	    index = 0;
+	
+	
+	
+	}
+	
+	
+	
+	
+	// remove item from array
+function remove(array, item)
+{
+    let ind = array.indexOf(item);
+    if(ind !== -1)
+        array.splice(ind, 1);
+}
+
+
+
+
+function addParticipantClick(eventObject) 
+{
+   id = eventObject.currentTarget.id.substr(22);
+   
+        var username = $('#select_participant_name_' + id).val();
+ 	if ( $.inArray(id.toString(), participant_ids) == -1 )
+		      {
+   			  addParticipantLine( id, username, '#participants' );
+		      	  //participants.push(username);
+
+		      	 
+		      }
+		     
+  return false;
+}
+
+
+function addParticipantLine( id, name , selector )
+{
+   
+     url= "/bucket/check_inscription_exist/"+ id +"/"+ $('#publication_id').val();
+	$.getJSON(url, function(json) {
+				     					
+		if(json.success == false)
+		{
+			
+						 
+		         index = index + 1;   
+		          userLine =  '<div id="participant_line_' + id + '" class="container" style="background-color:#fff; width:97%; margin:10px;" >';        
+                
+                             userLine += '<table style="background-color:#efefef; width:97%; margin:10px;" class="bordered-table zebra-striped">';
+		                     userLine += '<input type="hidden" name="participant_name_' + index + '" value="' + name + '" />';
+				      userLine += '<input type="hidden" id="participantId_' + index + '" name="participantId_' + index + '" value="' + id + '" />';
+			      		userLine +='<thead>';
+						userLine +='<tr>';
+						userLine +='<th> Participant </th>';
+						userLine +='<th>Publication</th>';
+						userLine +='<th>Price</th>';
+						//content +='<th> Buy </th>';
+						userLine +='<th> Delete </th>';
+						userLine +='</tr>';
+					userLine +='</thead>';
+					userLine +='<tbody>';
+						userLine +='<tr>';
+						
+						userLine +='<td>'+ name  +'</td>';
+						userLine +='<td>'+ $('#publication_title').val()  +'</td>';
+						userLine +='<td>'+ $('#publication_price').val()  +'</td>';
+						userLine +='<td><button type="button" id="deleteParticipant_'+ id +'_'+ name +'" class="btn btn-brand bx bxs-trash" style=""></button></td>';
+			      			
+			      			userLine +='</tr>';
+			      			
+			      		userLine +='</tbody>';
+				userLine +='</table>';
+				 
+			     userLine +='</div>';
+                             
+                             
+                             
+			
+			$(selector).prepend(userLine);
+		    	
+		    	participant_ids.push(id.toString());
+		       $('#deleteParticipant_' + id +'_'+ name).click(deleteParticipantClick);
+				 	     						
+		}
+		else
+	        {
+								  
+		} 
+				 	     				
+				 	     				
+	});				 	  
+      
+        
+         
+}
+
+
+function deleteParticipantClick(eventObject) 
+{
+  
+  divObj = $('#' + eventObject.currentTarget.id).parent().parent().parent().parent().parent();
+  parentId = divObj.attr('id');
+  //id =  $('#participantId_' + parentId).val()
+  
+  id = parentId.substr(17);
+
+  divObj.hide('fast', function(){ $(this).remove();  remove(participant_ids, id.toString()); });
+  
+  return false;
+}
+
+
+
+function addNumberOfParticipants( index, selector )
+{
+   userLine = '<input type="hidden" name="index" value="' + index + '" />';
+   $(selector).prepend(userLine);
+   index = 0;
+}
+
+	
+	       
+                
+    </script>
+      
+         
+      
+         
+
+ 
+   <style>
+   
+  /* 
+   
+  #sectionLaptop {
+    display: none;
+  }
+  
+  #sectionMobile {
+    display: block;
+  }
+   */
+
+  /* À partir de 1025px (Laptop / Desktop) 
+  @media (min-width: 1025px) {
+    #sectionLaptop {
+      display: block; 
+    }
+    #sectionMobile {
+      display: none;
+    }
+  }
+  
+ */
+  
+   /* Uniquement sur mobile */
+  @media (max-width: 767px) {
+    #reserve {
+      width: 90vw !important;   /* quasi pleine largeur */
+      min-height: 120px;        /* hauteur minimale pour donner du volume */
+      margin: 10px auto;        /* centré */
+      display: block;
+    }
+  }
+  
+</style>
+
+
+
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style=" margin-bottom:0px;">
+ 		     
+        <div class="row" style="height:auto;   margin-bottom:0px;">  
+        
+        	<div class="col-12">
+		            <div class="intro">
+		           	 	
+                        		<br/>
+                        		<h2> {{publication.title}} </h2>
+                        	<input type="hidden" id="publication_title" name="publication_title" value="{{ publication.title }}" />
+                       	        <p class="mx-auto"> {{publication.description}} </p>
+                       	<input type="hidden" id="publication_price" name="publication_price" value="{{ publication.price }}" />
+                       	        {% if user.groups.all.0.name == 'Admin' %}
+                       	      
+			      		  <div    onclick="inscription('{{ publication.id }}', '{{ publication.title }}');" data-bs-toggle="modal" data-bs-target="#modal-participant-to-add"  class="container" style="background-color:#DAD7CD; width:30%; border-radius:10px; padding:10px;   margin-bottom:10px; cursor:pointer;" >
+                       	        <span style="color:var(--brand);" > &nbsp; Buy </span>
+		               	        <div  class="mx-auto" style="background-color:var(--brand); border-radius:30px; width:90%; margin:10px; padding:10px; font-size:20px; font-weight:normal; color:#fff; font-family:Helvetica; cursor:pointer;">
+		                
+				      			 <span  id="" class="" style=" " >{{publication.price}} EUR </span>
+
+				      		        <i  class="bx bxs-cart" style="float:right; font-size:20px; font-weight:normal; margin-top:5px;"  >  </i>			</div>
+			      		        
+			      		 </div>
+                       	        {% else %}
+                       	        <div id="reserve"  data-bs-toggle="modal" data-bs-target="#exampleModal"  class="container" style="background-color:#DAD7CD; width:30%; border-radius:10px; padding:10px;   margin-bottom:10px; cursor:pointer;" >
+                       	        <span style="color:var(--brand);" > &nbsp; Réservez un cours d'essai gratuit </span>
+		               	        <div  class="mx-auto" style="background-color:var(--brand); border-radius:30px; width:90%; margin:10px; padding:10px; font-size:20px; font-weight:normal; color:#fff; font-family:Helvetica; cursor:pointer;">
+		                
+				      			 <span  id="" class="" style=" " >{{publication.price}} EUR </span>
+				      		        <i  class="bx bxs-cart" style="float:right; font-size:20px; font-weight:normal; margin-top:5px;"  >  </i>			</div>
+			      		        
+			      		 </div>
+			      		 {% endif %}
+                        
+		            </div>
+		</div>
+       
+                  
+	</div>
+ 
+ 
+ 
+
+    <section id="about">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-5 py-5">
+                    <div class="row">
+
+                        <div class="col-12">
+                            <div class="info-box">
+                                <img style="width:50px; height:50px;" src="{% static 'img/iconeOb.png' %}" alt="">
+                                <div class="ms-4">
+                                    <h5>Objectifs</h5>
+                                    
+					      {% if publication.id == 18 %}
+						Apprentissage des bases de la programmation avec Scratch. <br/>
+						Création de jeux vidéo 2D. 
+					      {% elif publication.id == 19 %}
+					        Apprentissage des bases de la programmation 3D avec Roblox Studio. <br/>
+						Création de jeux vidéo 3D. 
+					      {% elif publication.id == 11 %}
+					        Decoupe du plan 2D de construction. <br/>
+						Montage du robot.<br/>
+						Programmation du robot avec Microsoft MakeCode for Micro:bit. 
+					      {% elif publication.id == 12 %}
+					       Apprentissage des bases du machine learning avec Teachable Machine.  <br />
+					       Apprendre à créer des applications avec des modèles de machine learning dans Scratch. <br />
+					       Programmation d’une intelligence artificielle à un ou deux neurones avec Jupyter Notebook.
+					        					        
+					      
+					      {%endif%} 
+					
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-4">
+                            <div class="info-box">
+                                <img style="width:50px; height:50px;" src="{% static 'img/iconeE.png' %}" alt="">
+                                <div class="ms-4">
+                                    <h5>Concernés</h5>
+                                    <p>
+                                        {% if publication.id == 18 %}
+						Enfants de 8  à 10 ans  <br/>
+						
+					  {% else %}
+					       Pré-ados et ados (10 à 14 ans)
+					      
+					  {%endif%} 
+                                        
+                                        
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                     {% if publication.categorie.id == 3 %}
+                       <div class="col-12 mt-4">
+                            <div class="info-box">
+                                <img style="width:50px; height:50px;" src="{% static 'img/iconeR.png' %}" alt="">
+                                <div class="ms-4">
+                                    <h5>Kit de formation</h5>
+                                    <p>Cette formation en robotique nécessite l’acquisition préalable d’un kit pédagogique, disponible <span style="color:var(--brand);"> entre 75 et 100 € </span> selon le modèle choisi. <br/></p>
+                                 
+                                  <img style="width:400px; height:400px;" src="{% static 'img/kit.jpg' %}" alt="">
+                                  <!--<a href="https://cardboard.lofirobot.com/inventor-kit/" class="btn btn-brand" target="_blank" rel="noopener noreferrer"> Achat du kit</a>-->
+                                </div>
+                            </div>
+                        </div> 
+                     {%endif%} 
+                        
+                         <div class="col-12 mt-4">
+                            <div class="info-box">
+                                <img style="width:50px; height:50px;" src="{% static 'img/iconeCh.png' %}" alt="">
+                                <div class="ms-4">
+                                    <h5>Durée cette formation</h5>
+                                    <p> 24h de formation. <br/> </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-4">
+                            <div class="info-box">
+                                <img style="width:50px; height:50px;" src="{% static 'img/iconeO.png' %}" alt="">
+                                <div class="ms-4">
+                                    <h5>Lieu</h5>
+                                    <p>Les séances se déroulent en ligne(Google Meet), sous la supervision d’un enseignant certifié. Notre plateforme intègre des outils interactifs qui facilitent l’apprentissage des enfants.</p>
+                                </div>
+                            </div>
+                             <a href="https://wa.me/33616089582" style="margin-bottom:10px;" class="whatsapp-link btn btn-brand" target="_blank" aria-label="WhatsApp">
+			  <svg viewBox="0 0 24 24" class="whatsapp-icon">
+			    <path d="M12 0C5.372 0 0 5.372 0 12c0 2.114.548 4.092 1.507 5.821L0 24l6.33-1.507A11.95 11.95 0 0012 24c6.628 0 12-5.372 12-12S18.628 0 12 0zm0 22.05c-1.861 0-3.618-.487-5.17-1.338l-.37-.21-3.755.893.8-3.65-.24-.38A9.98 9.98 0 012.05 12C2.05 6.48 6.48 2.05 12 2.05S21.95 6.48 21.95 12 17.52 21.95 12 21.95zm5.248-7.338c-.284-.142-1.675-.83-1.934-.925-.26-.095-.45-.142-.64.142-.19.284-.735.925-.9 1.115-.166.19-.333.213-.617.071-.284-.142-1.2-.443-2.286-1.414-.845-.753-1.415-1.68-1.58-1.964-.166-.284-.018-.438.124-.58.128-.128.284-.333.425-.5.142-.166.19-.284.284-.474.095-.19.047-.355-.024-.497-.07-.142-.64-1.542-.875-2.11-.23-.553-.465-.478-.64-.487-.166-.007-.355-.009-.545-.009a1.05 1.05 0 00-.76.355c-.26.284-.994.97-.994 2.363 0 1.393 1.02 2.741 1.162 2.927.142.19 2.01 3.067 4.874 4.302.681.294 1.212.47 1.626.603.683.217 1.305.187 1.796.113.548-.082 1.675-.684 1.91-1.345s.236-1.226.166-1.345c-.07-.118-.26-.19-.545-.333z"/>
+			  </svg>
+			  J'ai une question
+			</a>
+
+                            <span style="margin-bottom:10px;" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-brand"> un cours d'essai gratuit?</span>
+                            
+                            
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+              {% if publication.categorie.id == 1 %}
+              		 {% if publication.id == 18 %}
+               	<img src="{% static 'img/VIS-CAT2D.png' %}" alt="">
+               	{% elif publication.id == 19 %}
+               	<img src="{% static 'img/VIS-CAT3-roblox.png' %}" alt="">
+               	{% endif %}
+              {% elif publication.categorie.id == 2 %}
+              		<img src="{% static 'img/CATB5-INTEL-ARTI.png' %}" alt=""> 
+              {% elif publication.categorie.id == 3 %}
+              		<img src="{% static 'img/CATB1-ROBOT.png' %}" alt=""> 
+              {% elif publication.categorie.id == 4 %}
+              		<img src="{% static 'img/CATB3-DEV.png' %}" alt=""> 
+              {% elif publication.categorie.id == 5 %}
+              		<img src="{% static 'img/CATB4-GAM-PRO.png' %}" alt=""> 
+              {% else %}
+              		<img src="{% static 'img/CATB4-GAM-PRO.png' %}" alt="">
+              {% endif %}
+             
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+   	<div class="row">
+	  <input type="hidden" id="treeType" name="treeType" value="1">
+	  <input type="hidden" id="pubId" name="pubId" value="{{publication.id}}">
+	<div/>
+	
+	<!-- <section id="sectionLaptop"  class="text-center" style=" ">
+	 	<div  class="container" style="background-color: #DAD7CD; " >
+	       		
+	       	<h4>Related Publications:</h4>
+	       	<h4 style="color:var(--brand);" > <i class='bx bxs-hand-down'></i></h4>	
+	       	<div id="infovis" style=" padding-bottom:20px;  height:600px;" class="row g-4">
+	       		
+	       		
+				
+	       	
+	       	
+	       	</div>
+		       <div id="log" style="visibility:hidden"></div>
+	 	</div>
+	 
+	 </section>
+	 
+	 
+	 
+	 
+	  <section id="sectionMobile"  class="text-center" style=" ">
+	 	<div  class="container" style="background-color: #DAD7CD; " >
+	       		
+	       	<h4>Related Publications: Mobile</h4>
+	       	<h4 style="color:var(--brand);" > <i class='bx bxs-hand-down'></i></h4>	
+	       	<div id="" style=" padding-bottom:20px;  height:600px;" class="row g-4">
+	       		
+	       		
+				
+	       	
+	       	
+	       	</div>
+		       
+	 	</div>
+	 
+	 </section>  -->
+
+
+</div>
+
+
+
+
+
+
+
+<!-- Register participant  Modal -->
+   <div class="modal fade" id="modal-participant-to-add" tabindex="-1" aria-labelledby="modalPubToLinkLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                          
+                            <div class="col-lg-12 text-center" style="width:100%;" >
+                               
+                                    <div>
+                                        <h3><span>Add Participants to </span> <span style="color:var(--brand);" id="inscription_title" >  the learning session </span></h3>
+                                    <p> here you can register a participant to the learning session</p>
+                                    </div>
+                                    <div class="col-lg-10">
+                                        <!--<label for="searchUser" class="form-label">Search by Name:</label>-->
+     <input type="text" class="form-control" placeholder="Search by User names ..." id="search_participants" name="search_participant_name" aria-describedby="searchUser">
+         <button type="submit" onclick="show_selected_users()" style=" margin-top:10px; " class="btn btn-brand">Search</button>
+   <button  onclick="show_add_user_form()" style="margin-left:10px; margin-top:10px;" class="btn btn-brand">Add new participant?</button>
+                                         
+                                         
+                                            <div id="selectParticipants" class="row" style="display:none; overflow-y:scroll; margin-top:10px; padding:5px; background-color:#EDF2F4;  width:60%; margin-left:18%;  height:200px;"> 
+                                            
+                                            
+                                             </div>
+                                             
+                                             
+                              <div id="add_new_participant_div" class="row" style="width:60%; margin-left:18%; margin-top:10px; padding:5px; height:auto;  display:none;">
+                                	 <form method="post"  id="register_participant_form" class="">
+                                    {% csrf_token %}
+                                    <div>
+                                        <h6>Add new Participant</h6>
+                                    	 <hr/>
+                                    </div>
+                                    <div class="row">
+                                        <label for="username" class="form-label">User:</label>
+                                        <input type="text" class="form-control" placeholder="Username..." name="username" id="p_username"
+                                            aria-describedby="username">
+                                    </div>
+                                    <div class="row">
+                                       <label for="email" class="form-label">Email:</label>
+                                        <input type="text"  class="form-control" placeholder="Email..." name="email" id="p_email"
+                                            aria-describedby="email">
+                                    </div>
+                                    
+                                    <div class="row">
+                                       <label for="password" class="form-label">Password:</label>
+                                        <input type="text"  class="form-control" placeholder="Password..." name="password" id="p_password"
+                                            aria-describedby="password">
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <button type="submit" style="margin-top:10px;" class="btn btn-brand">Add new participant</button>
+                                    </div>
+                                </form>
+                                
+                                
+                            </div>  
+                            
+                                             
+                                             
+                                    </div>
+                                    
+                                    
+                                    
+                                    <form method="post"  id="add_participant_form">
+			    		 {% csrf_token %}
+			    		 <input type="hidden" id="publication_id" name="publication_id" value="" />
+		       		 <input type="hidden" id="space_to_buy_id" name="space_to_buy_id" value="" />
+		       		     
+		                            <div  id="participants" style="overflow-y:scroll; height:200px; margin-top:50px;" class="p-lg-5 col-12 row g-3 text-center">
+
+		                               
+		                               	
+		                               
+		                            </div>
+		                            <div style="margin-bottom:30px;" class="col-lg-10 text-center">
+				                         <button type="submit" id="btn_add_participants_to_bucket" style=" margin-top:10px; " class="btn btn-brand">Add to bucket
+				                         </button>
+		                            	</div> 
+		                            
+                                    </form>
+                               
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+
+
+
+
+{% endblock %}

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+    <head>
+        <meta name="description" content="Event Dashboard" />
+        <!-- Twitter meta
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:site" content="@sajib1066" />
+        <meta property="twitter:creator" content="@sajib1066" />  -->
+        <!-- Open Graph Meta
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Vali Admin" />
+        <meta property="og:title" content="Vali - Free Bootstrap 4 admin theme" />
+        <meta property="og:url" content="https://sajib1066.github.io/" />
+        <meta property="og:image" content="https://sajib1066.github.io/images/me.jpg" />
+        <meta property="og:description" content="Event Dashboard" />  -->
+        <title>{% block title %}{% endblock title  %}</title>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <!-- Scripts 
+         <script src="{% static 'bs/jquery.min.js' %}" type="text/javascript"></script>
+         <script src="{% static 'bs/bootstrap-modal.js' %}"></script>
+	 <script src="{% static 'bs/bootstrap-dropdown.js' %}" type="text/javascript"></script>
+	 <script src="{% static 'bs/bootstrap-tabs.js' %}" type="text/javascript"></script>
+	 <script src="{% static 'js/jquery-ui-1.8.17.custom.min.js' %}" type="text/javascript"></script>  -->
+	 
+	<!-- for modal -->
+        <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    
+    
+        <!-- Main CSS  #009688 blue color of calendar-->
+       <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}" />
+       
+        <!-- var(--brand) CSS-->
+       <link rel="stylesheet" href="{% static 'css/style.css' %}">
+        <link href='https://unpkg.com/boxicons@2.1.1/css/boxicons.min.css' rel='stylesheet'> 
+        <!-- Font-icon css-->
+        <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+      <!-- a commenter pour bien marcher: retirer le necessaire du topbar et le mettre dans main.css 
+       <link href="{% static 'bs/bootstrap.min.css' %}" rel="stylesheet" type="text/css">   -->
+        
+      <!-- Le fav and touch icons -->
+  
+  <link rel="shortcut icon" href="images/favicon.ico">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="images/apple-touch-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="images/apple-touch-icon-114x114.png">
+        {% block extracss %}
+        {% endblock extracss %}
+    </head>
+<body class="app sidebar-mini" style="padding-top:0;">
+     
+     
+        <!-- Navbar-->
+       
+    <!-- TOP NAV -->
+    <div class="top-nav" id="home">
+        <div class="container">
+            <div class="row justify-content-between">
+                <div class="col-auto" style="margin-left:20%;" >
+                      <p style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#exampleModal" > <i class='bx bxs-envelope'></i> Réservez un cours d'essai gratuit </p>
+                   <!-- <p> <i class='bx bxs-phone-call'></i> +33 616 08 95 82 </p> -->
+                   
+                </div>
+                <div class="col-auto social-icons">
+                    <a href="#"><i class='bx bxl-facebook'></i></a>
+                    <a href="#"><i class='bx bxl-twitter'></i></a>
+                    <a href="#"><i class='bx bxl-instagram'></i></a>
+                    <a href="#"><i class='bx bxl-pinterest'></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+        
+        
+        
+        
+        
+        
+        
+        <!-- Sidebar menu-->
+        <div  class="app-sidebar__overlay" data-toggle="sidebar"></div>
+        <aside class="app-sidebar" style="padding-top:0;"  >
+          <!--  <div class="app-sidebar__user">
+               <img class="app-sidebar__user-avatar" src="https://sajib1066.github.io/images/me.jpg" alt="User Image" height="50px" width="50px"/>
+                <div>
+                    <p class="app-sidebar__user-name">Fokam Fekam </p>
+                    <p class="app-sidebar__user-designation">Software Engineer</p>
+                </div>
+            </div>  -->
+          
+          
+          <div class="app-sidebar__user">
+            	<a style="color: var(--brand);" class="navbar-brand" href="/"><img width="110" height="55" src="{% static 'img/LOGO.png' %}" alt=""></a>
+           
+           </div>
+            
+            
+            <ul style="margin-top:-10%;" class="app-menu">
+            
+            
+            	 {% if  user.is_authenticated %}
+                <ul class="navbar-nav ms-auto">
+                    <li class="">
+                        <a class="app-menu__item" style="" href="{% url 'contents:all_public_spaces' %}"> Services</a>
+                    </li>
+                    
+                                       
+                  
+		     
+		     <li class="treeview">
+                    <a class="app-menu__item" href="#" data-toggle="treeview"></i><span class="app-menu__label"> MySpaces</span><i class="treeview-indicator fa fa-angle-right"></i></a>
+                    <ul class="treeview-menu">
+                      {% if user.groups.all.0.name == 'Admin' %}
+                        <li>
+                            <a class="treeview-item" href="/publications/new/"><i class="icon fa fa-circle-o"></i>+ Publications</a>
+                        </li>
+                        <li>
+                            <a class="treeview-item" href="{% url 'contents:public_spaces' True %}"><i class="icon fa fa-circle-o"></i> My Contents</a>
+                        </li>
+                     {% endif %}
+                     {% if user.groups.all.0.name == 'Admin' or user.groups.all.0.name == 'Parent' %}
+                     	  <li>
+                            <a class="treeview-item" href="{% url 'calendarapp:event-themes'  %}"><i class="icon fa fa-circle-o"></i> Parent </a>
+                        </li>
+                     
+                     {% else %}
+                     
+                     	  <li>
+                            <a class="treeview-item" href="{% url 'calendarapp:event-themes'  %}"><i class="icon fa fa-circle-o"></i>  Lessons </a>
+                        </li>
+                     
+                    {% endif %}
+                    
+                    
+                     {% if user.groups.all.0.name == 'Admin' %}  
+                        
+                        <li>
+                            <a class="treeview-item" href="{% url 'lessonapp:my_lessons'  %}"><i class="icon fa fa-circle-o"></i> admin Lessons </a>
+                        </li>
+                        
+                          <li>
+                            <a class="treeview-item" href="{% url 'paiement:read_my_orders'  %}"><i class="icon fa fa-circle-o"></i> Orders</a>
+                        </li>
+                        
+                          <li>
+                            <a class="treeview-item" href="{% url 'paiement:read_enter_all_paiements'  %}"><i class="icon fa fa-circle-o"></i> Paiements </a>
+                        </li>
+                      {% endif %} 
+                      
+                        <li>
+                     <a class="treeview-item" href="{% url 'calendarapp:events-materials'  %}"><i class="icon fa fa-circle-o"></i> Materials </a>
+                        </li>
+                      
+                       <li>
+                            <a class="treeview-item" href="{% url 'chat:project_list'  %}"><i class="icon fa fa-circle-o"></i> IA</a>
+                        </li>
+                        
+                        
+                    
+                        <li>
+                            <a class="treeview-item" href="{% url 'bucket:bucket'  %}"><i class="icon fa fa-circle-o"></i>Save</a>
+                        </li>
+                    
+                    
+                     
+                    </ul>
+                 </li>
+		     
+		    <!-- <li class="">
+                        <a class="app-menu__item" href="{% url 'calendarapp:calendar' %}">My Calendar </a>
+                    </li> -->
+		     
+                  <!--  <li class="">
+                    		
+                        <a class="app-menu__item" data-bs-toggle="modal" data-bs-target="#exampleModal" href="#"> Contact </a>
+                    </li> -->
+                    
+                   
+                    
+                   <!--  <li class="">
+                    		
+                        <a class="app-menu__item"  href="#"> <i class='bx bxs-cart'></i>Cart </a>
+                    </li> -->
+                    
+     	             
+                
+                
+
+                
+                {% else %}
+                    <li class="">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#exampleModal" class="btn btn-brand ms-lg-3">Contact</a>
+                     </li>
+                {% endif %}	
+            	
+            	
+            	<hr style="color:var(--brand);" />
+            
+            <!--    <li>
+                    <a class="app-menu__item"  href="{% url 'dashboard' %}"><i class="app-menu__icon fa fa-dashboard"></i><span class="app-menu__label">Dashboard</span></a>
+                </li> -->
+                <li>
+                    <a class="app-menu__item"   href="{% url 'calendarapp:calendar' %}"><i class="app-menu__icon fa fa-calendar"></i><span class="app-menu__label">Calendar</span></a>
+                </li>
+           <!--     <li class="treeview">
+                    <a class="app-menu__item" href="#" data-toggle="treeview"><i class="app-menu__icon fa fa-th-list"></i><span class="app-menu__label"> Display Events</span><i class="treeview-indicator fa fa-angle-right"></i></a>
+                    <ul class="treeview-menu">
+                        <li> 
+                            <a class="treeview-item" href="{% url 'calendarapp:running_events' %}"><i class="icon fa fa-circle-o"></i> Running</a>
+                        </li>
+                        <li>
+                            <a class="treeview-item" href="{% url 'calendarapp:running_events' %}"><i class="icon fa fa-circle-o"></i> Upcoming</a>
+                        </li>
+                        <li>
+                            <a class="treeview-item" href="{% url 'calendarapp:all_events' %}"><i class="icon fa fa-circle-o"></i> All</a>
+                        </li>
+                    </ul>
+                 </li>  -->
+                
+   		
+
+   		 	
+   		
+     <!-- 
+                <li>
+                    <a class="app-menu__item" href="#"><i class="app-menu__icon fa fa-file-code-o"></i><span class="app-menu__label">Docs</span></a>
+                </li>  
+    -->
+            </ul>
+        </aside>
+        
+         <!-- Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/SLIDE1.png' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                                <form  method="post"  action="{% url 'registration:send_email' %}" class="p-lg-5 col-12 row g-3">
+                                  {% csrf_token %}
+                                    <div>
+                                        <h4> RÉSERVEZ VOTRE PLACE POUR UN COURS D'ESSAI !  </h4>
+                                    <p style="text-align:center;color:var(--brand);">  ON VOUS RAPPEL EN 24H !</p>
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label for="userName" class="form-label">Nom</label>
+                                        <input type="text" name="first_name" class="form-control" placeholder="Jon"  id="id_search_content"
+                                            aria-describedby="emailHelp">
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <label for="userName" class="form-label">Prenom</label>
+                                        <input type="text" name="last_name" class="form-control" placeholder="Doe" id="userName"
+                                            aria-describedby="emailHelp">
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="userName" class="form-label">Email</label>
+                                        <input type="email" name="email" class="form-control"  placeholder="Johndoe@example.com" id="userName"
+                                            aria-describedby="emailHelp">
+                                    </div>
+                                    
+                                     <!-- ✅ Champ Téléphone ajouté -->
+				    <div class="col-lg-6">
+					<label for="id_phone" class="form-label">Téléphone</label>
+					<input type="tel" name="phone" class="form-control" placeholder="06 12 34 56 78" id="id_phone">
+				    </div>
+
+				    <!-- ✅ Champ Âge ajouté -->
+				    <div class="col-lg-6">
+					<label for="id_age" class="form-label">Âge</label>
+					<input type="number" name="age" class="form-control" placeholder="Votre âge" min="1" max="99" id="id_age">
+				    </div>
+				    
+                                    
+                                    <div class="col-12">
+                                        <label for="exampleInputEmail1" class="form-label">Message</label>
+                                        <textarea name="message" placeholder="Ecrivez-nous!" class="form-control" id=""  rows="4"></textarea>
+                                    </div>
+                                    
+                                    
+                                      <!-- Checkbox consentement parent/légal -->
+				    <div class="col-12 form-check">
+					<input class="form-check-input" type="checkbox" value="1" id="id_parent_consent" name="parent_consent" required>
+					<label class="form-check-label" for="id_parent_consent">
+					    Je certifie être le parent ou le représentant légal
+					</label>
+				    </div>
+
+                                    <div class="col-12" style="margin-bottom:10px;">
+                                        <button type="submit" class="btn btn-brand">ENVOYER</button>
+                                    </div>
+                                    
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+        <main class="app-content"  >
+            <div class="app-title" style="padding-bottom:10px;">
+                {% block breadcrumb %}
+                {% endblock breadcrumb %}
+            </div>
+            {% block content %}
+            {% endblock content %}
+            
+        </main>
+        <!-- Essential javascripts for application to work -->
+        {% include 'base/js.html' %} 
+        {% block extrascripts %}
+        {% endblock extrascripts %}
+        
+        
+        
+    </body>
+</html>

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+{% block extrahead %}
+
+
+
+{% endblock %}
+
+{% block content %}
+
+<div class="well" style="background-color: #efefef;">
+	<a class="btn large pull-right" href="{{ material.file_link }}">Download</a>
+	
+	  		
+	<a href=""><h1>{{material.title}}</h1></a>
+	<p>{{material.description}}</p>
+	<input type="hidden" id="materialId" name="materialId" value="{{material.id}}">
+		<a href="">
+			<span class="label notice" style="padding:5px 5px 4px;">info</span>
+		</a>
+
+</div>
+
+
+{% endblock %}

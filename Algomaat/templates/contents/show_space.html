@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+{% block footer_scripts %}
+    <script type="text/javascript"  src="{% static 'js/loadContents.js' %}" ></script>
+{% endblock %}
+
+
+
+
+{% block content %}
+
+<input type="hidden" id="private" name="private" value="{{private}}">
+<input type="hidden" id="for_user" name="for_user" value="{{for_user}}">
+<input type="hidden" id="space_id" name="space_id" value="{{space_id}}">
+
+ <div id="spaceContents" class="container">
+ 
+ </div>
+
+
+
+<div class="modal hide fade" style="width:900px; height:500px;  " id="modal-pub-to-link">
+	<div class="modal-header">
+	  <!--a class="close" href="#">X</a-->
+	  <h3> Publications to link  </h3>
+	 
+	</div>
+	<div class="modal-body"  style="" >
+		
+		<input class="input-large span9" style="margin-left:50px;" id="id_search_content" type="text" name="content" placeholder="Search by Publication ...">
+        	<button class="btn" type="submit">Search</button>
+			
+		<div id="contents_to_link" style="width:800px; margin-top:30px; height:300px; overflow:scroll;" class="container">	
+			
+			
+			
+			
+		</div>
+
+
+	</div>
+	<div class="modal-footer">
+	  <a  id="close2"  class="btn close2 primary" style="opacity:1" href="#">Close</a>
+	</div>
+</div>
+
+
+<div class="modal hide fade" id="modal-relation">
+	<div class="modal-header">
+	  <!--a class="close" href="#">X</a-->
+	  <h3>Relation Created</h3>
+	</div>
+	<div class="modal-body">
+	  <p>The Relation between your pubications has been created</p>
+	</div>
+	<div class="modal-footer">
+	  <a id="closeRpub1" class="btn close2 primary" style="opacity:1" href="#">Close</a>
+	</div>
+</div>
+		  
+<div class="modal hide fade" id="modal-relation-false">
+	<div class="modal-header">
+	  <!--a class="close" href="#">X</a-->
+	  <h3>Relation Not Created</h3>
+	</div>
+	<div class="modal-body">
+	  <p>The Relation between your publications already exists</p>
+	</div>
+	<div class="modal-footer">
+	  <a id="closeRpub2" class="btn close2 primary" style="opacity:1" href="#">Close</a>
+	</div>
+</div>	
+{% endblock %}
+
+
+

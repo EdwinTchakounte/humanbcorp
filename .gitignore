@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Database
+db.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+
+# Collected static / build artifacts
+staticfiles/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store

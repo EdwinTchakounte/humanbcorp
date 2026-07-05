@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+<script src="{% static 'js/show_all_PAIEMEnts.js' %}" type="text/javascript"></script> 
+<!-- <link href="{% static 'css/show_paiements.css' %}" rel="stylesheet" type="text/css"> -->
+{% endblock %}
+{% block content %}
+
+<div class="row" style="height:auto;  margin-bottom:0px;">
+                <div class="col-12">
+                    <div class="intro">
+                        <h3 style="color:var(--brand);"><i class='bx bxs-purchase-tag'></i></h3>
+                        <h2> List of Paiements </h2>
+                        <p class="mx-auto"> Here you can read all paiements.</p>
+                    </div>
+                </div>
+ </div>
+ <div id="contentsOfPaiements"  class="text-center" style=" margin-top:-30px;">
+ 	
+       
+       
+       
+ 
+ 
+ </div>
+
+
+
+
+  <!-- Space Modal -->
+    <div class="modal fade" id="new-space-modal2" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="container-fluid">
+                        <div class="row gy-4">
+                            <div class="col-lg-4 col-sm-12 bg-cover"
+                                style="background-image: url({% static 'img/c2.jpg' %}"); min-height:300px;">
+                                <div>
+                                    
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                                <form method="post" action="{% url 'bucket:convert_to_space' %}" id="make-new-space" class="p-lg-5 col-12 row g-3">
+                                    {% csrf_token %}
+                                    <div>
+                                        <h1>Your new Space</h1>
+                                   	 <p>Here you can create your new space </p>
+                                    </div>
+                                   
+                                    
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-brand">Create</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+
+{% endblock %}

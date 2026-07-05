@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Stack de PRODUCTION — branché sur le reverse-proxy nginx MUTUALISÉ du VPS.
+#
+# Le nginx central (projet Docker "backend", conteneur backend-nginx-1) détient
+# les ports 80/443, termine le TLS et route humanbcorp.com vers le conteneur
+# `humanbcorp_web` via le réseau externe `backend_default`.
+#
+# => Ce stack n'embarque DONC PAS de nginx et n'expose AUCUN port sur l'hôte.
+#
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml logs -f humanbcorp_web
+# ---------------------------------------------------------------------------
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal            # réseau privé : jamais exposé au proxy central
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NB: le service est nommé `humanbcorp_web` (et non `web`) pour éviter toute
+  # collision d'alias avec les autres applis déjà présentes sur `backend_default`
+  # (afrikamode expose déjà un service `web`). Le nginx central le joint par ce nom.
+  humanbcorp_web:
+    image: ${WEB_IMAGE}
+    container_name: humanbcorp_web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    volumes:
+      - media_volume:/app/mediafiles   # médias uploadés, servis par le nginx central
+    networks:
+      - internal
+      - proxy
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+networks:
+  internal:
+  proxy:
+    external: true
+    name: backend_default      # réseau partagé du nginx central
+
+volumes:
+  pgdata:
+  media_volume:

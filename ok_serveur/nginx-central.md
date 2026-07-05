@@ -44,13 +44,31 @@ est bien sur `backend_default` (`networks: proxy` dans le compose).
 
 ---
 
+## Chemins CONFIRMÉS sur ce serveur (étape 0)
+- **Config = un seul fichier bind-monté** : `/home/deploy/afrikamode/backend/deploy/nginx/default.conf`
+  (les 4 autres sites y sont déjà). ⚠️ **On édite CE fichier** — créer un fichier à
+  côté ne servirait à rien (seul `default.conf` est monté dans le conteneur).
+- Webroot ACME : `/var/www/certbot` · Certificats : `/etc/letsencrypt`
+- App joignable depuis le nginx central ✅ (le `400 Bad Request` du test = Django qui
+  rejette `Host: humanbcorp_web:8000`, normal ; avec `Host: humanbcorp.com` ce sera OK).
+
+Variable pratique :
+```bash
+CONF=/home/deploy/afrikamode/backend/deploy/nginx/default.conf
+```
+
 ## 2. Bloc HTTP (:80) + émission du certificat
 
-### 2a. Ajouter UNIQUEMENT le server{} port 80
-Créer un fichier de site dédié (adapter le dossier trouvé en étape 0) :
+### 2a. SAUVEGARDER le fichier partagé (4 sites en prod dedans !)
 ```bash
-CONF_DIR=/home/deploy/afrikamode/backend/deploy/nginx     # <-- ADAPTER si l'étape 0 diffère
-cat > "$CONF_DIR/humanbcorp.conf" <<'EOF'
+cp "$CONF" "$CONF.bak"      # restauration : cp "$CONF.bak" "$CONF"
+```
+
+### 2b. Ajouter UNIQUEMENT le server{} port 80 (append en fin de fichier)
+```bash
+cat >> "$CONF" <<'EOF'
+
+# ===================== humanbcorp.com =====================
 server {
     listen 80;
     listen [::]:80;
@@ -65,16 +83,16 @@ server {
 }
 EOF
 ```
-> Si les sites sont dans un **seul** `default.conf` (pas de `conf.d/`), coller ce
-> bloc à l'intérieur, à côté des autres `server {}`.
 
-### 2b. Tester et recharger
+### 2c. Tester et recharger (si `nginx -t` échoue → restaurer le .bak)
 ```bash
 docker exec backend-nginx-1 nginx -t && docker exec backend-nginx-1 nginx -s reload
+# en cas d'échec du test :  cp "$CONF.bak" "$CONF"  puis re-tester
 ```
 
-### 2c. Émettre le certificat via le certbot mutualisé
+### 2d. Émettre le certificat via le certbot mutualisé
 ```bash
+docker ps --filter name=certbot --format '{{.Names}}'      # confirmer le nom (attendu: backend-certbot-1)
 docker exec backend-certbot-1 certbot certonly --webroot -w /var/www/certbot \
   -d humanbcorp.com -d www.humanbcorp.com
 ```
@@ -88,7 +106,7 @@ docker exec backend-certbot-1 certbot certonly --webroot -w /var/www/certbot \
 
 ### 3a. Ajouter le server{} port 443 dans le même fichier
 ```bash
-cat >> "$CONF_DIR/humanbcorp.conf" <<'EOF'
+cat >> "$CONF" <<'EOF'
 
 server {
     listen 443 ssl;

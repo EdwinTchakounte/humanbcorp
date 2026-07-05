@@ -15,10 +15,10 @@ On avance phase par phase ; cocher au fur et à mesure (`[x]`).
 | [x] | 1 — Utilisateur `humanbcorp` | admin | ✅ créé, groupe docker OK (`docker ps` fonctionne) |
 | [x] | 2 — Clé SSH CI | admin | ✅ paire dédiée, test `ssh humanbcorp@81.0.246.144` OK |
 | [ ] | 3 — Config GitHub | toi | secrets SSH_* + variables DEPLOY_* |
-| [ ] | 4 — Dépôt stack + `.env` | humanbcorp | bundle `ok_serveur/` → `/home/humanbcorp/humanbcorp/` |
-| [ ] | 5 — Premier `up -d` | humanbcorp | après 1er build GHCR |
-| [ ] | 6 — Certificat TLS | admin | certbot mutualisé |
-| [ ] | 7 — HTTPS actif | admin | bloc :443 dans nginx central |
+| [x] | 4 — Dépôt stack + `.env` | humanbcorp | ✅ bundle `ok_serveur/` en place, `.env` renseigné |
+| [x] | 5 — Premier `up -d` | humanbcorp | ✅ app démarrée, auth Postgres OK (voir `ok_serveur/correction-totale-bd.md`) |
+| [ ] | 6 — Certificat TLS | admin | certbot mutualisé — voir `ok_serveur/nginx-central.md` |
+| [ ] | 7 — HTTPS actif | admin | bloc :443 dans nginx central — voir `ok_serveur/nginx-central.md` |
 | [ ] | 8 — Volume média | admin | montage dans nginx central |
 | [ ] | 9 — Vérifications | — | `curl -I` + superuser |
 | [ ] | ✔ CI/CD actif | — | `push main` = déploiement auto |

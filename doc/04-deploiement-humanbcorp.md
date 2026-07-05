@@ -11,7 +11,7 @@ On avance phase par phase ; cocher au fur et à mesure (`[x]`).
 
 | État | Phase | Acteur | Détail |
 |:---:|-------|--------|--------|
-| [~] | 0 — DNS | toi | ✅ corrigé chez LWS (source = 81.0.246.144) ; propagation cache résolveurs en cours |
+| [x] | 0 — DNS | toi | ✅ propagé sur résolveurs publics (8.8.8.8 / 1.1.1.1 → 81.0.246.144) |
 | [x] | 1 — Utilisateur `humanbcorp` | admin | ✅ créé, groupe docker OK (`docker ps` fonctionne) |
 | [ ] | 2 — Clé SSH CI | admin | paire dédiée, publique dans `authorized_keys` |
 | [ ] | 3 — Config GitHub | toi | secrets SSH_* + variables DEPLOY_* |
@@ -117,9 +117,9 @@ rm /tmp/humanbcorp_ci /tmp/humanbcorp_ci.pub
 | `DEPLOY_ENABLED` | `true` |
 | `DEPLOY_PATH` | `/home/humanbcorp/humanbcorp` |
 
-> `GITHUB_TOKEN` est automatique. Si le package GHCR est **privé**, soit le rendre
-> public (Packages → Package settings → Change visibility), soit faire un
-> `docker login ghcr.io` persistant côté serveur avec un PAT `read:packages`.
+> `GITHUB_TOKEN` est automatique. **Choix retenu : package GHCR public** → aucun
+> `docker login` requis (ni serveur, ni CI). Le rendre public : GitHub → Packages →
+> `humanbcorp` → *Package settings* → *Change visibility* → *Public*.
 
 ## Étape 4 — Déposer le stack + `.env` *(utilisateur `humanbcorp`)*
 ```bash
@@ -141,7 +141,7 @@ nano .env               # renseigner SECRET_KEY, POSTGRES_PASSWORD, WEB_IMAGE, E
 > L'image doit déjà exister sur GHCR → faire un `push` sur `main` au moins une fois.
 ```bash
 cd /home/humanbcorp/humanbcorp
-docker login ghcr.io -u <user-github>                 # si package privé
+# package GHCR public -> aucun docker login nécessaire
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d       # crée humanbcorp_media_volume, démarre web+db
 docker compose -f docker-compose.prod.yml logs -f humanbcorp_web   # migrate + collectstatic + gunicorn

@@ -33,3 +33,18 @@ Attendu : *Database is up* → *migrations … OK* → **Listening at 0.0.0.0:80
 
 Il ne doit **plus** y avoir de ligne `humanbcorp-db-1` dans `ps` — uniquement
 `humanbcorp-humanbcorp_db-1` et `humanbcorp_web`.
+
+## `ps` attendu (les colonnes)
+```
+NAME                         IMAGE                                       SERVICE          STATUS                    PORTS
+humanbcorp-humanbcorp_db-1   postgres:16-alpine                          humanbcorp_db    Up (healthy)              5432/tcp
+humanbcorp_web               ghcr.io/edwintchakounte/humanbcorp:latest   humanbcorp_web   Up                        8000/tcp
+```
+
+| Colonne  | Attendu                                                                 |
+|----------|-------------------------------------------------------------------------|
+| NAME     | `humanbcorp-humanbcorp_db-1` et `humanbcorp_web` (PAS de `humanbcorp-db-1`) |
+| IMAGE    | `postgres:16-alpine` / `ghcr.io/edwintchakounte/humanbcorp:latest`      |
+| SERVICE  | `humanbcorp_db` / `humanbcorp_web`                                       |
+| STATUS   | base `Up (healthy)`, web `Up` (et qui **reste** up, pas en restart)     |
+| PORTS    | `5432/tcp` (base) / `8000/tcp` (web) — aucun port publié sur l'hôte     |

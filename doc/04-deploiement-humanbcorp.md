@@ -17,7 +17,7 @@ On avance phase par phase ; cocher au fur et à mesure (`[x]`).
 | [ ] | 3 — Config GitHub | toi | secrets SSH_* + variables DEPLOY_* |
 | [x] | 4 — Dépôt stack + `.env` | humanbcorp | ✅ bundle `ok_serveur/` en place, `.env` renseigné |
 | [x] | 5 — Premier `up -d` | humanbcorp | ✅ app démarrée, auth Postgres OK (voir `ok_serveur/correction-totale-bd.md`) |
-| [ ] | 6 — Certificat TLS | admin | certbot mutualisé — voir `ok_serveur/nginx-central.md` |
+| [x] | 6 — Certificat TLS | admin | ✅ émis (humanbcorp.com + www), expire 2026-10-03, renouv. auto |
 | [ ] | 7 — HTTPS actif | admin | bloc :443 dans nginx central — voir `ok_serveur/nginx-central.md` |
 | [ ] | 8 — Volume média | admin | montage dans nginx central |
 | [ ] | 9 — Vérifications | — | `curl -I` + superuser |

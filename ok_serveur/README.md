@@ -8,6 +8,7 @@ Runbook complet et à jour : [`../doc/04-deploiement-humanbcorp.md`](../doc/04-d
 | `docker-compose.prod.yml` | `/home/humanbcorp/humanbcorp/docker-compose.prod.yml` | 4-5 |
 | `.env` | `/home/humanbcorp/humanbcorp/.env` *(non versionné)* | 4 |
 | `humanbcorp-nginx.conf` | à coller dans `/home/deploy/afrikamode/backend/deploy/nginx/default.conf` | 6-7 |
+| `commandes.md` | fiche de toutes les commandes par phase (rien à copier — référence) | — |
 
 > ⚠️ `.env` contient un `SECRET_KEY` déjà généré mais **`POSTGRES_PASSWORD` est un
 > placeholder** (`CHANGE_ME_STRONG_PASSWORD`) — le renseigner **avant** le 1er `up -d`.

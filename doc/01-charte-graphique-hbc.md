@@ -10,17 +10,24 @@ _Source : `ressources/logo.png` + `ressources/Human Brain Corporation (1).pdf`_
 - **Secteur** : cabinet / accompagnement en ressources humaines
 - **Localisation** : Douala, Cameroun
 
-## Couleurs (échantillonnées sur le logo)
+## Couleurs (échantillonnées sur le logo officiel `logos/`)
+
+Refonte 2026 : palette **re-échantillonnée sur le vrai logo** (badge losange bleu +
+texte « HUMAN BRAIN » orange).
 
 | Rôle | Nom | Hex | Usage |
 |------|-----|-----|-------|
-| Primaire | Bleu marine | `#112848` | Fond nav/footer, titres, boutons |
-| Primaire foncé | Marine sombre | `#0b1c33` | Dégradés, footer |
-| Accent | Or | `#C49640` | Sur-titres, filets, survols, chiffres clés |
-| Accent foncé | Or foncé | `#a97f31` | Survol des accents |
+| Primaire | Bleu HBC | `#3C5EA5` | Titres, boutons, liens, icônes |
+| Primaire foncé | Bleu profond | `#2D467B` | Survols, dégradés |
+| Nuit | Bleu nuit | `#1C2F57` | Hero, footer, bandeaux |
+| Fond doux | Bleu très clair | `#EEF2FA` | Fonds de sections |
+| Accent | Orange HBC | `#EC7123` | Sur-titres, CTA, filets, chiffres clés |
+| Accent foncé | Orange foncé | `#C8601D` | Survol des accents |
 
 > Ces valeurs sont définies dans `Algomaat/static/css/hbc-brand.css` via les variables
-> CSS `--brand`, `--brand-dark`, `--brand-gold`, `--brand-gold-dark`.
+> CSS `--brand`, `--brand-dark`, `--brand-deep`, `--brand-soft`, `--accent`, `--accent-dark`.
+> `--brand-gold` reste défini en alias de `--accent` (rétro-compatibilité).
+> Typographie : **Poppins** (titres) + **Inter** (texte).
 
 ## À propos (texte officiel repris du PDF)
 

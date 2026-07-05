@@ -1,163 +1,294 @@
 /* =========================================================================
-   Human Brain Corporation-RH — charte de marque (surcharge de STYle2.css)
-   Chargé APRÈS STYle2.css pour surcharger l'ancienne identité "Algomaat".
-   Bleu marine : #112848  |  Or : #C49640
+   HUMAN BRAIN CORPORATION-RH — Design system (refonte 2026)
+   Chargé APRÈS STYle2.css / style.css : surcharge non destructive.
+   Palette officielle échantillonnée sur le logo :
+     Bleu HBC #3C5EA5 · Bleu foncé #2D467B · Orange #EC7123
    ========================================================================= */
 
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
 :root {
-    --brand: #112848;        /* bleu marine HBC */
-    --brand-dark: #0b1c33;
-    --brand-gold: #C49640;   /* or HBC */
-    --brand-gold-dark: #a97f31;
+    --brand: #3C5EA5;          /* bleu HBC */
+    --brand-dark: #2D467B;     /* bleu profond */
+    --brand-deep: #1c2f57;     /* nuit (footer, hero) */
+    --brand-soft: #EEF2FA;     /* fond bleu très clair */
+    --accent: #EC7123;         /* orange HBC */
+    --accent-dark: #C8601D;
+    --accent-soft: #FCECDD;
+    --brand-gold: #EC7123;     /* alias rétro-compat (ancien nom) */
+    --brand-gold-dark: #C8601D;
+
+    --ink: #1f2733;            /* texte principal */
+    --muted: #5c6675;          /* texte secondaire */
+    --line: #e7ebf2;
+
+    --r: 16px;
+    --r-lg: 26px;
+    --r-pill: 999px;
+    --sh-sm: 0 6px 18px rgba(28,50,94,.07);
+    --sh: 0 14px 38px rgba(28,50,94,.10);
+    --sh-lg: 0 26px 60px rgba(28,50,94,.16);
+    --ease: cubic-bezier(.22,.61,.36,1);
 }
 
-/* ---- Boutons de marque ---------------------------------------------------- */
-.btn-brand {
-    border-color: var(--brand);
-    background-color: var(--brand);
-    color: #fff;
-}
-.btn-brand:hover {
-    background-color: var(--brand-gold);
-    border-color: var(--brand-gold);
-    color: #fff;
-}
-
-/* Bouton "outline" clair sur fond marine -> accent or au survol */
-.btn-outline-light:hover {
-    background-color: var(--brand-gold);
-    border-color: var(--brand-gold);
-    color: #fff;
-}
-
-/* ---- Hero slider : dégradés de marque au lieu des photos "enfants" -------- */
-.slide1,
-.slide2,
-.slide3 {
-    background: linear-gradient(120deg, rgba(11, 28, 51, 0.92), rgba(17, 40, 72, 0.86)),
-                radial-gradient(circle at 80% 20%, rgba(196, 150, 64, 0.35), transparent 45%);
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-}
-
-/* Accent or sur le sur-titre du hero */
-.slide h6.text-uppercase {
-    color: var(--brand-gold) !important;
-    letter-spacing: 1px;
-}
-
-/* ---- Titres de section : filet doré sous les intros ---------------------- */
-.intro h6 {
-    color: var(--brand-gold);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    font-weight: 600;
-}
-.intro h1 {
-    color: var(--brand);
-}
-.intro h1::after {
-    content: "";
-    display: block;
-    width: 70px;
-    height: 3px;
-    background: var(--brand-gold);
-    margin: 14px auto 0;
-    border-radius: 3px;
-}
-
-/* ---- Overlays / éléments qui étaient rouge-orangé ------------------------ */
-#portfolio .overlay,
-.project .overlay {
-    background-color: rgba(17, 40, 72, 0.72) !important;
-}
-
-/* Cartes services : liseré doré au survol */
-.service {
-    border: 1px solid transparent;
-    transition: 0.3s ease;
-    border-radius: 8px;
+/* ---- Base typographique --------------------------------------------------- */
+body {
+    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
     background: #fff;
-    padding: 24px;
-    height: 100%;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.65;
 }
-.service:hover {
-    border-color: var(--brand-gold);
-    box-shadow: 0 10px 30px rgba(17, 40, 72, 0.12);
-    transform: translateY(-4px);
+h1,h2,h3,h4,h5,h6,.navbar-brand {
+    font-family: 'Poppins', system-ui, sans-serif;
+    color: var(--brand-deep);
+    letter-spacing: -.01em;
 }
-.service h5 {
-    color: var(--brand) !important;
-}
-.service .icon,
-.service i {
-    color: var(--brand-gold);
-}
-
-/* ---- Barre de navigation ------------------------------------------------- */
-.navbar-brand img {
-    width: auto !important;
-    height: 52px !important;
-}
-.top-nav {
-    background-color: var(--brand);
-}
-.top-nav a,
-.top-nav p {
-    color: #fff;
-}
-.top-nav .social-icons a:hover {
-    color: var(--brand-gold);
-}
-.nav-link:hover {
-    color: var(--brand-gold) !important;
-}
-
-/* ---- Chiffres clés (milestone) ------------------------------------------- */
-#milestone {
-    background: var(--brand);
-    color: #fff;
-}
-#milestone .display-4 {
-    color: var(--brand-gold);
-    font-weight: 700;
-}
-
-/* ---- Pied de page -------------------------------------------------------- */
-footer {
-    background: var(--brand-dark);
-    color: #e7ecf3;
-}
-footer .navbar-brand,
-footer h4 {
-    color: #fff;
-}
-footer .dot {
-    color: var(--brand-gold);
-}
-footer .social-icons a {
-    color: #fff;
-}
-footer .social-icons a:hover {
-    color: var(--brand-gold);
-}
-footer a {
-    color: var(--brand-gold);
-}
-
-/* ---- Divers rouges résiduels -------------------------------------------- */
+h1,h2 { font-weight: 800; line-height: 1.12; }
+p { color: var(--muted); }
+a { text-decoration: none; }
 .text-brand { color: var(--brand) !important; }
-.text-gold { color: var(--brand-gold) !important; }
-.bg-brand { background-color: var(--brand) !important; color:#fff; }
+.text-gold, .text-accent { color: var(--accent) !important; }
+section { padding: 92px 0; }
+img { max-width: 100%; }
 
-/* Filet doré décoratif réutilisable */
-.hbc-rule {
-    width: 60px; height: 3px; background: var(--brand-gold);
-    border: 0; border-radius: 3px; margin: 12px 0;
+/* ---- Sur-titre de section ------------------------------------------------- */
+.intro { max-width: 720px; margin: 0 auto 54px; text-align: center; }
+.intro h6, .eyebrow {
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    font-weight: 700;
+    font-size: .78rem;
+    margin-bottom: 12px;
 }
+.intro h1, .intro h2 { font-size: clamp(1.9rem, 3.4vw, 2.7rem); margin-bottom: 16px; }
+.intro p { color: var(--muted); font-size: 1.05rem; }
+.section-rule, .hbc-rule {
+    width: 64px; height: 4px; border: 0; opacity: 1;
+    background: linear-gradient(90deg, var(--accent), var(--brand));
+    border-radius: 4px; margin: 18px 0;
+}
+.intro .section-rule { margin: 18px auto 0; }
 
-/* ---- Section "À propos" & contact --------------------------------------- */
-.info-box h5 { color: var(--brand); }
-#about .display-6, #contact .display-6 { color: var(--brand); }
-.hbc-contact-item i { color: var(--brand-gold); font-size: 22px; }
+/* ---- Boutons -------------------------------------------------------------- */
+.btn-brand, .btn-accent, .btn-outline-brand, .btn-outline-light, .btn-outline-dark {
+    border-radius: var(--r-pill);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    letter-spacing: .01em;
+    padding: 13px 30px;
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease), background .25s;
+    border: 2px solid transparent;
+    display: inline-flex; align-items: center; gap: 9px;
+}
+.btn-brand {
+    background: var(--brand); border-color: var(--brand); color: #fff;
+    box-shadow: 0 10px 24px rgba(60,94,165,.30);
+}
+.btn-brand:hover { background: var(--brand-dark); border-color: var(--brand-dark); color:#fff; transform: translateY(-2px); box-shadow: 0 16px 32px rgba(60,94,165,.38); }
+.btn-accent {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+    box-shadow: 0 10px 24px rgba(236,113,35,.32);
+}
+.btn-accent:hover { background: var(--accent-dark); border-color: var(--accent-dark); color:#fff; transform: translateY(-2px); }
+.btn-outline-brand { color: var(--brand); border-color: var(--brand); background: transparent; }
+.btn-outline-brand:hover { background: var(--brand); color:#fff; transform: translateY(-2px); }
+.btn-outline-light { color:#fff; border-color: rgba(255,255,255,.6); background: transparent; }
+.btn-outline-light:hover { background:#fff; color: var(--brand-dark); transform: translateY(-2px); }
+.btn-outline-dark { border-color: var(--brand-dark); color: var(--brand-dark); background:transparent; }
+.btn-outline-dark:hover { background: var(--brand-dark); color:#fff; }
+
+/* ---- Barre supérieure + navbar ------------------------------------------- */
+.top-nav { background: var(--brand-deep); color:#fff; font-size:.86rem; padding:9px 0; }
+.top-nav a, .top-nav p { color:#dfe6f2 !important; margin:0; }
+.top-nav .social-icons a { margin-left:12px; font-size:1.05rem; transition:.25s; }
+.top-nav .social-icons a:hover { color: var(--accent) !important; }
+
+.navbar.sticky-top, nav.navbar {
+    background:#fff !important;
+    box-shadow: 0 4px 24px rgba(28,50,94,.07);
+    padding: 12px 0;
+}
+.navbar-brand img { height: 52px; width:auto; }
+.navbar .nav-link {
+    color: var(--brand-deep) !important;
+    font-family:'Poppins',sans-serif; font-weight:500; font-size:.98rem;
+    margin: 0 4px; position: relative; padding: 8px 6px !important;
+    transition: color .2s;
+}
+.navbar .nav-link::after {
+    content:""; position:absolute; left:6px; right:6px; bottom:2px; height:2px;
+    background: var(--accent); border-radius:2px; transform: scaleX(0);
+    transform-origin:left; transition: transform .3s var(--ease);
+}
+.navbar .nav-link:hover { color: var(--brand) !important; }
+.navbar .nav-link:hover::after { transform: scaleX(1); }
+.navbar .btn-brand { color:#fff !important; padding:9px 22px; }
+
+/* ---- HERO ----------------------------------------------------------------- */
+.hbc-hero {
+    position: relative;
+    min-height: 88vh;
+    display: flex; align-items: center;
+    background-size: cover; background-position: center;
+    color:#fff; padding: 120px 0;
+}
+.hbc-hero::before {
+    content:""; position:absolute; inset:0;
+    background: linear-gradient(105deg, rgba(20,33,64,.92) 0%, rgba(28,47,87,.82) 42%, rgba(28,47,87,.45) 100%);
+}
+.hbc-hero .container { position: relative; z-index: 2; }
+.hbc-hero .eyebrow { color: #ffd0ad; }
+.hbc-hero h1 {
+    color:#fff; font-size: clamp(2.3rem, 5vw, 4rem); margin: 16px 0 20px;
+    text-shadow: 0 2px 30px rgba(0,0,0,.25);
+}
+.hbc-hero h1 .accent { color: var(--accent); }
+.hbc-hero p.lead { color:#e6ecf7; font-size: 1.2rem; max-width: 600px; margin-bottom: 32px; }
+.hbc-hero .hero-cta { display:flex; flex-wrap:wrap; gap:14px; }
+.hbc-hero .hero-badges { margin-top: 40px; display:flex; flex-wrap:wrap; gap: 26px; }
+.hbc-hero .hero-badges span { color:#dbe4f4; font-size:.95rem; display:flex; align-items:center; gap:8px; }
+.hbc-hero .hero-badges i { color: var(--accent); font-size:1.3rem; }
+
+/* ---- Bandeau statistiques (chevauche le hero) ----------------------------- */
+.hbc-stats {
+    position: relative; z-index: 3; margin-top: -62px; margin-bottom: 20px;
+}
+.hbc-stats .wrap {
+    background:#fff; border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+    padding: 34px 20px; display:grid; grid-template-columns: repeat(4,1fr);
+}
+.hbc-stats .item { text-align:center; padding: 6px 12px; border-right:1px solid var(--line); }
+.hbc-stats .item:last-child { border-right:0; }
+.hbc-stats .num { font-family:'Poppins'; font-weight:800; font-size:2.2rem; color: var(--brand); line-height:1; }
+.hbc-stats .num span { color: var(--accent); }
+.hbc-stats .lbl { color: var(--muted); font-size:.92rem; margin:6px 0 0; }
+
+/* ---- À propos ------------------------------------------------------------- */
+#about { background:#fff; }
+#about .about-img {
+    border-radius: var(--r-lg); overflow:hidden; box-shadow: var(--sh-lg);
+    position: relative;
+}
+#about .about-img img { display:block; width:100%; height:100%; object-fit:cover; }
+#about .about-badge {
+    position:absolute; left:22px; bottom:22px; background: var(--accent);
+    color:#fff; border-radius: var(--r); padding:16px 20px; box-shadow: var(--sh);
+    font-family:'Poppins'; font-weight:700; line-height:1.15;
+}
+#about .about-badge b { font-size:1.7rem; display:block; }
+.info-box { align-items:flex-start; margin-bottom:6px; }
+.info-box .ico {
+    flex: 0 0 52px; width:52px; height:52px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    background: var(--brand-soft); color: var(--brand); font-size:26px;
+}
+.info-box h5 { font-size:1.06rem; margin-bottom:3px; color:var(--brand-deep); }
+.info-box p { margin:0; font-size:.95rem; }
+
+/* ---- Cartes services / pourquoi ------------------------------------------ */
+#services { background: var(--brand-soft); }
+.service {
+    background:#fff; border-radius: var(--r-lg); padding: 38px 28px;
+    box-shadow: var(--sh-sm); height:100%; text-align:left;
+    border: 1px solid var(--line); position:relative; overflow:hidden;
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+}
+.service::before {
+    content:""; position:absolute; top:0; left:0; right:0; height:4px;
+    background: linear-gradient(90deg, var(--brand), var(--accent));
+    transform: scaleX(0); transform-origin:left; transition: transform .4s var(--ease);
+}
+.service:hover { transform: translateY(-8px); box-shadow: var(--sh-lg); }
+.service:hover::before { transform: scaleX(1); }
+.service .svc-ico {
+    width:66px; height:66px; border-radius:18px; margin-bottom:20px;
+    display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg, var(--brand-soft), #fff);
+    color: var(--brand); font-size:32px; box-shadow: inset 0 0 0 1px var(--line);
+    transition:.35s var(--ease);
+}
+.service:hover .svc-ico { background: var(--brand); color:#fff; transform: rotate(-6deg); }
+.service h5 { font-size:1.14rem; margin-bottom:10px; color:var(--brand-deep); }
+.service p { font-size:.95rem; margin:0; }
+.service.text-center { text-align:center; }
+.service.text-center .svc-ico { margin-left:auto; margin-right:auto; }
+
+/* ---- Galerie -------------------------------------------------------------- */
+#galerie { background:#fff; }
+.hbc-gallery { display:grid; grid-template-columns: repeat(12,1fr); gap:16px; }
+.hbc-gallery figure {
+    margin:0; border-radius: var(--r); overflow:hidden; position:relative;
+    box-shadow: var(--sh-sm); min-height:200px;
+}
+.hbc-gallery img { width:100%; height:100%; object-fit:cover; display:block; transition: transform .6s var(--ease); }
+.hbc-gallery figure::after {
+    content:""; position:absolute; inset:0;
+    background: linear-gradient(to top, rgba(28,47,87,.5), transparent 55%);
+    opacity:0; transition:.35s;
+}
+.hbc-gallery figure:hover img { transform: scale(1.07); }
+.hbc-gallery figure:hover::after { opacity:1; }
+.hbc-gallery .g-tall { grid-column: span 6; grid-row: span 2; min-height:412px; }
+.hbc-gallery .g-wide { grid-column: span 6; }
+.hbc-gallery .g-third { grid-column: span 4; }
+.hbc-gallery .g-half { grid-column: span 6; }
+
+/* ---- Milestone ------------------------------------------------------------ */
+#milestone {
+    background: linear-gradient(120deg, var(--brand-deep), var(--brand-dark));
+    color:#fff; padding: 74px 0;
+}
+#milestone h1 { color:#fff; font-size:3rem; }
+#milestone h1 span, #milestone .display-4 { color: var(--accent); }
+#milestone p { color:#c9d4ea; }
+
+/* ---- Bandeau contact ------------------------------------------------------ */
+#contact { background: linear-gradient(120deg, var(--brand-deep), var(--brand-dark)) !important; }
+#contact h2 { color:#fff; }
+.hbc-contact-item i { font-size:2rem; color: var(--accent); margin-bottom:8px; display:block; }
+.hbc-contact-item p { color:#dbe4f4; }
+
+/* ---- Footer --------------------------------------------------------------- */
+footer { background: var(--brand-deep); color:#c9d4ea; }
+footer .footer-top { padding: 66px 0 30px; }
+footer h4.navbar-brand { color:#fff; font-weight:800; }
+footer h4 .dot { color: var(--accent); }
+footer h5 { color:#fff; font-family:'Poppins'; font-size:1.05rem; margin-bottom:14px; }
+footer p, footer li a { color:#b9c4da; }
+footer li a:hover { color: var(--accent); padding-left:4px; transition:.2s; }
+footer .social-icons a {
+    display:inline-flex; width:38px; height:38px; border-radius:50%;
+    background: rgba(255,255,255,.08); align-items:center; justify-content:center;
+    margin-right:8px; margin-top:14px; color:#fff; font-size:1.15rem; transition:.25s;
+}
+footer .social-icons a:hover { background: var(--accent); transform: translateY(-3px); }
+footer .footer-bottom { border-top:1px solid rgba(255,255,255,.1); padding:18px 0; color:#93a2c0; }
+footer .footer-logo { height:56px; margin-bottom:16px; }
+
+/* ---- Modale contact ------------------------------------------------------- */
+.modal-content { border:0; border-radius: var(--r-lg); overflow:hidden; box-shadow: var(--sh-lg); }
+.modal-content .btn-brand { background: var(--accent); border-color: var(--accent); }
+.modal-content .btn-brand:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+.form-control, .form-select { border-radius: 12px; padding:11px 14px; border:1px solid var(--line); }
+.form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(60,94,165,.15); }
+
+/* ---- Responsive ----------------------------------------------------------- */
+@media (max-width: 991px){
+    section { padding: 64px 0; }
+    .hbc-stats .wrap { grid-template-columns: repeat(2,1fr); gap:18px 0; }
+    .hbc-stats .item:nth-child(2){ border-right:0; }
+    .hbc-hero { min-height: 78vh; text-align:center; }
+    .hbc-hero p.lead { margin-left:auto; margin-right:auto; }
+    .hbc-hero .hero-cta, .hbc-hero .hero-badges { justify-content:center; }
+    #about .about-img { margin-top: 34px; }
+    .hbc-gallery .g-tall { grid-column: span 12; grid-row: span 1; min-height:240px; }
+    .hbc-gallery .g-wide, .hbc-gallery .g-third, .hbc-gallery .g-half { grid-column: span 6; }
+}
+@media (max-width: 575px){
+    .hbc-stats .wrap { grid-template-columns: 1fr 1fr; }
+    .hbc-gallery figure { grid-column: span 12 !important; min-height:200px; }
+    .btn-brand,.btn-accent,.btn-outline-light,.btn-outline-brand { width:100%; justify-content:center; }
+    .hbc-hero .hero-cta { flex-direction:column; }
+}

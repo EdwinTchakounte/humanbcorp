@@ -1,5 +1,8 @@
+# NB: service nommé `humanbcorp_db` (et non `db`) : le web est aussi sur
+# `backend_default` où d'autres stacks exposent déjà un service `db` — un nom
+# unique évite que l'app résolve la mauvaise base.
 services:
-  db:
+  humanbcorp_db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -25,7 +28,7 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_HOST: db
+      POSTGRES_HOST: humanbcorp_db
       POSTGRES_PORT: 5432
     volumes:
       - media_volume:/app/mediafiles
@@ -33,7 +36,7 @@ services:
       - internal
       - proxy
     depends_on:
-      db:
+      humanbcorp_db:
         condition: service_healthy
     expose:
       - "8000"

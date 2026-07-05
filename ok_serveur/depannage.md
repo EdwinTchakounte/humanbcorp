@@ -5,7 +5,30 @@ Problèmes rencontrés et leur correctif. À exécuter sur le VPS, dans
 
 ---
 
-## 1. `password authentication failed for user "humanbcorp"`
+## 0. `password authentication failed` alors que le mot de passe est IDENTIQUE des deux côtés
+
+**LA vraie cause dans notre cas.** Symptôme trompeur : `.env` et le conteneur web ont
+exactement le même `POSTGRES_PASSWORD`, mais l'auth échoue quand même, sur une IP du
+type `172.18.0.x` (sous-réseau de `backend_default`, pas de `humanbcorp_internal`).
+
+**Cause.** Le service base s'appelait `db`. Or `humanbcorp_web` est aussi sur le réseau
+mutualisé `backend_default`, où **d'autres stacks exposent déjà un service `db`**.
+L'app résolvait `db` vers **la mauvaise base** (celle d'une autre appli) → échec d'auth.
+
+**Correctif.** Renommer le service en **`humanbcorp_db`** (nom unique) et pointer
+`POSTGRES_HOST: humanbcorp_db`. Déjà appliqué dans `docker-compose.prod.yml`.
+Sur le serveur : remplacer le compose puis :
+```bash
+docker compose -f docker-compose.prod.yml down       # PAS -v : la vraie base garde ses données
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml logs --tail=25 humanbcorp_web
+```
+Diagnostic : `docker network inspect backend_default -f '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'`
+→ si l'IP de l'erreur y apparaît sous un autre conteneur, c'est bien la collision.
+
+---
+
+## 1. `password authentication failed for user "humanbcorp"` (mots de passe DIFFÉRENTS)
 
 **Symptôme** (logs `humanbcorp_web`) :
 ```

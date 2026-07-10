@@ -296,6 +296,8 @@ TARA_BUSINESS_ID = config("TARA_BUSINESS_ID", default="")
 TARA_WEBHOOK_SECRET = config("TARA_WEBHOOK_SECRET", default="")
 # Sert à construire l'URL de webhook envoyée à Tara : {PUBLIC_BASE_URL}/api/v1/payments/webhook/tara/
 PUBLIC_BASE_URL = config("PUBLIC_BASE_URL", default="http://localhost:8011")
+# URL publique de la vitrine (web/) — sert à construire le lien magique de l'espace apprenant.
+SITE_PUBLIC_URL = config("SITE_PUBLIC_URL", default="http://localhost:3000")
 # Modes test — À LAISSER FALSE EN PROD (valident les paiements sans Tara / sans contrôle de montant).
 PAYMENTS_TEST_AUTO_VALIDATE = config("PAYMENTS_TEST_AUTO_VALIDATE", default=False, cast=bool)
 PAYMENTS_TEST_ALLOW_ANY_AMOUNT = config("PAYMENTS_TEST_ALLOW_ANY_AMOUNT", default=False, cast=bool)

@@ -180,6 +180,103 @@ export async function submitCandidature(
 }
 
 // ---------------------------------------------------------------------------
+// Espace apprenant (lien magique) — contenu des formations achetées
+// ---------------------------------------------------------------------------
+export interface LearnerFormation {
+  publication_id: number;
+  title: string;
+  description: string;
+  image: string | null;
+  has_content: boolean;
+}
+export interface MySpace {
+  learner: { name: string; email: string };
+  formations: LearnerFormation[];
+}
+export interface QuizOption {
+  id: number;
+  title: string;
+  input_type: number; // 1=checkbox 2=radio
+}
+export interface QuizQuestion {
+  id: number;
+  index: number;
+  title: string;
+  description: string;
+  points: number;
+  number: number;
+  options: QuizOption[];
+}
+export interface LearnerDoc {
+  id: number;
+  index: number;
+  title: string;
+  description: string;
+  url: string | null;
+  m_type: number;
+}
+export interface LearnerComponent {
+  id: number;
+  title: string;
+  paragraph: string | null;
+  image: string | null;
+  number: number;
+}
+export interface LearnerActivity {
+  id: number;
+  index: number;
+  title: string;
+  type: number; // 1=Quizz 2=PDF 3=Link
+  state: number;
+  documents: LearnerDoc[];
+  questions: QuizQuestion[];
+  components: LearnerComponent[];
+}
+export interface LearnerSeance {
+  id: number;
+  index: number;
+  title: string;
+  type: number; // 0=Théorie 1=Pratique 2=Exercice
+  documents: LearnerDoc[];
+  activities: LearnerActivity[];
+}
+export interface LearnerTheme {
+  id: number;
+  title: string;
+  image: string | null;
+  objectifs: string[];
+  seances: LearnerSeance[];
+}
+export interface MyFormation {
+  publication_id: number;
+  title: string;
+  description: string;
+  themes: LearnerTheme[];
+}
+
+export async function getMySpace(token: string): Promise<MySpace | null> {
+  try {
+    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getMyFormation(token: string, publicationId: number): Promise<MyFormation | null> {
+  try {
+    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/formation/${publicationId}/`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Documents téléchargeables publics
 // ---------------------------------------------------------------------------
 export interface PublicDocument {

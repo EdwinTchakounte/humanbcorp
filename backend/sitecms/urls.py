@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import public_catalog
+from . import learner
 from .api import (
     ArticleDetailView,
     ArticleListView,
@@ -80,6 +81,9 @@ urlpatterns = [
     path("site/inscription/<str:token>/", public_catalog.inscription_status, name="site-inscription-status"),
     path("site/inscription/<str:token>/payer/", public_catalog.inscription_pay, name="site-inscription-pay"),
     path("site/documents/", public_catalog.documents_list, name="site-documents"),
+    # Espace apprenant (accès par lien magique signé)
+    path("site/mon-espace/<str:token>/", learner.my_space, name="site-mon-espace"),
+    path("site/mon-espace/<str:token>/formation/<int:publication_id>/", learner.my_formation, name="site-mon-espace-formation"),
     path("contact/", ContactView.as_view(), name="contact"),
     path("chat/", ChatView.as_view(), name="chat"),
 

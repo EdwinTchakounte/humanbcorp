@@ -1,0 +1,232 @@
+"""Espace **apprenant** public (accès par lien magique, sans mot de passe).
+
+Après confirmation du paiement, l'apprenant reçoit par e-mail un lien signé vers
+son espace : la liste de ses formations confirmées et, pour chacune, le contenu
+pédagogique rattaché (arbre ``Theme → Séances → Activités`` : documents PDF/liens,
+blocs texte/image, quiz en lecture).
+
+MVP volontairement en **lecture seule** : pas encore de réponse interactive au
+quiz, ni de notation, ni de progression (itération suivante).
+"""
+from __future__ import annotations
+
+from django.contrib.auth.models import User
+from django.core import signing
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+
+from bucket.models import Inscription
+
+_MEMBER_SALT = "sitecms.learner.member"
+_TOKEN_MAX_AGE = 60 * 60 * 24 * 180  # 6 mois d'accès au contenu acheté
+
+
+def sign_member(user: User) -> str:
+    """Jeton opaque et signé identifiant un apprenant (accès à son espace)."""
+    return signing.dumps({"member": user.pk}, salt=_MEMBER_SALT)
+
+
+def learner_space_url(user: User) -> str:
+    """Lien magique complet vers l'espace apprenant sur la vitrine."""
+    from django.conf import settings
+
+    base = getattr(settings, "SITE_PUBLIC_URL", "http://localhost:3000").rstrip("/")
+    return f"{base}/mon-espace/{sign_member(user)}"
+
+
+def load_member(token: str) -> User:
+    """Résout un jeton → User. Lève ``User.DoesNotExist`` si invalide/expiré."""
+    try:
+        data = signing.loads(token, salt=_MEMBER_SALT, max_age=_TOKEN_MAX_AGE)
+    except signing.BadSignature as exc:  # inclut SignatureExpired
+        raise User.DoesNotExist(str(exc))
+    return User.objects.get(pk=data["member"])
+
+
+def _abs(request, url):
+    if not url:
+        return None
+    return request.build_absolute_uri(url) if request else url
+
+
+def _doc_payload(request, doc, index):
+    """Sérialise un Material* (MaterialSeanceDoc / MaterialActivityDoc)."""
+    try:
+        url = doc.doc_link()
+    except Exception:  # noqa: BLE001 — document manquant / incohérent
+        url = None
+    return {
+        "id": doc.pk,
+        "index": index,
+        "title": doc.title,
+        "description": doc.description,
+        "url": _abs(request, url),
+        "m_type": doc.m_type,  # 1=Cours 2=Exercice 3=Réponse 4=Correction
+    }
+
+
+def build_theme_content(theme, request):
+    """Construit l'arbre de contenu d'un Theme (adapté de lessonapp.read_theme)."""
+    # Imports locaux (évite de charger lessonapp/material au démarrage de sitecms).
+    from lessonapp.models import Objectif, Seance, Activity, Activityquestion, Question
+    from material.models import (
+        MaterialSeanceDoc,
+        MaterialActivityDoc,
+        InputQuestionBox,
+        ActivityComponent,
+    )
+
+    objectifs = list(Objectif.objects.filter(theme=theme).values_list("name", flat=True))
+
+    seances_out = []
+    for si, seance in enumerate(Seance.objects.filter(theme=theme), start=1):
+        seance_docs = [
+            _doc_payload(request, d, i)
+            for i, d in enumerate(MaterialSeanceDoc.objects.filter(seance=seance), start=1)
+        ]
+
+        activities_out = []
+        for ai, activity in enumerate(Activity.objects.filter(seance=seance), start=1):
+            # Documents PDF (a_type == 2)
+            docs = []
+            if activity.a_type == Activity.PDF:
+                docs = [
+                    _doc_payload(request, d, i)
+                    for i, d in enumerate(MaterialActivityDoc.objects.filter(activity=activity), start=1)
+                ]
+
+            # Quiz (a_type == 1) — questions + options (lecture seule, sans révéler la bonne réponse)
+            questions = []
+            if activity.a_type == Activity.QUIZZ:
+                aqs = Activityquestion.objects.filter(activity=activity).select_related("question", "question__bloc")
+                for qi, aq in enumerate(aqs, start=1):
+                    q = aq.question
+                    options = [
+                        {"id": o.pk, "title": o.title, "input_type": o.input_type}
+                        for o in InputQuestionBox.objects.filter(question=q)
+                    ]
+                    questions.append({
+                        "id": q.pk,
+                        "index": qi,
+                        "title": q.title,
+                        "description": q.description,
+                        "points": aq.points,
+                        "number": aq.number,
+                        "options": options,
+                    })
+
+            # Blocs de contenu (texte / image)
+            components = [
+                {
+                    "id": c.pk,
+                    "title": c.title,
+                    "paragraph": c.paragraph,
+                    "image": _abs(request, c.image.url) if c.image else None,
+                    "number": c.number,
+                }
+                for c in ActivityComponent.objects.filter(activity=activity).order_by("number")
+            ]
+
+            activities_out.append({
+                "id": activity.pk,
+                "index": ai,
+                "title": activity.title,
+                "type": activity.a_type,  # 1=Quizz 2=PDF 3=Link
+                "state": activity.state,
+                "documents": docs,
+                "questions": questions,
+                "components": components,
+            })
+
+        seances_out.append({
+            "id": seance.pk,
+            "index": si,
+            "title": seance.title,
+            "type": seance.s_type,  # 0=Théorie 1=Pratique 2=Exercice
+            "documents": seance_docs,
+            "activities": activities_out,
+        })
+
+    image = getattr(theme, "image", None)
+    return {
+        "id": theme.pk,
+        "title": theme.title,
+        "image": _abs(request, image.url) if image else None,
+        "objectifs": objectifs,
+        "seances": seances_out,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def my_space(request, token):
+    """GET /api/v1/site/mon-espace/<token>/ → formations confirmées de l'apprenant."""
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+
+    inscriptions = (
+        Inscription.objects.filter(participant=user, status=Inscription.CONFIRMED, is_deleted=False)
+        .select_related("publication")
+    )
+    seen = set()
+    formations = []
+    for ins in inscriptions:
+        pub = ins.publication
+        if not pub or pub.id in seen:
+            continue
+        seen.add(pub.id)
+        formations.append({
+            "publication_id": pub.id,
+            "title": pub.title,
+            "description": pub.description,
+            "image": _abs(request, pub.image.url) if pub.image else None,
+            "has_content": pub.themes.exists(),
+        })
+    return Response({
+        "learner": {"name": user.get_full_name() or user.first_name or user.username, "email": user.email},
+        "formations": formations,
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def my_formation(request, token, publication_id):
+    """GET /api/v1/site/mon-espace/<token>/formation/<id>/ → contenu d'une formation.
+
+    Autorisation : l'apprenant doit avoir une inscription **confirmée** sur cette
+    publication. Renvoie le contenu de chaque Theme rattaché.
+    """
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+
+    ins = (
+        Inscription.objects.filter(
+            participant=user, publication_id=publication_id,
+            status=Inscription.CONFIRMED, is_deleted=False,
+        )
+        .select_related("publication")
+        .first()
+    )
+    if not ins:
+        return Response(
+            {"detail": "Vous n'avez pas accès à cette formation."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    pub = ins.publication
+    themes = [build_theme_content(t, request) for t in pub.themes.all()]
+    return Response({
+        "publication_id": pub.id,
+        "title": pub.title,
+        "description": pub.description,
+        "themes": themes,
+    })

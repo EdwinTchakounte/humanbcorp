@@ -44,6 +44,11 @@ class Publication(models.Model):
     liste_tags=models.ManyToManyField(Tags,null=True)
     image = models.ImageField(upload_to='img',null=True)
     is_private = models.BooleanField(null=True,default=True)
+    # Contenu pédagogique rattaché à cette formation payante (LMS lessonapp).
+    # Réf. par chaîne pour éviter tout import circulaire contents <-> lessonapp.
+    themes = models.ManyToManyField(
+        "lessonapp.Theme", blank=True, related_name="publications"
+    )
     
 	  
  

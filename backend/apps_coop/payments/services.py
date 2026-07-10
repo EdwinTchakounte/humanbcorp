@@ -354,6 +354,15 @@ def _emit_paiement_recu(payment, order, *, fully_paid, total_paid) -> None:
         from apps_coop.notifications.events import emit_event
 
         to_email = getattr(payment.member, "email", "") or ""
+
+        # Lien magique vers l'espace apprenant (accès au contenu de la formation).
+        try:
+            from sitecms.learner import learner_space_url
+
+            portal_url = learner_space_url(payment.member)
+        except Exception:  # noqa: BLE001 — dégrade sur l'URL dashboard si indispo
+            portal_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3007")
+
         emit_event(
             "paiement.recu",
             member=payment.member,
@@ -364,7 +373,7 @@ def _emit_paiement_recu(payment, order, *, fully_paid, total_paid) -> None:
                 "commande_id": order.id,
                 "reste": _fmt_xaf(max(order.total_amount - total_paid, 0)),
                 "statut": "payée intégralement" if fully_paid else "partiellement payée",
-                "portal_url": getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3007"),
+                "portal_url": portal_url,
             },
         )
     except Exception:  # noqa: BLE001

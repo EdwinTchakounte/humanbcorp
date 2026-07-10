@@ -21,6 +21,10 @@ from .views import DashboardView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/', include('sitecms.urls')),
+    path('api/v1/', include('recruitment.urls')),
+    path('api/v1/payments/', include('apps_coop.payments.urls')),
+    path('api/v1/notifications/', include('apps_coop.notifications.urls')),
     path('administration/', views.administration),
     path('', views.homepage),
     path('about/', views.about),

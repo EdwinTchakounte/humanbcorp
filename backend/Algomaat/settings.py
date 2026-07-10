@@ -49,7 +49,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    
+    "rest_framework_simplejwt",
+    "corsheaders",
+
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -70,11 +72,20 @@ INSTALLED_APPS = [
     "lessonapp",
     "chat",
     "paiement",
+    "sitecms",
+    "recruitment",
     #"accounts.apps.AccountsConfig",
+
+    # Refonte 2026 — modules greffés (mail Brevo + paiement mobile money Tara)
+    "anymail",
+    "django_q",
+    "apps_coop.notifications",
+    "apps_coop.payments",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -265,13 +276,44 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# Email
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Email — migré vers Brevo via django-anymail (refonte 2026).
+# En dev : backend console (rien n'est envoyé, les mails s'affichent dans les logs).
+# En prod : EMAIL_BACKEND=anymail.backends.brevo.EmailBackend + BREVO_API_KEY.
+EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+ANYMAIL = {"BREVO_API_KEY": config("BREVO_API_KEY", default="")}
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="HBC-RH <noreply@humanbcorp.com>")
+CONTACT_NOTIFICATION_EMAIL = config("CONTACT_NOTIFICATION_EMAIL", default="contact@humanbcorp.com")
+# Anciens réglages SMTP conservés (inertes tant que EMAIL_BACKEND ≠ smtp).
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+
+# Paiement mobile money Tara (app apps_coop.payments).
+TARA_API_KEY = config("TARA_API_KEY", default="")
+TARA_BUSINESS_ID = config("TARA_BUSINESS_ID", default="")
+TARA_WEBHOOK_SECRET = config("TARA_WEBHOOK_SECRET", default="")
+# Sert à construire l'URL de webhook envoyée à Tara : {PUBLIC_BASE_URL}/api/v1/payments/webhook/tara/
+PUBLIC_BASE_URL = config("PUBLIC_BASE_URL", default="http://localhost:8011")
+# Modes test — À LAISSER FALSE EN PROD (valident les paiements sans Tara / sans contrôle de montant).
+PAYMENTS_TEST_AUTO_VALIDATE = config("PAYMENTS_TEST_AUTO_VALIDATE", default=False, cast=bool)
+PAYMENTS_TEST_ALLOW_ANY_AMOUNT = config("PAYMENTS_TEST_ALLOW_ANY_AMOUNT", default=False, cast=bool)
+
+# Ordonnanceur django-q2 (cron de réconciliation des paiements EN_ATTENTE).
+# Broker = ORM Django (pas de Redis requis). Le cluster ne tourne que si `manage.py qcluster` est lancé.
+Q_CLUSTER = {
+    "name": "hbc",
+    "orm": "default",
+    "timeout": 90,
+    "retry": 120,
+    "workers": 2,
+    "catch_up": False,
+}
+
+# Chatbot (OpenRouter) — la clé reste côté serveur.
+OPENROUTER_API_KEY = config("OPENROUTER_API_KEY", default="")
+OPENROUTER_MODEL = config("OPENROUTER_MODEL", default="openai/gpt-4o-mini")
 
 
 # ---------------------------------------------------------------------------
@@ -289,3 +331,48 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
+
+# ---------------------------------------------------------------------------
+# API REST (DRF) + JWT + CORS — pour la stack découplée
+#   humanbcorp.com (vitrine Next) · dashboard.humanbcorp.com (CMS Next)
+#   api.humanbcorp.com (ce backend Django)
+# ---------------------------------------------------------------------------
+from datetime import timedelta
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ),
+    "DEFAULT_RENDERER_CLASSES": (
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 50,
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": False,
+}
+
+# CORS — origines autorisées des front-ends Next (dev + prod).
+CORS_ALLOWED_ORIGINS = [o.strip() for o in config(
+    "CORS_ALLOWED_ORIGINS",
+    default=(
+        "http://localhost:3000,http://localhost:3001,http://localhost:3007,"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3007"
+    ),
+).split(",") if o.strip()]
+CORS_ALLOW_CREDENTIALS = True
+# En dev (DEBUG), autoriser tout localhost:<port> pour ne pas bloquer un front
+# lancé sur un port différent (évite les erreurs CORS lors des tests locaux).
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [r"^http://(localhost|127\.0\.0\.1):\d+$"]

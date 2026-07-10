@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #3c5ea5;
+  --brand-dark: #2d467b;
+  --brand-deep: #1c2f57;
+  --accent: #ec7123;
+  --font-poppins: "Poppins", system-ui, sans-serif;
+  --font-inter: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-white font-sans text-ink antialiased;
+    line-height: 1.65;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading text-brand-deep;
+    letter-spacing: -0.01em;
+  }
+  h1, h2 {
+    font-weight: 800;
+    line-height: 1.12;
+  }
+}
+
+@layer components {
+  .container-hbc {
+    @apply mx-auto w-full max-w-container px-5 md:px-8;
+  }
+  .eyebrow {
+    @apply font-heading text-[0.78rem] font-semibold uppercase tracking-[0.18em] text-accent;
+  }
+  .section-rule {
+    @apply mx-auto mt-4 h-1 w-16 rounded-full;
+    background: linear-gradient(90deg, var(--accent), var(--brand));
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 font-heading text-sm font-semibold
+      transition-transform duration-300 ease-hbc hover:-translate-y-0.5;
+  }
+  .btn-brand { @apply btn bg-brand text-white hover:bg-brand-dark; }
+  .btn-accent { @apply btn bg-accent text-white hover:bg-accent-dark; }
+  .btn-outline-brand { @apply btn border-2 border-brand text-brand hover:bg-brand hover:text-white; }
+  .btn-outline-light { @apply btn border-2 border-white/70 text-white hover:bg-white hover:text-brand-deep; }
+  .card-soft {
+    @apply rounded-2xl bg-white shadow-hbc-sm transition-all duration-300 ease-hbc;
+  }
+  .hbc-input {
+    @apply w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none
+      transition focus:border-brand focus:ring-4 focus:ring-brand/15;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .min-h-screen-dvh { min-height: 100dvh; }
+  /* masque de vague appliqué en bas d'une section */
+  .mask-wave-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, black 88%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 88%, transparent 100%);
+  }
+}

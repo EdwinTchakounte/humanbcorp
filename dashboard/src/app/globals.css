@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-poppins: "Poppins", system-ui, sans-serif;
+  --font-inter: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-soft/40 font-sans text-ink antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading text-brand-deep;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-heading text-sm font-semibold transition;
+  }
+  .btn-brand { @apply btn bg-brand text-white hover:bg-brand-dark disabled:opacity-50; }
+  .btn-accent { @apply btn bg-accent text-white hover:bg-accent-dark disabled:opacity-50; }
+  .btn-ghost { @apply btn border border-line bg-white text-ink hover:border-brand hover:text-brand; }
+  .btn-danger { @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50; }
+  .input {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none
+      transition focus:border-brand focus:ring-4 focus:ring-brand/10;
+  }
+  .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-muted; }
+  .card { @apply rounded-xl border border-line bg-white shadow-hbc-sm; }
+}

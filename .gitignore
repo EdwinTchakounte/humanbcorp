@@ -8,8 +8,26 @@ db.sqlite3
 __pycache__/
 *.pyc
 
+# Virtualenvs
+.venv/
+.venv_local/
+venv/
+env/
+
 # Collected static / build artifacts
 staticfiles/
+
+# Médias uploadés au runtime (CMS, CV candidatures, documents…) — jamais du code source
+backend/mediafiles/
+
+# Node / Next.js (web/ et dashboard/)
+node_modules/
+.next/
+out/
+.turbo/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
 
 # Editor / OS
 .idea/

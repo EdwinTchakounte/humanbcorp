@@ -63,8 +63,15 @@ class PublicFormationSerializer(serializers.ModelSerializer):
         fields = ["id", "title", "description", "price", "categorie_name", "image_url", "date"]
 
     def get_image_url(self, obj):
+        # Renvoie null si l'image est absente OU si le fichier n'existe pas sur le
+        # disque (évite une <img> cassée côté vitrine → placeholder propre).
         if not obj.image:
             return None
+        try:
+            if not obj.image.storage.exists(obj.image.name):
+                return None
+        except Exception:  # noqa: BLE001 — stockage indisponible → on tente l'URL
+            pass
         request = self.context.get("request")
         return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 

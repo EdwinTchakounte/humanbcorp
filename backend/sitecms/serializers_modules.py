@@ -23,13 +23,14 @@ class EventSerializer(serializers.ModelSerializer):
     theme = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     theme_id = serializers.SerializerMethodField()
     theme_title = serializers.SerializerMethodField()
+    participants_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         fields = [
             "id", "title", "description", "start_time", "end_time",
             "is_test", "is_active", "user", "user_name", "created_at",
-            "theme", "theme_id", "theme_title",
+            "theme", "theme_id", "theme_title", "participants_count",
         ]
         read_only_fields = ["created_at", "user_name"]
         extra_kwargs = {
@@ -49,6 +50,23 @@ class EventSerializer(serializers.ModelSerializer):
     def get_theme_title(self, obj):
         et = self._event_theme(obj)
         return et.theme.title if et else None
+
+    def get_participants_count(self, obj):
+        # Participants = apprenants avec inscription CONFIRMED sur une formation
+        # (Publication) rattachée au thème de l'événement.
+        et = self._event_theme(obj)
+        if not et:
+            return 0
+        from bucket.models import Inscription
+
+        return (
+            Inscription.objects.filter(
+                publication__themes=et.theme, status=Inscription.CONFIRMED, is_deleted=False
+            )
+            .values("participant")
+            .distinct()
+            .count()
+        )
 
     def _sync_theme(self, event, theme_id):
         from calendarapp.models import EventTheme

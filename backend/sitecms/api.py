@@ -377,6 +377,36 @@ class EventViewSet(_ModuleViewSet):
     def perform_create(self, serializer):
         serializer.save(user=serializer.validated_data.get("user") or self.request.user)
 
+    @action(detail=True, methods=["get"], url_path="participants")
+    def participants(self, request, pk=None):
+        """Liste des apprenants inscrits (CONFIRMED) à la formation liée à l'événement."""
+        event = self.get_object()
+        from calendarapp.models import EventTheme
+        from bucket.models import Inscription
+
+        et = EventTheme.objects.filter(event=event).select_related("theme").first()
+        if not et:
+            return Response([])
+        seen, out = set(), []
+        qs = (
+            Inscription.objects.filter(
+                publication__themes=et.theme, status=Inscription.CONFIRMED, is_deleted=False
+            )
+            .select_related("participant")
+            .order_by("participant__first_name")
+        )
+        for ins in qs:
+            u = ins.participant
+            if not u or u.id in seen:
+                continue
+            seen.add(u.id)
+            out.append({
+                "id": u.id,
+                "name": u.get_full_name() or u.first_name or u.username,
+                "email": u.email,
+            })
+        return Response(out)
+
 
 class MeetingViewSet(_ModuleViewSet):
     module_key = "agenda"

@@ -47,6 +47,13 @@ export default function AgendaPage() {
   const [mDraft, setMDraft] = useState<MeetDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [parts, setParts] = useState<{ event: EventItem; list: { id: number; name: string; email: string }[] } | null>(null);
+
+  async function showParticipants(e: EventItem) {
+    setParts({ event: e, list: [] });
+    const list = await api<{ id: number; name: string; email: string }[]>(`/modules/events/${e.id}/participants/`);
+    setParts({ event: e, list });
+  }
 
   async function saveMeeting() {
     if (!mDraft) return;
@@ -225,6 +232,15 @@ export default function AgendaPage() {
                               <i className="bx bx-book" /> {e.theme_title}
                             </span>
                           )}
+                          {e.theme_title && (
+                            <button
+                              onClick={() => showParticipants(e)}
+                              className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/20"
+                              title="Voir les participants"
+                            >
+                              <i className="bx bx-group" /> {e.participants_count} participant{e.participants_count > 1 ? "s" : ""}
+                            </button>
+                          )}
                         </div>
                         <div className="text-xs text-muted">
                           {fmt(e.start_time)} → {fmt(e.end_time)} · {e.user_name}
@@ -396,6 +412,39 @@ export default function AgendaPage() {
               />
             )}
             {err && <p className="text-sm text-red-600">{err}</p>}
+          </div>
+        )}
+      </Modal>
+
+      {/* Modale participants */}
+      <Modal
+        open={parts !== null}
+        title={parts ? `Participants — ${parts.event.title}` : ""}
+        onClose={() => setParts(null)}
+        footer={<button onClick={() => setParts(null)} className="btn-ghost">Fermer</button>}
+      >
+        {parts && (
+          <div>
+            <p className="mb-3 text-sm text-muted">
+              Apprenants inscrits (confirmés) à <strong>{parts.event.theme_title}</strong>.
+            </p>
+            {parts.list.length === 0 ? (
+              <p className="text-sm text-muted">Aucun participant confirmé.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {parts.list.map((p) => (
+                  <li key={p.id} className="flex items-center gap-3 py-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand">
+                      {(p.name || "?").slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-ink">{p.name}</div>
+                      <div className="truncate text-xs text-muted">{p.email}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </Modal>

@@ -81,9 +81,20 @@ def build_theme_content(theme, request, user=None):
         InputQuestionBox,
         ActivityComponent,
         QuizAttempt,
+        ActivityProgress,
     )
 
     objectifs = list(Objectif.objects.filter(theme=theme).values_list("name", flat=True))
+
+    # Activités terminées par l'apprenant sur ce thème (1 requête).
+    completed_ids = set()
+    if user is not None:
+        completed_ids = set(
+            ActivityProgress.objects.filter(
+                learner=user, completed=True, activity__seance__theme=theme
+            ).values_list("activity_id", flat=True)
+        )
+    theme_done = theme_total = 0
 
     seances_out = []
     for si, seance in enumerate(Seance.objects.filter(theme=theme), start=1):
@@ -140,6 +151,11 @@ def build_theme_content(theme, request, user=None):
                 if la:
                     last_attempt = {"score": la.score, "max_score": la.max_score}
 
+            completed = activity.pk in completed_ids
+            theme_total += 1
+            if completed:
+                theme_done += 1
+
             activities_out.append({
                 "id": activity.pk,
                 "index": ai,
@@ -150,6 +166,7 @@ def build_theme_content(theme, request, user=None):
                 "questions": questions,
                 "components": components,
                 "last_attempt": last_attempt,
+                "completed": completed,
             })
 
         seances_out.append({
@@ -168,6 +185,11 @@ def build_theme_content(theme, request, user=None):
         "image": _abs(request, image.url) if image else None,
         "objectifs": objectifs,
         "seances": seances_out,
+        "progress": {
+            "done": theme_done,
+            "total": theme_total,
+            "percent": round(100 * theme_done / theme_total) if theme_total else 0,
+        },
     }
 
 
@@ -200,6 +222,7 @@ def my_space(request, token):
             "description": pub.description,
             "image": _abs(request, pub.image.url) if pub.image else None,
             "has_content": pub.themes.exists(),
+            "progress": _publication_progress(user, pub),
         })
     return Response({
         "learner": {"name": user.get_full_name() or user.first_name or user.username, "email": user.email},
@@ -323,4 +346,54 @@ def submit_quiz(request, token, activity_id):
     QuizAttempt.objects.create(
         learner=user, activity=activity, score=score, max_score=max_score, answers=answers
     )
+    _mark_activity(user, activity, True)  # un quiz soumis marque l'activité terminée
     return Response({"score": score, "max_score": max_score, "results": results})
+
+
+def _mark_activity(user, activity, completed: bool) -> None:
+    from material.models import ActivityProgress
+
+    ActivityProgress.objects.update_or_create(
+        learner=user, activity=activity, defaults={"completed": completed}
+    )
+
+
+def _publication_progress(user, pub) -> dict:
+    """% d'activités terminées sur l'ensemble des thèmes de la formation."""
+    from lessonapp.models import Activity
+    from material.models import ActivityProgress
+
+    total = Activity.objects.filter(seance__theme__in=pub.themes.all()).count()
+    done = (
+        ActivityProgress.objects.filter(
+            learner=user, completed=True, activity__seance__theme__in=pub.themes.all()
+        ).count()
+        if user is not None else 0
+    )
+    return {"done": done, "total": total, "percent": round(100 * done / total) if total else 0}
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def mark_activity(request, token, activity_id):
+    """POST /api/v1/site/mon-espace/<token>/activite/<activity_id>/terminer/
+
+    Corps optionnel ``{"done": bool}`` (défaut true) → marque l'activité
+    terminée / non terminée pour l'apprenant.
+    """
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+
+    from lessonapp.models import Activity
+
+    activity = Activity.objects.filter(pk=activity_id).first()
+    if activity is None:
+        return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
+    if not _learner_can_access_activity(user, activity):
+        return Response({"detail": "Vous n'avez pas accès à cette activité."}, status=status.HTTP_403_FORBIDDEN)
+
+    done = request.data.get("done", True)
+    _mark_activity(user, activity, bool(done))
+    return Response({"activity_id": activity.id, "completed": bool(done)})

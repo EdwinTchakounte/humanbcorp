@@ -216,6 +216,24 @@ class QuizAttempt(models.Model):
 	def __str__(self):
 		return f"{self.learner} · {self.activity} · {self.score}/{self.max_score}"
 
+
+class ActivityProgress(models.Model):
+	"""Avancement d'un apprenant sur une activité (terminée ou non).
+
+	Une ligne par (apprenant, activité). Un quiz soumis marque l'activité
+	terminée automatiquement ; les autres activités via « Marquer comme terminé ».
+	"""
+	learner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="activity_progress")
+	activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name="progress")
+	completed = models.BooleanField(default=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		unique_together = ("learner", "activity")
+
+	def __str__(self):
+		return f"{self.learner} · {self.activity} · {'✓' if self.completed else '…'}"
+
  
  
 

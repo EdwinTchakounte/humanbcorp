@@ -182,12 +182,18 @@ export async function submitCandidature(
 // ---------------------------------------------------------------------------
 // Espace apprenant (lien magique) — contenu des formations achetées
 // ---------------------------------------------------------------------------
+export interface Progress {
+  done: number;
+  total: number;
+  percent: number;
+}
 export interface LearnerFormation {
   publication_id: number;
   title: string;
   description: string;
   image: string | null;
   has_content: boolean;
+  progress: Progress;
 }
 export interface MySpace {
   learner: { name: string; email: string };
@@ -245,6 +251,7 @@ export interface LearnerActivity {
   questions: QuizQuestion[];
   components: LearnerComponent[];
   last_attempt: { score: number; max_score: number } | null;
+  completed: boolean;
 }
 export interface LearnerSeance {
   id: number;
@@ -260,6 +267,7 @@ export interface LearnerTheme {
   image: string | null;
   objectifs: string[];
   seances: LearnerSeance[];
+  progress: Progress;
 }
 export interface MyFormation {
   publication_id: number;
@@ -305,6 +313,19 @@ export async function submitQuiz(
     return await res.json();
   } catch {
     return null;
+  }
+}
+
+export async function markActivity(token: string, activityId: number, done: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/activite/${activityId}/terminer/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

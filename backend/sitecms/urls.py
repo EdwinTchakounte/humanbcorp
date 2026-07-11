@@ -85,6 +85,7 @@ urlpatterns = [
     path("site/mon-espace/<str:token>/", learner.my_space, name="site-mon-espace"),
     path("site/mon-espace/<str:token>/formation/<int:publication_id>/", learner.my_formation, name="site-mon-espace-formation"),
     path("site/mon-espace/<str:token>/quiz/<int:activity_id>/", learner.submit_quiz, name="site-mon-espace-quiz"),
+    path("site/mon-espace/<str:token>/activite/<int:activity_id>/terminer/", learner.mark_activity, name="site-mon-espace-activite"),
     path("contact/", ContactView.as_view(), name="contact"),
     path("chat/", ChatView.as_view(), name="chat"),
 

@@ -5,6 +5,7 @@ import {
   getMySpace,
   getMyFormation,
   submitQuiz,
+  markActivity,
   type MySpace,
   type MyFormation,
   type LearnerActivity,
@@ -15,6 +16,22 @@ import {
 
 const SEANCE_TYPE: Record<number, string> = { 0: "Théorie", 1: "Pratique", 2: "Exercice" };
 const DOC_TYPE: Record<number, string> = { 1: "Cours", 2: "Exercice", 3: "Réponse", 4: "Correction" };
+
+type OnComplete = (activityId: number, completed: boolean) => void;
+
+function ProgressBar({ percent }: { percent: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-line/60">
+        <div
+          className={`h-full rounded-full transition-all ${percent === 100 ? "bg-green-500" : "bg-accent"}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className="shrink-0 text-xs font-semibold text-muted">{percent}%</span>
+    </div>
+  );
+}
 
 function DocRow({ d }: { d: LearnerDoc }) {
   return (
@@ -37,7 +54,15 @@ function DocRow({ d }: { d: LearnerDoc }) {
   );
 }
 
-function QuizBlock({ activity, token }: { activity: LearnerActivity; token: string }) {
+function QuizBlock({
+  activity,
+  token,
+  onComplete,
+}: {
+  activity: LearnerActivity;
+  token: string;
+  onComplete: OnComplete;
+}) {
   const [answers, setAnswers] = useState<Record<number, number[]>>({});
   const [result, setResult] = useState<SubmitQuizResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,7 +83,10 @@ function QuizBlock({ activity, token }: { activity: LearnerActivity; token: stri
     setBusy(true);
     const res = await submitQuiz(token, activity.id, answers);
     setBusy(false);
-    if (res) setResult(res);
+    if (res) {
+      setResult(res);
+      onComplete(activity.id, true); // un quiz soumis marque l'activité terminée
+    }
   }
 
   function reset() {
@@ -141,12 +169,23 @@ function QuizBlock({ activity, token }: { activity: LearnerActivity; token: stri
   );
 }
 
-function ActivityBlock({ a, token }: { a: LearnerActivity; token: string }) {
+function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: string; onComplete: OnComplete }) {
+  const isQuiz = a.questions.length > 0;
+  const [marking, setMarking] = useState(false);
+
+  async function toggleDone() {
+    setMarking(true);
+    const ok = await markActivity(token, a.id, !a.completed);
+    setMarking(false);
+    if (ok) onComplete(a.id, !a.completed);
+  }
+
   return (
     <div className="rounded-2xl border border-line/70 bg-brand-soft/40 p-5">
       <h4 className="mb-3 flex items-center gap-2 font-semibold text-brand-deep">
         {a.type === 1 ? <i className="bx bx-help-circle" /> : <i className="bx bx-book-open" />}
         {a.title}
+        {a.completed && <i className="bx bxs-check-circle ml-auto text-lg text-green-600" title="Terminé" />}
       </h4>
 
       {/* Blocs de contenu (texte / image) */}
@@ -171,12 +210,26 @@ function ActivityBlock({ a, token }: { a: LearnerActivity; token: string }) {
       )}
 
       {/* Quiz interactif + notation */}
-      {a.questions.length > 0 && <QuizBlock activity={a} token={token} />}
+      {isQuiz && <QuizBlock activity={a} token={token} onComplete={onComplete} />}
+
+      {/* Marquer comme terminé (activités non-quiz : le quiz s'auto-complète) */}
+      {!isQuiz && (
+        <button
+          onClick={toggleDone}
+          disabled={marking}
+          className={`mt-4 text-sm font-semibold disabled:opacity-50 ${
+            a.completed ? "text-muted hover:text-brand-deep" : "text-accent"
+          }`}
+        >
+          <i className={`bx ${a.completed ? "bx-undo" : "bx-check"}`} />{" "}
+          {a.completed ? "Marquer comme non terminé" : "Marquer comme terminé"}
+        </button>
+      )}
     </div>
   );
 }
 
-function SeanceBlock({ s, token }: { s: LearnerSeance; token: string }) {
+function SeanceBlock({ s, token, onComplete }: { s: LearnerSeance; token: string; onComplete: OnComplete }) {
   return (
     <div className="card p-6">
       <div className="mb-4 flex items-center gap-3">
@@ -197,7 +250,7 @@ function SeanceBlock({ s, token }: { s: LearnerSeance; token: string }) {
       )}
       <div className="space-y-4">
         {s.activities.map((a) => (
-          <ActivityBlock key={a.id} a={a} token={token} />
+          <ActivityBlock key={a.id} a={a} token={token} onComplete={onComplete} />
         ))}
       </div>
     </div>
@@ -242,6 +295,45 @@ export default function LearnerSpace({ token }: { token: string }) {
     setLoadingContent(false);
   }
 
+  // Met à jour la progression localement (sans recharger → préserve l'état du quiz).
+  function patchCompleted(activityId: number, completed: boolean) {
+    setContent((prev) => {
+      if (!prev) return prev;
+      let gDone = 0;
+      let gTotal = 0;
+      const themes = prev.themes.map((th) => {
+        let done = 0;
+        let total = 0;
+        const seances = th.seances.map((s) => ({
+          ...s,
+          activities: s.activities.map((a) => {
+            const c = a.id === activityId ? completed : a.completed;
+            total += 1;
+            if (c) done += 1;
+            return a.id === activityId ? { ...a, completed } : a;
+          }),
+        }));
+        gDone += done;
+        gTotal += total;
+        return { ...th, seances, progress: { done, total, percent: total ? Math.round((100 * done) / total) : 0 } };
+      });
+      const gPercent = gTotal ? Math.round((100 * gDone) / gTotal) : 0;
+      setSpace((sp) =>
+        sp
+          ? {
+              ...sp,
+              formations: sp.formations.map((f) =>
+                f.publication_id === prev.publication_id
+                  ? { ...f, progress: { done: gDone, total: gTotal, percent: gPercent } }
+                  : f
+              ),
+            }
+          : sp
+      );
+      return { ...prev, themes };
+    });
+  }
+
   if (loading) return <p className="text-muted">Chargement…</p>;
 
   if (invalid || !space)
@@ -278,9 +370,15 @@ export default function LearnerSpace({ token }: { token: string }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-lg leading-tight">{f.title}</h3>
-                  <p className="truncate text-sm text-muted">
-                    {f.has_content ? "Contenu disponible" : "Contenu en préparation"}
-                  </p>
+                  {f.has_content && f.progress.total > 0 ? (
+                    <div className="mt-2 max-w-xs">
+                      <ProgressBar percent={f.progress.percent} />
+                    </div>
+                  ) : (
+                    <p className="truncate text-sm text-muted">
+                      {f.has_content ? "Contenu disponible" : "Contenu en préparation"}
+                    </p>
+                  )}
                 </div>
                 {f.has_content && (
                   <i
@@ -302,6 +400,11 @@ export default function LearnerSpace({ token }: { token: string }) {
                       {content.themes.map((th) => (
                         <div key={th.id}>
                           <h2 className="mb-2 text-2xl">{th.title}</h2>
+                          {th.progress.total > 0 && (
+                            <div className="mb-4 max-w-sm">
+                              <ProgressBar percent={th.progress.percent} />
+                            </div>
+                          )}
                           {th.objectifs.length > 0 && (
                             <div className="mb-4 rounded-xl border border-line/70 bg-white p-4">
                               <p className="mb-1 text-sm font-semibold text-brand-deep">Objectifs</p>
@@ -314,7 +417,7 @@ export default function LearnerSpace({ token }: { token: string }) {
                           )}
                           <div className="space-y-4">
                             {th.seances.map((s) => (
-                              <SeanceBlock key={s.id} s={s} token={token} />
+                              <SeanceBlock key={s.id} s={s} token={token} onComplete={patchCompleted} />
                             ))}
                           </div>
                         </div>

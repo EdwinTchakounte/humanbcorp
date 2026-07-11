@@ -262,12 +262,24 @@ export interface LearnerSeance {
   documents: LearnerDoc[];
   activities: LearnerActivity[];
 }
+export interface ScheduleMeeting {
+  m_type: number; // 0=Google Meet 1=Zoom 2=Présentiel
+  link_url: string | null;
+}
+export interface ScheduleEvent {
+  id: number;
+  title: string;
+  start_time: string;
+  end_time: string;
+  meetings: ScheduleMeeting[];
+}
 export interface LearnerTheme {
   id: number;
   title: string;
   image: string | null;
   objectifs: string[];
   seances: LearnerSeance[];
+  schedule: ScheduleEvent[];
   progress: Progress;
 }
 export interface MyFormation {

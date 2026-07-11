@@ -177,6 +177,33 @@ def build_theme_content(theme, request, user=None):
             "activities": activities_out,
         })
 
+    # Planning : événements du calendrier rattachés à ce thème (EventTheme) + visio.
+    schedule = []
+    try:
+        from calendarapp.models import EventTheme, Meeting
+
+        for et in (
+            EventTheme.objects.filter(theme=theme)
+            .select_related("event")
+            .order_by("event__start_time")
+        ):
+            ev = et.event
+            if not ev or getattr(ev, "is_deleted", False):
+                continue
+            meetings = [
+                {"m_type": m.m_type, "link_url": m.link_url}
+                for m in Meeting.objects.filter(event=ev, is_deleted=False)
+            ]
+            schedule.append({
+                "id": ev.id,
+                "title": ev.title,
+                "start_time": ev.start_time,
+                "end_time": ev.end_time,
+                "meetings": meetings,
+            })
+    except Exception:  # noqa: BLE001 — planning best-effort
+        schedule = []
+
     image = getattr(theme, "image", None)
     return {
         "id": theme.pk,
@@ -184,6 +211,7 @@ def build_theme_content(theme, request, user=None):
         "image": _abs(request, image.url) if image else None,
         "objectifs": objectifs,
         "seances": seances_out,
+        "schedule": schedule,
         "progress": {
             "done": theme_done,
             "total": theme_total,

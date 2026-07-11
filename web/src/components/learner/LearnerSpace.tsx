@@ -16,6 +16,11 @@ import {
 
 const SEANCE_TYPE: Record<number, string> = { 0: "Théorie", 1: "Pratique", 2: "Exercice" };
 const DOC_TYPE: Record<number, string> = { 1: "Cours", 2: "Exercice", 3: "Réponse", 4: "Correction" };
+const MEET_TYPE: Record<number, string> = { 0: "Google Meet", 1: "Zoom", 2: "Présentiel" };
+
+function fmtDateTime(iso: string) {
+  return iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" }) : "";
+}
 
 type OnComplete = (activityId: number, completed: boolean) => void;
 
@@ -449,6 +454,34 @@ export default function LearnerSpace({ token }: { token: string }) {
                                 {th.objectifs.map((o, i) => (
                                   <li key={i}>{o}</li>
                                 ))}
+                              </ul>
+                            </div>
+                          )}
+                          {th.schedule.length > 0 && (
+                            <div className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/40 p-4">
+                              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-deep">
+                                <i className="bx bx-calendar" /> Planning des séances
+                              </p>
+                              <ul className="space-y-2">
+                                {th.schedule.map((ev) => {
+                                  const link = ev.meetings.find((m) => m.link_url)?.link_url;
+                                  return (
+                                    <li key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                      <span className="font-medium text-ink">{ev.title}</span>
+                                      <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
+                                      {ev.meetings[0] && (
+                                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand">
+                                          {MEET_TYPE[ev.meetings[0].m_type] ?? ""}
+                                        </span>
+                                      )}
+                                      {link && (
+                                        <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent">
+                                          <i className="bx bx-video" /> Rejoindre
+                                        </a>
+                                      )}
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             </div>
                           )}

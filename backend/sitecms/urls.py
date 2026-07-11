@@ -36,6 +36,7 @@ from .api import (
     ActivityViewSet,
     ActivityComponentViewSet,
     ActivityDocViewSet,
+    QuizQuestionViewSet,
     SectionViewSet,
     SiteSettingsPublicView,
     SiteSettingsViewSet,
@@ -58,6 +59,7 @@ router.register("modules/seances", SeanceViewSet, basename="mod-seances")
 router.register("modules/activities", ActivityViewSet, basename="mod-activities")
 router.register("modules/components", ActivityComponentViewSet, basename="mod-components")
 router.register("modules/activity-docs", ActivityDocViewSet, basename="mod-activity-docs")
+router.register("modules/quiz-questions", QuizQuestionViewSet, basename="mod-quiz-questions")
 router.register("modules/publications", PublicationViewSet, basename="mod-publications")
 router.register("modules/paiements", PaiementViewSet, basename="mod-paiements")
 router.register("modules/inscriptions", InscriptionViewSet, basename="mod-inscriptions")

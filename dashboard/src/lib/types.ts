@@ -191,6 +191,21 @@ export interface ActivityDocItem {
   m_type: number;
 }
 
+export interface QuizOptionEdit {
+  id?: number;
+  title: string;
+  is_answer: boolean;
+}
+export interface QuizQuestionItem {
+  id: number;
+  title: string;
+  description: string;
+  points: number;
+  number: number;
+  input_type: number; // 1=checkbox 2=radio
+  options: { id: number; title: string; is_answer: boolean }[];
+}
+
 export interface FormationsOverview {
   counts: { themes: number; sessions: number; sequences: number; classes: number; categories: number };
   sessions: { id: number; year: string }[];

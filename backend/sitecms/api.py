@@ -541,6 +541,127 @@ class ActivityDocViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _quiz_question_payload(question, aq):
+    """Sérialise une question de quiz + ses options (pour l'authoring)."""
+    from material.models import InputQuestionBox
+
+    options = list(InputQuestionBox.objects.filter(question=question).order_by("id"))
+    input_type = options[0].input_type if options else 2
+    return {
+        "id": question.id,
+        "title": question.title,
+        "description": question.description,
+        "points": aq.points if aq else 1,
+        "number": aq.number if aq else 0,
+        "input_type": input_type,  # 1=checkbox 2=radio
+        "options": [{"id": o.id, "title": o.title, "is_answer": o.is_answer} for o in options],
+    }
+
+
+class QuizQuestionViewSet(viewsets.ViewSet):
+    """Authoring des questions d'un quiz (Bloc + Question + Activityquestion + options).
+
+    list ?activity= ; create/update/destroy exposent une question « à plat »
+    (titre, description, points, input_type, options[{title,is_answer}]).
+    """
+
+    permission_classes = [HasModuleAccess]
+    module_key = "formations"
+
+    def list(self, request):
+        from lessonapp.models import Activityquestion
+
+        activity = request.query_params.get("activity")
+        if not activity:
+            return Response([])
+        aqs = (
+            Activityquestion.objects.filter(activity_id=activity)
+            .select_related("question")
+            .order_by("number", "id")
+        )
+        return Response([_quiz_question_payload(aq.question, aq) for aq in aqs])
+
+    def _write_options(self, question, input_type, options):
+        from material.models import InputQuestionBox
+
+        InputQuestionBox.objects.filter(question=question).delete()
+        for o in options or []:
+            title = (o.get("title") or "").strip()
+            if not title:
+                continue
+            InputQuestionBox.objects.create(
+                title=title, is_answer=bool(o.get("is_answer")), input_type=input_type, question=question
+            )
+
+    def create(self, request):
+        from lessonapp.models import Activity, Question, Activityquestion
+        from lessonapp.models.bloc import Bloc
+
+        d = request.data
+        activity = Activity.objects.filter(pk=d.get("activity")).first()
+        if activity is None:
+            return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        title = (d.get("title") or "").strip()
+        if not title:
+            return Response({"detail": "Intitulé de la question requis."}, status=status.HTTP_400_BAD_REQUEST)
+        bloc = Bloc.objects.create(title=title[:400], created_by=request.user, categorie=Bloc.QUESTION)
+        q = Question.objects.create(title=title, description=(d.get("description") or ""), bloc=bloc)
+        n = Activityquestion.objects.filter(activity=activity).count() + 1
+        try:
+            points = int(d.get("points", 1) or 1)
+        except (TypeError, ValueError):
+            points = 1
+        aq = Activityquestion.objects.create(activity=activity, question=q, points=points, number=n)
+        input_type = int(d.get("input_type", 2) or 2)
+        self._write_options(q, input_type, d.get("options"))
+        return Response(_quiz_question_payload(q, aq), status=status.HTTP_201_CREATED)
+
+    def _update(self, request, pk):
+        from lessonapp.models import Question, Activityquestion
+
+        q = Question.objects.filter(pk=pk).first()
+        if q is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        d = request.data
+        if "title" in d:
+            q.title = (d.get("title") or "").strip() or q.title
+        if "description" in d:
+            q.description = d.get("description") or ""
+        q.save()
+        aq = Activityquestion.objects.filter(question=q).first()
+        if aq and "points" in d:
+            try:
+                aq.points = int(d.get("points") or 1)
+                aq.save(update_fields=["points"])
+            except (TypeError, ValueError):
+                pass
+        if "options" in d:
+            input_type = int(d.get("input_type", 2) or 2)
+            self._write_options(q, input_type, d.get("options"))
+        return Response(_quiz_question_payload(q, aq))
+
+    def update(self, request, pk=None):
+        return self._update(request, pk)
+
+    def partial_update(self, request, pk=None):
+        return self._update(request, pk)
+
+    def destroy(self, request, pk=None):
+        from lessonapp.models import Question
+
+        q = Question.objects.filter(pk=pk).first()
+        if q is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        bloc = q.bloc
+        q.delete()  # cascade Activityquestion + InputQuestionBox
+        if bloc:
+            try:
+                bloc.delete()
+            except Exception:  # noqa: BLE001
+                pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class FormationsOverviewView(APIView):
     """GET /modules/formations/overview/ → compteurs + listes pour filtres."""
 

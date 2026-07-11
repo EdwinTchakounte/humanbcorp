@@ -19,6 +19,42 @@ const DOC_TYPE: Record<number, string> = { 1: "Cours", 2: "Exercice", 3: "Répon
 
 type OnComplete = (activityId: number, completed: boolean) => void;
 
+function toEmbed(url: string): { kind: "iframe" | "video" | "link"; src: string } {
+  const u = url.trim();
+  // YouTube : watch?v=ID, youtu.be/ID, /embed/ID, /shorts/ID
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  if (yt) return { kind: "iframe", src: `https://www.youtube.com/embed/${yt[1]}` };
+  // Vimeo : vimeo.com/ID
+  const vm = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vm) return { kind: "iframe", src: `https://player.vimeo.com/video/${vm[1]}` };
+  // Fichier vidéo direct
+  if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(u)) return { kind: "video", src: u };
+  return { kind: "link", src: u };
+}
+
+function VideoEmbed({ url }: { url: string }) {
+  const { kind, src } = toEmbed(url);
+  if (kind === "iframe")
+    return (
+      <div className="relative mt-2 aspect-video overflow-hidden rounded-lg bg-black">
+        <iframe
+          src={src}
+          title="Vidéo"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0 h-full w-full"
+        />
+      </div>
+    );
+  if (kind === "video")
+    return <video src={src} controls className="mt-2 w-full rounded-lg" />;
+  return (
+    <a href={src} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-accent">
+      <i className="bx bx-play-circle text-lg" /> Voir la vidéo
+    </a>
+  );
+}
+
 function ProgressBar({ percent }: { percent: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -188,7 +224,7 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
         {a.completed && <i className="bx bxs-check-circle ml-auto text-lg text-green-600" title="Terminé" />}
       </h4>
 
-      {/* Blocs de contenu (texte / image) */}
+      {/* Blocs de contenu (texte / image / vidéo) */}
       {a.components.map((c) => (
         <div key={c.id} className="mb-3">
           {c.title && <p className="font-medium text-ink">{c.title}</p>}
@@ -197,6 +233,7 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
             // eslint-disable-next-line @next/next/no-img-element
             <img src={c.image} alt={c.title} className="mt-2 max-w-full rounded-lg" />
           )}
+          {c.video_url && <VideoEmbed url={c.video_url} />}
         </div>
       ))}
 

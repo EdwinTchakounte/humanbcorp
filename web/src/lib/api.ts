@@ -226,6 +226,7 @@ export interface LearnerComponent {
   title: string;
   paragraph: string | null;
   image: string | null;
+  video_url: string | null;
   number: number;
 }
 export interface QuizResult {

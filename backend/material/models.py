@@ -189,6 +189,8 @@ class Component(models.Model):
 	img_width = models.IntegerField(default=400)
 	img_height = models.IntegerField(default=300)
 	image = models.ImageField(upload_to='img',null=True)
+	# Vidéo pédagogique : lien YouTube / Vimeo / fichier direct (.mp4). Embed côté front.
+	video_url = models.URLField(max_length=500, null=True, blank=True)
 	number = models.IntegerField()
       
   

@@ -140,6 +140,7 @@ def build_theme_content(theme, request, user=None):
                     "title": c.title,
                     "paragraph": c.paragraph,
                     "image": _abs(request, c.image.url) if c.image else None,
+                    "video_url": c.video_url or None,
                     "number": c.number,
                 }
                 for c in ActivityComponent.objects.filter(activity=activity).order_by("number")

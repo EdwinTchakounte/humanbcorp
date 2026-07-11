@@ -5,7 +5,7 @@ Chaque helper retourne un fragment HTML prêt à concaténer dans le
 (``{prenom}``, ``{montant}``…) sont injectés tels quels par
 ``send_template`` via ``str.format(**context)``.
 
-Design system aligné avec la vitrine Gathe Finance :
+Design system aligné avec la vitrine HBC-RH :
 - Typographie sans-serif système + serif Georgia pour les titres
 - Palette navy #1E3A8A, teal #00B894, bleu accent #0EA5E9
 - Cards info à fond bleu pâle, CTA pill bleu navy

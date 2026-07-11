@@ -144,7 +144,7 @@ def _wrap_layout(subject: str, inner_html: str, *, eyebrow: str = "") -> str:
 
     Si ``settings.EMAIL_LOGO_URL`` est défini (URL publique HTTPS d'une
     image servie depuis la vitrine ou un CDN), on l'affiche dans le
-    header. Sinon, on retombe sur un wordmark texte stylé "Gathe Finance"
+    header. Sinon, on retombe sur un wordmark texte stylé "HBC-RH"
     en serif blanc — propre et compatible toutes inboxes sans dépendre
     d'un fichier hébergé.
     """

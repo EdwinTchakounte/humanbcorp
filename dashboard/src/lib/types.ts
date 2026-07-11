@@ -174,6 +174,23 @@ export interface ActivityItem {
   is_active: boolean;
 }
 
+export interface ComponentItem {
+  id: number;
+  activity: number;
+  title: string;
+  paragraph: string | null;
+  video_url: string | null;
+  number: number;
+}
+
+export interface ActivityDocItem {
+  id: number;
+  activity: number;
+  title: string;
+  url: string | null;
+  m_type: number;
+}
+
 export interface FormationsOverview {
   counts: { themes: number; sessions: number; sequences: number; classes: number; categories: number };
   sessions: { id: number; year: string }[];

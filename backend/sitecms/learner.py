@@ -105,13 +105,11 @@ def build_theme_content(theme, request, user=None):
 
         activities_out = []
         for ai, activity in enumerate(Activity.objects.filter(seance=seance), start=1):
-            # Documents PDF (a_type == 2)
-            docs = []
-            if activity.a_type == Activity.PDF:
-                docs = [
-                    _doc_payload(request, d, i)
-                    for i, d in enumerate(MaterialActivityDoc.objects.filter(activity=activity), start=1)
-                ]
+            # Documents rattachés à l'activité (PDF/liens) — tout type d'activité.
+            docs = [
+                _doc_payload(request, d, i)
+                for i, d in enumerate(MaterialActivityDoc.objects.filter(activity=activity), start=1)
+            ]
 
             # Quiz (a_type == 1) — questions + options (lecture seule, sans révéler la bonne réponse)
             questions = []

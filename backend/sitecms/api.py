@@ -32,6 +32,7 @@ from .serializers_modules import (
     ThemeSerializer,
     SeanceSerializer,
     ActivitySerializer,
+    ActivityComponentSerializer,
     SessionMiniSerializer,
     SequenceMiniSerializer,
     CategorieMiniSerializer,
@@ -444,6 +445,100 @@ class ActivityViewSet(_ModuleViewSet):
             categorie=Bloc.ACTIVITY,
         )
         serializer.save(bloc=bloc)
+
+
+class ActivityComponentViewSet(_ModuleViewSet):
+    """Module Formations : blocs de contenu (texte + vidéo) d'une activité. Filtre `?activity=`."""
+
+    module_key = "formations"
+    serializer_class = ActivityComponentSerializer
+
+    def get_queryset(self):
+        from material.models import ActivityComponent
+
+        qs = ActivityComponent.objects.all()
+        activity = self.request.query_params.get("activity")
+        if activity:
+            qs = qs.filter(activity_id=activity)
+        return qs.order_by("number", "id")
+
+    def perform_create(self, serializer):
+        from material.models import ActivityComponent
+
+        activity = serializer.validated_data.get("activity")
+        n = ActivityComponent.objects.filter(activity=activity).count() + 1
+        serializer.save(number=n)
+
+
+class ActivityDocViewSet(viewsets.ViewSet):
+    """Documents (liens) d'une activité. Crée un Link + MaterialActivityDoc.
+
+    Upload de fichier non géré ici (passe par l'admin) — on référence une URL.
+    """
+
+    permission_classes = [HasModuleAccess]
+    module_key = "formations"
+
+    def list(self, request):
+        from material.models import MaterialActivityDoc
+
+        qs = MaterialActivityDoc.objects.all()
+        activity = request.query_params.get("activity")
+        if activity:
+            qs = qs.filter(activity_id=activity)
+        out = []
+        for d in qs:
+            try:
+                url = d.doc_link()
+            except Exception:  # noqa: BLE001
+                url = None
+            out.append({"id": d.id, "title": d.title, "url": url, "m_type": d.m_type, "activity": d.activity_id})
+        return Response(out)
+
+    def create(self, request):
+        from lessonapp.models import Activity
+        from material.models import Link, MaterialActivityDoc
+
+        activity_id = request.data.get("activity")
+        url = (request.data.get("url") or "").strip()
+        title = (request.data.get("title") or "").strip()
+        if not activity_id or not url:
+            return Response({"detail": "activity et url requis."}, status=status.HTTP_400_BAD_REQUEST)
+        activity = Activity.objects.filter(pk=activity_id).first()
+        if activity is None:
+            return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            m_type = int(request.data.get("m_type", 1) or 1)
+        except (TypeError, ValueError):
+            m_type = 1
+        link = Link.objects.create(title=title or url, url=url)
+        doc = MaterialActivityDoc.objects.create(
+            title=title or "Document",
+            description=request.data.get("description", "") or "",
+            document=link,
+            m_type=m_type,
+            owner=request.user,
+            activity=activity,
+        )
+        return Response(
+            {"id": doc.id, "title": doc.title, "url": link.url, "m_type": doc.m_type, "activity": activity.id},
+            status=status.HTTP_201_CREATED,
+        )
+
+    def destroy(self, request, pk=None):
+        from material.models import MaterialActivityDoc
+
+        d = MaterialActivityDoc.objects.filter(pk=pk).first()
+        if d is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        doc = d.document
+        d.delete()
+        if doc:
+            try:
+                doc.delete()
+            except Exception:  # noqa: BLE001
+                pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class FormationsOverviewView(APIView):

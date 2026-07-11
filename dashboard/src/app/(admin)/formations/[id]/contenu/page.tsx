@@ -175,6 +175,9 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
                           <i className={`bx ${ACT_ICON[a.a_type] || "bx-square"} text-lg text-brand`} />
                           <span className="flex-1 text-sm text-ink">{a.title}</span>
                           <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">{a.a_type_label}</span>
+                          <Link href={`/formations/${themeId}/contenu/activite/${a.id}`} className="btn-ghost text-xs" title="Éditer le contenu">
+                            <i className="bx bx-list-ul" /> Contenu
+                          </Link>
                           {writable && (
                             <div className="flex gap-1">
                               <button onClick={() => setADraft({ id: a.id, seance: s.id, title: a.title, a_type: String(a.a_type) })} className="btn-ghost text-xs" title="Modifier">

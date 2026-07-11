@@ -81,6 +81,7 @@ class ThemeSerializer(serializers.ModelSerializer):
 
 SEANCE_TYPES = {0: "Théorie", 1: "Pratique", 2: "Exercice"}
 ACTIVITY_TYPES = {1: "Quiz", 2: "Document (PDF)", 3: "Contenu / Vidéo"}
+DOC_TYPES = {1: "Cours", 2: "Exercice", 3: "Réponse", 4: "Correction"}
 
 
 class SeanceSerializer(serializers.ModelSerializer):
@@ -112,6 +113,22 @@ class ActivitySerializer(serializers.ModelSerializer):
 
     def get_a_type_label(self, obj):
         return ACTIVITY_TYPES.get(obj.a_type, "—")
+
+
+class ActivityComponentSerializer(serializers.ModelSerializer):
+    """Bloc de contenu (texte + vidéo) d'une activité (authoring)."""
+
+    class Meta:
+        from material.models import ActivityComponent
+
+        model = ActivityComponent
+        fields = ["id", "activity", "title", "paragraph", "video_url", "number"]
+        extra_kwargs = {
+            "number": {"required": False},
+            "title": {"required": False, "allow_blank": True},
+            "paragraph": {"required": False, "allow_blank": True, "allow_null": True},
+            "video_url": {"required": False, "allow_blank": True, "allow_null": True},
+        }
 
 
 class SessionMiniSerializer(serializers.ModelSerializer):

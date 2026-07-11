@@ -25,6 +25,13 @@ function toLocalInput(iso: string) {
 type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; theme: string };
 const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", theme: "" };
 
+const MEETING_TYPE_OPTIONS = [
+  { value: "0", label: "Google Meet" },
+  { value: "1", label: "Zoom" },
+  { value: "2", label: "Présentiel" },
+];
+type MeetDraft = { id?: number; event: string; m_type: string; link_url: string };
+
 export default function AgendaPage() {
   const { isAdmin, canWrite } = useAuth();
   const writable = canWrite("agenda");
@@ -37,8 +44,35 @@ export default function AgendaPage() {
   const [view, setView] = useState<"calendar" | "list">("calendar");
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [mDraft, setMDraft] = useState<MeetDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+
+  async function saveMeeting() {
+    if (!mDraft) return;
+    if (!mDraft.event) {
+      setErr("Choisissez l'événement.");
+      return;
+    }
+    setSaving(true);
+    setErr("");
+    try {
+      const body = { event: Number(mDraft.event), m_type: Number(mDraft.m_type), link_url: mDraft.link_url || null };
+      if (mDraft.id) await api(`/modules/meetings/${mDraft.id}/`, { method: "PATCH", body });
+      else await api("/modules/meetings/", { method: "POST", body });
+      await load();
+      setMDraft(null);
+    } catch (e) {
+      setErr(String(e).slice(0, 200));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function delMeeting(m: MeetingItem) {
+    if (!confirm("Supprimer ce rendez-vous ?")) return;
+    await api(`/modules/meetings/${m.id}/`, { method: "DELETE" });
+    setMeetings((xs) => xs.filter((x) => x.id !== m.id));
+  }
 
   async function load() {
     const [e, m, t] = await Promise.all([
@@ -215,7 +249,14 @@ export default function AgendaPage() {
           </section>
 
           <section>
-            <h3 className="mb-3 font-heading text-lg text-brand-deep">Rendez-vous</h3>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-heading text-lg text-brand-deep">Rendez-vous</h3>
+              {writable && (
+                <button onClick={() => { setErr(""); setMDraft({ event: "", m_type: "0", link_url: "" }); }} className="btn-ghost text-sm">
+                  <i className="bx bx-plus" /> Rendez-vous
+                </button>
+              )}
+            </div>
             {meetings.length === 0 ? (
               <p className="text-sm text-muted">Aucun rendez-vous.</p>
             ) : (
@@ -234,6 +275,16 @@ export default function AgendaPage() {
                         <a href={m.link_url} target="_blank" rel="noopener noreferrer" className="btn-ghost text-xs">
                           <i className="bx bx-link-external" /> Lien
                         </a>
+                      )}
+                      {writable && (
+                        <>
+                          <button onClick={() => { setErr(""); setMDraft({ id: m.id, event: String(m.event), m_type: String(m.m_type), link_url: m.link_url || "" }); }} className="btn-ghost text-xs" title="Éditer">
+                            <i className="bx bx-edit" />
+                          </button>
+                          <button onClick={() => delMeeting(m)} className="btn-danger text-xs" title="Supprimer">
+                            <i className="bx bx-trash" />
+                          </button>
+                        </>
                       )}
                     </div>
                   ))}
@@ -304,6 +355,47 @@ export default function AgendaPage() {
                 <i className="bx bx-info-circle" /> L&apos;événement sera créé à votre nom.
               </p>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Modale rendez-vous (Meeting) */}
+      <Modal
+        open={mDraft !== null}
+        title={mDraft?.id ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}
+        onClose={() => setMDraft(null)}
+        footer={
+          <>
+            <button onClick={() => setMDraft(null)} className="btn-ghost">Annuler</button>
+            <button onClick={saveMeeting} disabled={saving} className="btn-brand">
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </>
+        }
+      >
+        {mDraft && (
+          <div className="space-y-4">
+            <SelectField
+              label="Événement"
+              value={mDraft.event}
+              onChange={(v) => setMDraft({ ...mDraft, event: v })}
+              options={[{ value: "", label: "— Choisir —" }, ...events.map((e) => ({ value: String(e.id), label: e.title }))]}
+            />
+            <SelectField
+              label="Type"
+              value={mDraft.m_type}
+              onChange={(v) => setMDraft({ ...mDraft, m_type: v })}
+              options={MEETING_TYPE_OPTIONS}
+            />
+            {mDraft.m_type !== "2" && (
+              <TextField
+                label="Lien de la visio"
+                value={mDraft.link_url}
+                onChange={(v) => setMDraft({ ...mDraft, link_url: v })}
+                placeholder="https://meet.google.com/… ou https://zoom.us/…"
+              />
+            )}
+            {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
         )}
       </Modal>

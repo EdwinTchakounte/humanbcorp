@@ -180,6 +180,7 @@ export interface ComponentItem {
   title: string;
   paragraph: string | null;
   video_url: string | null;
+  image_url: string | null;
   number: number;
 }
 

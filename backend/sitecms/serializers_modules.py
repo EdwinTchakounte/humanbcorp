@@ -116,19 +116,28 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 
 class ActivityComponentSerializer(serializers.ModelSerializer):
-    """Bloc de contenu (texte + vidéo) d'une activité (authoring)."""
+    """Bloc de contenu (texte + vidéo + image) d'une activité (authoring)."""
+
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         from material.models import ActivityComponent
 
         model = ActivityComponent
-        fields = ["id", "activity", "title", "paragraph", "video_url", "number"]
+        fields = ["id", "activity", "title", "paragraph", "video_url", "image", "image_url", "number"]
         extra_kwargs = {
             "number": {"required": False},
             "title": {"required": False, "allow_blank": True},
             "paragraph": {"required": False, "allow_blank": True, "allow_null": True},
             "video_url": {"required": False, "allow_blank": True, "allow_null": True},
+            "image": {"required": False, "allow_null": True, "write_only": True},
         }
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
 
 class SessionMiniSerializer(serializers.ModelSerializer):

@@ -13,6 +13,7 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -448,10 +449,11 @@ class ActivityViewSet(_ModuleViewSet):
 
 
 class ActivityComponentViewSet(_ModuleViewSet):
-    """Module Formations : blocs de contenu (texte + vidéo) d'une activité. Filtre `?activity=`."""
+    """Module Formations : blocs de contenu (texte + vidéo + image) d'une activité. Filtre `?activity=`."""
 
     module_key = "formations"
     serializer_class = ActivityComponentSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         from material.models import ActivityComponent
@@ -477,6 +479,7 @@ class ActivityDocViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [HasModuleAccess]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     module_key = "formations"
 
     def list(self, request):
@@ -492,18 +495,22 @@ class ActivityDocViewSet(viewsets.ViewSet):
                 url = d.doc_link()
             except Exception:  # noqa: BLE001
                 url = None
+            if url and url.startswith("/"):
+                url = request.build_absolute_uri(url)
             out.append({"id": d.id, "title": d.title, "url": url, "m_type": d.m_type, "activity": d.activity_id})
         return Response(out)
 
     def create(self, request):
+        """Document par **fichier uploadé** (`file`) ou par **lien** (`url`)."""
         from lessonapp.models import Activity
-        from material.models import Link, MaterialActivityDoc
+        from material.models import File, Link, MaterialActivityDoc
 
         activity_id = request.data.get("activity")
         url = (request.data.get("url") or "").strip()
         title = (request.data.get("title") or "").strip()
-        if not activity_id or not url:
-            return Response({"detail": "activity et url requis."}, status=status.HTTP_400_BAD_REQUEST)
+        upload = request.FILES.get("file")
+        if not activity_id or (not url and not upload):
+            return Response({"detail": "activity et (url ou file) requis."}, status=status.HTTP_400_BAD_REQUEST)
         activity = Activity.objects.filter(pk=activity_id).first()
         if activity is None:
             return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
@@ -511,17 +518,32 @@ class ActivityDocViewSet(viewsets.ViewSet):
             m_type = int(request.data.get("m_type", 1) or 1)
         except (TypeError, ValueError):
             m_type = 1
-        link = Link.objects.create(title=title or url, url=url)
+
+        if upload:
+            document = File.objects.create(
+                title=title or upload.name,
+                document=upload,
+                mime_type=getattr(upload, "content_type", "") or "",
+                hash_value="",
+                filename=upload.name,
+                size=upload.size,
+            )
+            rel_url = document.document.url
+        else:
+            document = Link.objects.create(title=title or url, url=url)
+            rel_url = document.url
+
         doc = MaterialActivityDoc.objects.create(
-            title=title or "Document",
+            title=title or (upload.name if upload else "Document"),
             description=request.data.get("description", "") or "",
-            document=link,
+            document=document,
             m_type=m_type,
             owner=request.user,
             activity=activity,
         )
+        abs_url = request.build_absolute_uri(rel_url) if rel_url.startswith("/") else rel_url
         return Response(
-            {"id": doc.id, "title": doc.title, "url": link.url, "m_type": doc.m_type, "activity": activity.id},
+            {"id": doc.id, "title": doc.title, "url": abs_url, "m_type": doc.m_type, "activity": activity.id},
             status=status.HTTP_201_CREATED,
         )
 

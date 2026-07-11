@@ -19,8 +19,8 @@ const INPUT_TYPES = [
   { value: "1", label: "Choix multiple (plusieurs bonnes réponses)" },
 ];
 
-type CompDraft = { id?: number; title: string; paragraph: string; video_url: string };
-type DocDraft = { title: string; url: string; m_type: string };
+type CompDraft = { id?: number; title: string; paragraph: string; video_url: string; imageFile: File | null };
+type DocDraft = { title: string; url: string; m_type: string; file: File | null };
 type QDraft = { id?: number; title: string; description: string; points: string; input_type: string; options: QuizOptionEdit[] };
 
 export default function ActivityContentPage({ params }: { params: { id: string; aid: string } }) {
@@ -108,9 +108,20 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
     setSaving(true);
     setErr("");
     try {
-      const body = { activity: activityId, title: cDraft.title, paragraph: cDraft.paragraph, video_url: cDraft.video_url };
-      if (cDraft.id) await api(`/modules/components/${cDraft.id}/`, { method: "PATCH", body });
-      else await api("/modules/components/", { method: "POST", body });
+      if (cDraft.imageFile) {
+        const fd = new FormData();
+        fd.set("activity", String(activityId));
+        fd.set("title", cDraft.title);
+        fd.set("paragraph", cDraft.paragraph);
+        fd.set("video_url", cDraft.video_url);
+        fd.set("image", cDraft.imageFile);
+        if (cDraft.id) await api(`/modules/components/${cDraft.id}/`, { method: "PATCH", body: fd, isForm: true });
+        else await api("/modules/components/", { method: "POST", body: fd, isForm: true });
+      } else {
+        const body = { activity: activityId, title: cDraft.title, paragraph: cDraft.paragraph, video_url: cDraft.video_url };
+        if (cDraft.id) await api(`/modules/components/${cDraft.id}/`, { method: "PATCH", body });
+        else await api("/modules/components/", { method: "POST", body });
+      }
       setCDraft(null);
       await loadComps();
     } catch (e) {
@@ -130,10 +141,19 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
     setSaving(true);
     setErr("");
     try {
-      await api("/modules/activity-docs/", {
-        method: "POST",
-        body: { activity: activityId, title: dDraft.title, url: dDraft.url, m_type: Number(dDraft.m_type) },
-      });
+      if (dDraft.file) {
+        const fd = new FormData();
+        fd.set("activity", String(activityId));
+        fd.set("title", dDraft.title);
+        fd.set("m_type", dDraft.m_type);
+        fd.set("file", dDraft.file);
+        await api("/modules/activity-docs/", { method: "POST", body: fd, isForm: true });
+      } else {
+        await api("/modules/activity-docs/", {
+          method: "POST",
+          body: { activity: activityId, title: dDraft.title, url: dDraft.url, m_type: Number(dDraft.m_type) },
+        });
+      }
       setDDraft(null);
       await loadDocs();
     } catch (e) {
@@ -215,7 +235,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-brand-deep">Blocs de contenu</h2>
           {writable && (
-            <button onClick={() => setCDraft({ title: "", paragraph: "", video_url: "" })} className="btn-brand text-sm">
+            <button onClick={() => setCDraft({ title: "", paragraph: "", video_url: "", imageFile: null })} className="btn-brand text-sm">
               <i className="bx bx-plus" /> Bloc
             </button>
           )}
@@ -231,10 +251,14 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
                   {c.title && <div className="font-medium text-ink">{c.title}</div>}
                   {c.paragraph && <div className="line-clamp-2 text-sm text-muted">{c.paragraph}</div>}
                   {c.video_url && <div className="truncate text-xs text-accent">{c.video_url}</div>}
+                  {c.image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.image_url} alt="" className="mt-2 h-16 rounded-lg object-cover" />
+                  )}
                 </div>
                 {writable && (
                   <div className="flex gap-1">
-                    <button onClick={() => setCDraft({ id: c.id, title: c.title || "", paragraph: c.paragraph || "", video_url: c.video_url || "" })} className="btn-ghost text-xs">
+                    <button onClick={() => setCDraft({ id: c.id, title: c.title || "", paragraph: c.paragraph || "", video_url: c.video_url || "", imageFile: null })} className="btn-ghost text-xs">
                       <i className="bx bx-edit" />
                     </button>
                     <button onClick={() => delComp(c)} className="btn-ghost text-xs text-red-500">
@@ -253,7 +277,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-brand-deep">Documents</h2>
           {writable && (
-            <button onClick={() => setDDraft({ title: "", url: "", m_type: "1" })} className="btn-brand text-sm">
+            <button onClick={() => setDDraft({ title: "", url: "", m_type: "1", file: null })} className="btn-brand text-sm">
               <i className="bx bx-plus" /> Document
             </button>
           )}
@@ -299,6 +323,10 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
             <TextField label="Titre (optionnel)" value={cDraft.title} onChange={(v) => setCDraft({ ...cDraft, title: v })} />
             <TextArea label="Texte" value={cDraft.paragraph} onChange={(v) => setCDraft({ ...cDraft, paragraph: v })} rows={4} />
             <TextField label="Lien vidéo (YouTube / Vimeo / .mp4)" value={cDraft.video_url} onChange={(v) => setCDraft({ ...cDraft, video_url: v })} placeholder="https://youtu.be/…" />
+            <div>
+              <label className="label">Image (optionnel)</label>
+              <input type="file" accept="image/*" onChange={(e) => setCDraft({ ...cDraft, imageFile: e.target.files?.[0] ?? null })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
+            </div>
             {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
         )}
@@ -312,13 +340,18 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
         footer={
           <>
             <button onClick={() => setDDraft(null)} className="btn-ghost">Annuler</button>
-            <button onClick={saveDoc} disabled={saving || !dDraft?.url} className="btn-brand disabled:opacity-50">{saving ? "…" : "Ajouter"}</button>
+            <button onClick={saveDoc} disabled={saving || (!dDraft?.url && !dDraft?.file)} className="btn-brand disabled:opacity-50">{saving ? "…" : "Ajouter"}</button>
           </>
         }
       >
         {dDraft && (
           <div className="space-y-4">
             <TextField label="Titre" value={dDraft.title} onChange={(v) => setDDraft({ ...dDraft, title: v })} />
+            <div>
+              <label className="label">Fichier à uploader (PDF, DOC…)</label>
+              <input type="file" onChange={(e) => setDDraft({ ...dDraft, file: e.target.files?.[0] ?? null })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
+            </div>
+            <div className="text-center text-xs text-muted">— ou —</div>
             <TextField label="Lien du document (URL)" value={dDraft.url} onChange={(v) => setDDraft({ ...dDraft, url: v })} placeholder="https://…/fichier.pdf" />
             <SelectField label="Type" value={dDraft.m_type} onChange={(v) => setDDraft({ ...dDraft, m_type: v })} options={DOC_TYPES} />
             {err && <p className="text-sm text-red-600">{err}</p>}

@@ -125,6 +125,8 @@ export interface EventItem {
   user: number;
   user_name: string;
   created_at: string;
+  theme_id: number | null;
+  theme_title: string | null;
 }
 
 export interface MeetingItem {

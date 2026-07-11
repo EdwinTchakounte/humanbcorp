@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api, listAll } from "@/lib/api";
-import { Modal, Pagination, PAGE_SIZE, TextField, TextArea } from "@/components/ui";
+import { Modal, Pagination, PAGE_SIZE, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import EventCalendar from "@/components/EventCalendar";
-import type { EventItem, MeetingItem } from "@/lib/types";
+import type { EventItem, MeetingItem, ThemeItem } from "@/lib/types";
 
 // Aligné sur calendarapp.Meeting.TYPES_CHOICES (0=Google Meet, 1=Zoom, 2=Présentiel).
 const MEETING_TYPES: Record<number, string> = { 0: "Google Meet", 1: "Zoom", 2: "Présentiel" };
@@ -22,14 +22,15 @@ function toLocalInput(iso: string) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
-type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string };
-const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "" };
+type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; theme: string };
+const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", theme: "" };
 
 export default function AgendaPage() {
   const { isAdmin, canWrite } = useAuth();
   const writable = canWrite("agenda");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const [themes, setThemes] = useState<ThemeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [mPage, setMPage] = useState(1);
@@ -40,12 +41,14 @@ export default function AgendaPage() {
   const [err, setErr] = useState("");
 
   async function load() {
-    const [e, m] = await Promise.all([
+    const [e, m, t] = await Promise.all([
       listAll<EventItem>("/modules/events/"),
       listAll<MeetingItem>("/modules/meetings/"),
+      listAll<ThemeItem>("/modules/themes/"),
     ]);
     setEvents(e);
     setMeetings(m);
+    setThemes(t);
   }
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -73,6 +76,7 @@ export default function AgendaPage() {
       description: e.description,
       start_time: toLocalInput(e.start_time),
       end_time: toLocalInput(e.end_time),
+      theme: e.theme_id ? String(e.theme_id) : "",
     });
   }
 
@@ -90,6 +94,7 @@ export default function AgendaPage() {
         description: draft.description,
         start_time: new Date(draft.start_time).toISOString(),
         end_time: new Date(draft.end_time).toISOString(),
+        theme: draft.theme ? Number(draft.theme) : null,
       };
       if (draft.id) await api(`/modules/events/${draft.id}/`, { method: "PATCH", body });
       else await api("/modules/events/", { method: "POST", body });
@@ -179,7 +184,14 @@ export default function AgendaPage() {
                         <i className="bx bx-calendar" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium text-brand-deep">{e.title}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium text-brand-deep">{e.title}</span>
+                          {e.theme_title && (
+                            <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
+                              <i className="bx bx-book" /> {e.theme_title}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted">
                           {fmt(e.start_time)} → {fmt(e.end_time)} · {e.user_name}
                         </div>
@@ -280,6 +292,12 @@ export default function AgendaPage() {
                 />
               </div>
             </div>
+            <SelectField
+              label="Formation liée (optionnel)"
+              value={draft.theme}
+              onChange={(v) => setDraft({ ...draft, theme: v })}
+              options={[{ value: "", label: "— Aucune —" }, ...themes.map((t) => ({ value: String(t.id), label: t.title }))]}
+            />
             {err && <p className="text-sm text-red-600">{err}</p>}
             {!isAdmin && (
               <p className="text-xs text-muted">

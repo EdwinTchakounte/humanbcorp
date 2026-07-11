@@ -19,15 +19,60 @@ ORDER_STATUS = {1: "En attente", 2: "Payée", 3: "Partiellement payée", 4: "Éc
 
 class EventSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.username", read_only=True)
+    # Rattachement à une formation (lessonapp.Theme) via calendarapp.EventTheme.
+    theme = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    theme_id = serializers.SerializerMethodField()
+    theme_title = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         fields = [
             "id", "title", "description", "start_time", "end_time",
             "is_test", "is_active", "user", "user_name", "created_at",
+            "theme", "theme_id", "theme_title",
         ]
         read_only_fields = ["created_at", "user_name"]
-        extra_kwargs = {"user": {"required": False}}
+        extra_kwargs = {
+            "user": {"required": False},
+            "description": {"required": False, "allow_blank": True},
+        }
+
+    def _event_theme(self, obj):
+        from calendarapp.models import EventTheme
+
+        return EventTheme.objects.filter(event=obj).select_related("theme").first()
+
+    def get_theme_id(self, obj):
+        et = self._event_theme(obj)
+        return et.theme_id if et else None
+
+    def get_theme_title(self, obj):
+        et = self._event_theme(obj)
+        return et.theme.title if et else None
+
+    def _sync_theme(self, event, theme_id):
+        from calendarapp.models import EventTheme
+        from lessonapp.models import Theme
+
+        EventTheme.objects.filter(event=event).delete()
+        if theme_id:
+            t = Theme.objects.filter(pk=theme_id).first()
+            if t:
+                EventTheme.objects.create(event=event, theme=t, link_url="")
+
+    def create(self, validated_data):
+        theme_id = validated_data.pop("theme", None)
+        event = super().create(validated_data)
+        self._sync_theme(event, theme_id)
+        return event
+
+    def update(self, instance, validated_data):
+        has_theme = "theme" in validated_data
+        theme_id = validated_data.pop("theme", None)
+        event = super().update(instance, validated_data)
+        if has_theme:
+            self._sync_theme(event, theme_id)
+        return event
 
 
 class MeetingSerializer(serializers.ModelSerializer):

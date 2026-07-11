@@ -154,6 +154,26 @@ export interface ThemeItem {
   is_active: boolean;
 }
 
+export interface SeanceItem {
+  id: number;
+  title: string;
+  theme: number;
+  s_type: number;
+  s_type_label: string;
+  activities_count: number;
+  is_active: boolean;
+}
+
+export interface ActivityItem {
+  id: number;
+  title: string;
+  seance: number;
+  a_type: number;
+  a_type_label: string;
+  state: number;
+  is_active: boolean;
+}
+
 export interface FormationsOverview {
   counts: { themes: number; sessions: number; sequences: number; classes: number; categories: number };
   sessions: { id: number; year: string }[];

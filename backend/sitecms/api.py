@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from calendarapp.models import Event, Meeting
-from lessonapp.models import Theme, Session, Sequence, Categorie, Classe
+from lessonapp.models import Theme, Session, Sequence, Categorie, Classe, Seance, Activity
 from contents.models import Publication, Category, Tags, Space
 from paiement.models import Paiement
 from bucket.models import Inscription, Order
@@ -30,6 +30,8 @@ from .serializers_modules import (
     MeetingSerializer,
     ProfileTokenSerializer,
     ThemeSerializer,
+    SeanceSerializer,
+    ActivitySerializer,
     SessionMiniSerializer,
     SequenceMiniSerializer,
     CategorieMiniSerializer,
@@ -402,6 +404,46 @@ class ThemeViewSet(_ModuleViewSet):
         if categorie:
             qs = qs.filter(categorie_id=categorie)
         return qs.order_by("-id")
+
+
+class SeanceViewSet(_ModuleViewSet):
+    """Module Formations : séances d'un thème (authoring). Filtre `?theme=`."""
+
+    module_key = "formations"
+    serializer_class = SeanceSerializer
+
+    def get_queryset(self):
+        qs = Seance.objects.filter(is_deleted=False)
+        theme = self.request.query_params.get("theme")
+        if theme:
+            qs = qs.filter(theme_id=theme)
+        return qs.order_by("id")
+
+
+class ActivityViewSet(_ModuleViewSet):
+    """Module Formations : activités d'une séance (authoring). Filtre `?seance=`."""
+
+    module_key = "formations"
+    serializer_class = ActivitySerializer
+
+    def get_queryset(self):
+        qs = Activity.objects.filter(is_deleted=False)
+        seance = self.request.query_params.get("seance")
+        if seance:
+            qs = qs.filter(seance_id=seance)
+        return qs.order_by("id")
+
+    def perform_create(self, serializer):
+        # Le modèle Activity exige un Bloc ; on en crée un discret par activité
+        # pour masquer cette complexité héritée à l'éditeur.
+        from lessonapp.models.bloc import Bloc
+
+        bloc = Bloc.objects.create(
+            title=serializer.validated_data.get("title", "Activité"),
+            created_by=self.request.user,
+            categorie=Bloc.ACTIVITY,
+        )
+        serializer.save(bloc=bloc)
 
 
 class FormationsOverviewView(APIView):

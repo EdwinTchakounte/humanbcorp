@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, listAll } from "@/lib/api";
 import { Toggle, Pagination, PAGE_SIZE } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
@@ -128,6 +129,9 @@ export default function FormationsPage() {
                   {t.classes_names.length > 0 && <span><i className="bx bx-group" /> {t.classes_names.join(", ")}</span>}
                 </div>
               </div>
+              <Link href={`/formations/${t.id}/contenu`} className="btn-ghost shrink-0 text-xs" title="Éditer le contenu">
+                <i className="bx bx-list-ul" /> Contenu
+              </Link>
               {writable ? (
                 <Toggle checked={t.is_visible} onChange={() => toggle(t)} label={t.is_visible ? "Visible" : "Masqué"} />
               ) : (

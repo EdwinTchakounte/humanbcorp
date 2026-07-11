@@ -4,7 +4,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from calendarapp.models import Event, Meeting
-from lessonapp.models import Theme, Session, Sequence, Categorie, Classe
+from lessonapp.models import Theme, Session, Sequence, Categorie, Classe, Seance, Activity
 from contents.models import Publication, Category, Tags, Space
 from paiement.models import Paiement
 from bucket.models import Inscription, Order
@@ -77,6 +77,41 @@ class ThemeSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         url = obj.image.url
         return request.build_absolute_uri(url) if request else url
+
+
+SEANCE_TYPES = {0: "Théorie", 1: "Pratique", 2: "Exercice"}
+ACTIVITY_TYPES = {1: "Quiz", 2: "Document (PDF)", 3: "Contenu / Vidéo"}
+
+
+class SeanceSerializer(serializers.ModelSerializer):
+    """Séance d'un thème (authoring dashboard)."""
+
+    s_type_label = serializers.SerializerMethodField()
+    activities_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Seance
+        fields = ["id", "title", "theme", "s_type", "s_type_label", "activities_count", "is_active"]
+
+    def get_s_type_label(self, obj):
+        return SEANCE_TYPES.get(obj.s_type, "—")
+
+    def get_activities_count(self, obj):
+        return obj.activity_set.count()
+
+
+class ActivitySerializer(serializers.ModelSerializer):
+    """Activité d'une séance (authoring). Le `bloc` requis est géré côté vue."""
+
+    a_type_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activity
+        fields = ["id", "title", "seance", "a_type", "a_type_label", "state", "is_active"]
+        extra_kwargs = {"state": {"required": False}}
+
+    def get_a_type_label(self, obj):
+        return ACTIVITY_TYPES.get(obj.a_type, "—")
 
 
 class SessionMiniSerializer(serializers.ModelSerializer):

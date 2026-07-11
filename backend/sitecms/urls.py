@@ -32,6 +32,8 @@ from .api import (
     ProfileTokenView,
     PublicationViewSet,
     PublicationsOverviewView,
+    SeanceViewSet,
+    ActivityViewSet,
     SectionViewSet,
     SiteSettingsPublicView,
     SiteSettingsViewSet,
@@ -50,6 +52,8 @@ router.register("cms/settings", SiteSettingsViewSet, basename="cms-settings")
 router.register("modules/events", EventViewSet, basename="mod-events")
 router.register("modules/meetings", MeetingViewSet, basename="mod-meetings")
 router.register("modules/themes", ThemeViewSet, basename="mod-themes")
+router.register("modules/seances", SeanceViewSet, basename="mod-seances")
+router.register("modules/activities", ActivityViewSet, basename="mod-activities")
 router.register("modules/publications", PublicationViewSet, basename="mod-publications")
 router.register("modules/paiements", PaiementViewSet, basename="mod-paiements")
 router.register("modules/inscriptions", InscriptionViewSet, basename="mod-inscriptions")

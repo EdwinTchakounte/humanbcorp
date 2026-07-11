@@ -222,6 +222,19 @@ export interface LearnerComponent {
   image: string | null;
   number: number;
 }
+export interface QuizResult {
+  question_id: number;
+  is_correct: boolean;
+  points: number;
+  points_earned: number;
+  correct_option_ids: number[];
+  selected_option_ids: number[];
+}
+export interface SubmitQuizResponse {
+  score: number;
+  max_score: number;
+  results: QuizResult[];
+}
 export interface LearnerActivity {
   id: number;
   index: number;
@@ -231,6 +244,7 @@ export interface LearnerActivity {
   documents: LearnerDoc[];
   questions: QuizQuestion[];
   components: LearnerComponent[];
+  last_attempt: { score: number; max_score: number } | null;
 }
 export interface LearnerSeance {
   id: number;
@@ -268,6 +282,24 @@ export async function getMyFormation(token: string, publicationId: number): Prom
   try {
     const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/formation/${publicationId}/`, {
       cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function submitQuiz(
+  token: string,
+  activityId: number,
+  answers: Record<number, number[]>
+): Promise<SubmitQuizResponse | null> {
+  try {
+    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/quiz/${activityId}/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
     });
     if (!res.ok) return null;
     return await res.json();

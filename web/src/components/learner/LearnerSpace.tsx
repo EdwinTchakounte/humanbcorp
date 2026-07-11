@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import {
   getMySpace,
   getMyFormation,
+  submitQuiz,
   type MySpace,
   type MyFormation,
   type LearnerActivity,
   type LearnerSeance,
   type LearnerDoc,
+  type SubmitQuizResponse,
 } from "@/lib/api";
 
 const SEANCE_TYPE: Record<number, string> = { 0: "Théorie", 1: "Pratique", 2: "Exercice" };
@@ -35,7 +37,111 @@ function DocRow({ d }: { d: LearnerDoc }) {
   );
 }
 
-function ActivityBlock({ a }: { a: LearnerActivity }) {
+function QuizBlock({ activity, token }: { activity: LearnerActivity; token: string }) {
+  const [answers, setAnswers] = useState<Record<number, number[]>>({});
+  const [result, setResult] = useState<SubmitQuizResponse | null>(null);
+  const [busy, setBusy] = useState(false);
+  const locked = result !== null;
+
+  function toggle(questionId: number, optionId: number, isCheckbox: boolean) {
+    if (locked) return;
+    setAnswers((prev) => {
+      const cur = prev[questionId] || [];
+      if (isCheckbox) {
+        return { ...prev, [questionId]: cur.includes(optionId) ? cur.filter((x) => x !== optionId) : [...cur, optionId] };
+      }
+      return { ...prev, [questionId]: [optionId] };
+    });
+  }
+
+  async function onSubmit() {
+    setBusy(true);
+    const res = await submitQuiz(token, activity.id, answers);
+    setBusy(false);
+    if (res) setResult(res);
+  }
+
+  function reset() {
+    setAnswers({});
+    setResult(null);
+  }
+
+  const byQuestion = (qid: number) => result?.results.find((r) => r.question_id === qid);
+
+  return (
+    <div className="space-y-4">
+      {result && (
+        <div
+          className={`flex items-center gap-3 rounded-xl px-4 py-3 font-semibold ${
+            result.score === result.max_score ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          <i className={`bx ${result.score === result.max_score ? "bx-trophy" : "bx-bar-chart-alt-2"} text-xl`} />
+          Votre score : {result.score} / {result.max_score}
+        </div>
+      )}
+      {!result && activity.last_attempt && (
+        <p className="text-xs text-muted">
+          Dernier score : {activity.last_attempt.score} / {activity.last_attempt.max_score}
+        </p>
+      )}
+
+      {activity.questions.map((q) => {
+        const r = byQuestion(q.id);
+        return (
+          <div key={q.id} className="rounded-xl border border-line/70 bg-white p-4">
+            <p className="font-medium text-ink">
+              {q.number}. {q.title}{" "}
+              {q.points > 0 && <span className="text-xs font-normal text-muted">({q.points} pts)</span>}
+              {r && (
+                <i className={`bx ml-1 ${r.is_correct ? "bx-check text-green-600" : "bx-x text-red-500"}`} />
+              )}
+            </p>
+            {q.description && <p className="mb-2 text-sm text-muted">{q.description}</p>}
+            <ul className="mt-2 space-y-1.5">
+              {q.options.map((o) => {
+                const isCheckbox = o.input_type === 1;
+                const selected = (answers[q.id] || []).includes(o.id);
+                // Après correction : vert = bonne réponse, rouge = cochée mais fausse
+                let tone = "";
+                if (r) {
+                  if (r.correct_option_ids.includes(o.id)) tone = "text-green-700 font-medium";
+                  else if (r.selected_option_ids.includes(o.id)) tone = "text-red-600 line-through";
+                }
+                return (
+                  <li key={o.id} className={`flex items-center gap-2 text-sm ${tone || "text-ink"}`}>
+                    <input
+                      type={isCheckbox ? "checkbox" : "radio"}
+                      name={`q-${q.id}`}
+                      checked={selected}
+                      disabled={locked}
+                      onChange={() => toggle(q.id, o.id, isCheckbox)}
+                      className="accent-brand"
+                    />
+                    {o.title}
+                    {r && r.correct_option_ids.includes(o.id) && <i className="bx bx-check text-green-600" />}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+
+      {!result ? (
+        <button onClick={onSubmit} disabled={busy} className="btn-brand text-sm disabled:opacity-50">
+          {busy ? "Validation…" : "Valider mes réponses"}
+        </button>
+      ) : (
+        <button onClick={reset} className="btn-ghost text-sm">
+          <i className="bx bx-refresh" /> Recommencer
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ActivityBlock({ a, token }: { a: LearnerActivity; token: string }) {
   return (
     <div className="rounded-2xl border border-line/70 bg-brand-soft/40 p-5">
       <h4 className="mb-3 flex items-center gap-2 font-semibold text-brand-deep">
@@ -64,36 +170,13 @@ function ActivityBlock({ a }: { a: LearnerActivity }) {
         </div>
       )}
 
-      {/* Quiz (lecture seule) */}
-      {a.questions.length > 0 && (
-        <div className="space-y-4">
-          {a.questions.map((q) => (
-            <div key={q.id} className="rounded-xl border border-line/70 bg-white p-4">
-              <p className="font-medium text-ink">
-                {q.number}. {q.title}{" "}
-                {q.points > 0 && <span className="text-xs font-normal text-muted">({q.points} pts)</span>}
-              </p>
-              {q.description && <p className="mb-2 text-sm text-muted">{q.description}</p>}
-              <ul className="mt-2 space-y-1.5">
-                {q.options.map((o) => (
-                  <li key={o.id} className="flex items-center gap-2 text-sm text-ink">
-                    <input type={o.input_type === 1 ? "checkbox" : "radio"} disabled className="accent-brand" />
-                    {o.title}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-          <p className="flex items-center gap-1.5 text-xs italic text-muted">
-            <i className="bx bx-info-circle" /> Réponse interactive et notation à venir.
-          </p>
-        </div>
-      )}
+      {/* Quiz interactif + notation */}
+      {a.questions.length > 0 && <QuizBlock activity={a} token={token} />}
     </div>
   );
 }
 
-function SeanceBlock({ s }: { s: LearnerSeance }) {
+function SeanceBlock({ s, token }: { s: LearnerSeance; token: string }) {
   return (
     <div className="card p-6">
       <div className="mb-4 flex items-center gap-3">
@@ -114,7 +197,7 @@ function SeanceBlock({ s }: { s: LearnerSeance }) {
       )}
       <div className="space-y-4">
         {s.activities.map((a) => (
-          <ActivityBlock key={a.id} a={a} />
+          <ActivityBlock key={a.id} a={a} token={token} />
         ))}
       </div>
     </div>
@@ -231,7 +314,7 @@ export default function LearnerSpace({ token }: { token: string }) {
                           )}
                           <div className="space-y-4">
                             {th.seances.map((s) => (
-                              <SeanceBlock key={s.id} s={s} />
+                              <SeanceBlock key={s.id} s={s} token={token} />
                             ))}
                           </div>
                         </div>

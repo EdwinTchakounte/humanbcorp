@@ -194,7 +194,27 @@ class Component(models.Model):
   
  
 class ActivityComponent(Component):
-	activity = models.ForeignKey(Activity, on_delete=models.CASCADE)  
+	activity = models.ForeignKey(Activity, on_delete=models.CASCADE)
+
+
+class QuizAttempt(models.Model):
+	"""Tentative de quiz d'un apprenant : score obtenu + réponses saisies.
+
+	`answers` = {question_id (str): [option_ids]}. Une ligne par soumission
+	(l'apprenant peut recommencer ; on garde l'historique, la plus récente fait foi).
+	"""
+	learner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="quiz_attempts")
+	activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name="quiz_attempts")
+	score = models.PositiveIntegerField(default=0)
+	max_score = models.PositiveIntegerField(default=0)
+	answers = models.JSONField(default=dict, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["-created_at"]
+
+	def __str__(self):
+		return f"{self.learner} · {self.activity} · {self.score}/{self.max_score}"
 
  
  

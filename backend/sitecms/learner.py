@@ -67,8 +67,12 @@ def _doc_payload(request, doc, index):
     }
 
 
-def build_theme_content(theme, request):
-    """Construit l'arbre de contenu d'un Theme (adapté de lessonapp.read_theme)."""
+def build_theme_content(theme, request, user=None):
+    """Construit l'arbre de contenu d'un Theme (adapté de lessonapp.read_theme).
+
+    Si ``user`` est fourni, chaque activité quiz porte ``last_attempt`` (dernier
+    score de l'apprenant sur ce quiz) — sinon ``None``.
+    """
     # Imports locaux (évite de charger lessonapp/material au démarrage de sitecms).
     from lessonapp.models import Objectif, Seance, Activity, Activityquestion, Question
     from material.models import (
@@ -76,6 +80,7 @@ def build_theme_content(theme, request):
         MaterialActivityDoc,
         InputQuestionBox,
         ActivityComponent,
+        QuizAttempt,
     )
 
     objectifs = list(Objectif.objects.filter(theme=theme).values_list("name", flat=True))
@@ -129,6 +134,12 @@ def build_theme_content(theme, request):
                 for c in ActivityComponent.objects.filter(activity=activity).order_by("number")
             ]
 
+            last_attempt = None
+            if user is not None and activity.a_type == Activity.QUIZZ:
+                la = QuizAttempt.objects.filter(learner=user, activity=activity).first()
+                if la:
+                    last_attempt = {"score": la.score, "max_score": la.max_score}
+
             activities_out.append({
                 "id": activity.pk,
                 "index": ai,
@@ -138,6 +149,7 @@ def build_theme_content(theme, request):
                 "documents": docs,
                 "questions": questions,
                 "components": components,
+                "last_attempt": last_attempt,
             })
 
         seances_out.append({
@@ -223,10 +235,92 @@ def my_formation(request, token, publication_id):
         )
 
     pub = ins.publication
-    themes = [build_theme_content(t, request) for t in pub.themes.all()]
+    themes = [build_theme_content(t, request, user=user) for t in pub.themes.all()]
     return Response({
         "publication_id": pub.id,
         "title": pub.title,
         "description": pub.description,
         "themes": themes,
     })
+
+
+def _learner_can_access_activity(user, activity) -> bool:
+    """L'apprenant a une inscription confirmée sur une formation contenant ce quiz."""
+    theme = getattr(getattr(activity, "seance", None), "theme", None)
+    if theme is None:
+        return False
+    return Inscription.objects.filter(
+        participant=user,
+        status=Inscription.CONFIRMED,
+        is_deleted=False,
+        publication__themes=theme,
+    ).exists()
+
+
+def _score_quiz(activity, answers: dict):
+    """Corrige un quiz. Renvoie (score, max_score, results).
+
+    Une question est **juste** si l'ensemble des options cochées == l'ensemble
+    des options correctes (vrai pour radio comme pour checkbox).
+    """
+    from lessonapp.models import Activityquestion
+    from material.models import InputQuestionBox
+
+    total = max_total = 0
+    results = []
+    for aq in Activityquestion.objects.filter(activity=activity).select_related("question"):
+        q = aq.question
+        correct = set(
+            InputQuestionBox.objects.filter(question=q, is_answer=True).values_list("id", flat=True)
+        )
+        raw = answers.get(str(q.id), answers.get(q.id, [])) or []
+        try:
+            selected = {int(x) for x in raw}
+        except (TypeError, ValueError):
+            selected = set()
+        is_correct = bool(correct) and selected == correct
+        earned = aq.points if is_correct else 0
+        total += earned
+        max_total += aq.points
+        results.append({
+            "question_id": q.id,
+            "is_correct": is_correct,
+            "points": aq.points,
+            "points_earned": earned,
+            "correct_option_ids": sorted(correct),
+            "selected_option_ids": sorted(selected),
+        })
+    return total, max_total, results
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def submit_quiz(request, token, activity_id):
+    """POST /api/v1/site/mon-espace/<token>/quiz/<activity_id>/ → corrige et note.
+
+    Corps : ``{"answers": {"<question_id>": [<option_id>, ...]}}``. Persiste la
+    tentative et renvoie le score + le détail (bonnes/mauvaises réponses).
+    """
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+
+    from lessonapp.models import Activity
+    from material.models import QuizAttempt
+
+    activity = Activity.objects.filter(pk=activity_id, a_type=Activity.QUIZZ).first()
+    if activity is None:
+        return Response({"detail": "Quiz introuvable."}, status=status.HTTP_404_NOT_FOUND)
+    if not _learner_can_access_activity(user, activity):
+        return Response({"detail": "Vous n'avez pas accès à ce quiz."}, status=status.HTTP_403_FORBIDDEN)
+
+    answers = request.data.get("answers") or {}
+    if not isinstance(answers, dict):
+        return Response({"detail": "Format de réponses invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
+    score, max_score, results = _score_quiz(activity, answers)
+    QuizAttempt.objects.create(
+        learner=user, activity=activity, score=score, max_score=max_score, answers=answers
+    )
+    return Response({"score": score, "max_score": max_score, "results": results})

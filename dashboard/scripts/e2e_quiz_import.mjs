@@ -59,8 +59,8 @@ try {
   // fermer et vérifier que les questions apparaissent
   await page.getByRole("button", { name: /Fermer/i }).click();
   await page.waitForTimeout(1000);
-  ok("Question importée « Couleur du ciel » visible", await page.getByText(/Couleur du ciel/i).isVisible().catch(() => false));
-  ok("Question importée « Nombres pairs » visible", await page.getByText(/Nombres pairs/i).isVisible().catch(() => false));
+  ok("Question importée « Couleur du ciel » visible", await page.getByText(/Couleur du ciel/i).first().isVisible().catch(() => false));
+  ok("Question importée « Nombres pairs » visible", await page.getByText(/Nombres pairs/i).first().isVisible().catch(() => false));
   await page.screenshot({ path: `${OUT}/11_quiz_apres_import.jpeg`, type: "jpeg", quality: 90, fullPage: true });
 
 } catch (e) {

@@ -22,6 +22,9 @@ const ACT_ICON: Record<number, string> = { 1: "bx-help-circle", 2: "bx-file", 3:
 type SeanceDraft = { id?: number; title: string; s_type: string };
 type ActivityDraft = { id?: number; seance: number; title: string; a_type: string };
 
+// Feuille d'arbre normalisée (composant / document / question).
+type Leaf = { key: string; label: string; icon: string; tone: string };
+
 export default function ContenuPage({ params }: { params: { id: string } }) {
   const themeId = Number(params.id);
   const { canWrite } = useAuth();
@@ -31,6 +34,8 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
   const [seances, setSeances] = useState<SeanceItem[]>([]);
   const [acts, setActs] = useState<Record<number, ActivityItem[]>>({});
   const [openSeance, setOpenSeance] = useState<number | null>(null);
+  const [openActs, setOpenActs] = useState<Set<number>>(new Set());
+  const [leaves, setLeaves] = useState<Record<number, Leaf[] | null>>({});
   const [loading, setLoading] = useState(true);
 
   const [sDraft, setSDraft] = useState<SeanceDraft | null>(null);
@@ -45,6 +50,40 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
     setActs((m) => ({ ...m, [seanceId]: [] }));
     const list = await listAll<ActivityItem>(`/modules/activities/?seance=${seanceId}`);
     setActs((m) => ({ ...m, [seanceId]: list }));
+  }
+
+  // Charge les contenus (feuilles) d'une activité : composants + docs + questions.
+  async function loadLeaves(a: ActivityItem) {
+    setLeaves((m) => ({ ...m, [a.id]: null }));
+    type Comp = { id: number; title?: string; paragraph?: string; video_url?: string; audio_url?: string; image_url?: string };
+    type Doc = { id: number; title?: string; url?: string; m_type?: number };
+    type Q = { id: number; title?: string };
+    const reqs: Promise<Leaf[]>[] = [
+      listAll<Comp>(`/modules/components/?activity=${a.id}`).then((cs) =>
+        cs.map((c) => {
+          let icon = "bx-text", tone = "text-slate-500", kind = "Texte";
+          if (c.video_url) { icon = "bx-play-circle"; tone = "text-rose-500"; kind = "Vidéo"; }
+          else if (c.audio_url) { icon = "bx-volume-full"; tone = "text-violet-500"; kind = "Audio"; }
+          else if (c.image_url) { icon = "bx-image"; tone = "text-emerald-500"; kind = "Image"; }
+          return { key: `c${c.id}`, label: c.title || kind, icon, tone };
+        }),
+      ),
+      listAll<Doc>(`/modules/activity-docs/?activity=${a.id}`).then((ds) =>
+        ds.map((d) => {
+          const isLink = d.url && !/\.(pdf|docx?|pptx?|xlsx?)$/i.test(d.url);
+          return { key: `d${d.id}`, label: d.title || "Document", icon: isLink ? "bx-link" : "bx-file-blank", tone: "text-sky-500" };
+        }),
+      ),
+    ];
+    if (a.a_type === 1) {
+      reqs.push(
+        listAll<Q>(`/modules/quiz-questions/?activity=${a.id}`).then((qs) =>
+          qs.map((q, i) => ({ key: `q${q.id}`, label: q.title || `Question ${i + 1}`, icon: "bx-help-circle", tone: "text-amber-500" })),
+        ),
+      );
+    }
+    const all = (await Promise.all(reqs)).flat();
+    setLeaves((m) => ({ ...m, [a.id]: all }));
   }
 
   useEffect(() => {
@@ -63,6 +102,18 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
     }
     setOpenSeance(seanceId);
     if (!acts[seanceId]) loadActs(seanceId);
+  }
+
+  function toggleAct(a: ActivityItem) {
+    setOpenActs((prev) => {
+      const next = new Set(prev);
+      if (next.has(a.id)) next.delete(a.id);
+      else {
+        next.add(a.id);
+        if (leaves[a.id] === undefined) loadLeaves(a);
+      }
+      return next;
+    });
   }
 
   // --- Séances ---
@@ -123,7 +174,7 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl">Contenu — {theme?.title}</h1>
-          <p className="text-sm text-muted">Séances et activités de la formation.</p>
+          <p className="text-sm text-muted">Arbre du contenu : séance → activité → contenus.</p>
         </div>
         {writable && (
           <button onClick={() => setSDraft({ title: "", s_type: "0" })} className="btn-brand text-sm">
@@ -170,26 +221,59 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
                   ) : (
                     <div className="space-y-2">
                       {acts[s.id].length === 0 && <p className="text-sm text-muted">Aucune activité.</p>}
-                      {acts[s.id].map((a) => (
-                        <div key={a.id} className="flex items-center gap-3 rounded-lg border border-line bg-white px-4 py-2.5">
-                          <i className={`bx ${ACT_ICON[a.a_type] || "bx-square"} text-lg text-brand`} />
-                          <span className="flex-1 text-sm text-ink">{a.title}</span>
-                          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">{a.a_type_label}</span>
-                          <Link href={`/formations/${themeId}/contenu/activite/${a.id}`} className="btn-ghost text-xs" title="Éditer le contenu">
-                            <i className="bx bx-list-ul" /> Contenu
-                          </Link>
-                          {writable && (
-                            <div className="flex gap-1">
-                              <button onClick={() => setADraft({ id: a.id, seance: s.id, title: a.title, a_type: String(a.a_type) })} className="btn-ghost text-xs" title="Modifier">
-                                <i className="bx bx-edit" />
+                      {acts[s.id].map((a) => {
+                        const isOpen = openActs.has(a.id);
+                        const kids = leaves[a.id];
+                        return (
+                          <div key={a.id} className="rounded-lg border border-line bg-white">
+                            <div className="flex items-center gap-3 px-4 py-2.5">
+                              <button onClick={() => toggleAct(a)} className="flex flex-1 items-center gap-3 text-left" title="Déplier les contenus">
+                                <i className={`bx bx-chevron-right text-lg text-muted transition ${isOpen ? "rotate-90" : ""}`} />
+                                <i className={`bx ${ACT_ICON[a.a_type] || "bx-square"} text-lg text-brand`} />
+                                <span className="flex-1 text-sm text-ink">{a.title}</span>
                               </button>
-                              <button onClick={() => delActivity(a)} className="btn-ghost text-xs text-red-500" title="Supprimer">
-                                <i className="bx bx-trash" />
-                              </button>
+                              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">{a.a_type_label}</span>
+                              <Link href={`/formations/${themeId}/contenu/activite/${a.id}`} className="btn-ghost text-xs" title="Éditer le contenu">
+                                <i className="bx bx-list-ul" /> Contenu
+                              </Link>
+                              {writable && (
+                                <div className="flex gap-1">
+                                  <button onClick={() => setADraft({ id: a.id, seance: s.id, title: a.title, a_type: String(a.a_type) })} className="btn-ghost text-xs" title="Modifier">
+                                    <i className="bx bx-edit" />
+                                  </button>
+                                  <button onClick={() => delActivity(a)} className="btn-ghost text-xs text-red-500" title="Supprimer">
+                                    <i className="bx bx-trash" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      ))}
+
+                            {isOpen && (
+                              <div className="border-t border-line px-4 py-2 pl-11">
+                                {kids === null || kids === undefined ? (
+                                  <p className="py-1 text-xs text-muted">Chargement…</p>
+                                ) : kids.length === 0 ? (
+                                  <p className="py-1 text-xs text-muted">
+                                    Aucun contenu.{" "}
+                                    <Link href={`/formations/${themeId}/contenu/activite/${a.id}`} className="font-semibold text-accent">
+                                      Ajouter →
+                                    </Link>
+                                  </p>
+                                ) : (
+                                  <ul className="space-y-1 py-1">
+                                    {kids.map((k) => (
+                                      <li key={k.key} className="flex items-center gap-2 text-sm text-ink">
+                                        <i className={`bx ${k.icon} ${k.tone}`} />
+                                        <span className="truncate">{k.label}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                       {writable && (
                         <button onClick={() => setADraft({ seance: s.id, title: "", a_type: "3" })} className="mt-1 text-sm font-semibold text-accent">
                           <i className="bx bx-plus" /> Ajouter une activité
@@ -245,7 +329,7 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
           <div className="space-y-4">
             <TextField label="Titre de l'activité" value={aDraft.title} onChange={(v) => setADraft({ ...aDraft, title: v })} />
             <SelectField label="Type" value={aDraft.a_type} onChange={(v) => setADraft({ ...aDraft, a_type: v })} options={ACTIVITY_TYPES} />
-            <p className="text-xs text-muted">Le contenu détaillé (texte, vidéo, documents, questions du quiz) s’ajoute à l’étape suivante.</p>
+            <p className="text-xs text-muted">Le contenu détaillé (texte, vidéo, audio, documents, questions du quiz) s’ajoute via « Contenu ».</p>
             {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
         )}

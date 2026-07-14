@@ -1,5 +1,6 @@
 """Serializers des modules rapatriés dans le dashboard + JWT enrichi du profil."""
 
+from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -9,7 +10,7 @@ from contents.models import Publication, Category, Tags, Space
 from paiement.models import Paiement
 from bucket.models import Inscription, Order
 from chat.models import Project, ChatMessage
-from .roles import is_admin, profile_payload
+from .roles import is_admin, is_teacher, profile_payload
 
 PAIEMENT_STATUS = {1: "Réussi", 2: "Échoué", 3: "En attente"}
 PAIEMENT_METHOD = {1: "Espèces", 2: "Mobile Money", 3: "PayPal"}
@@ -113,23 +114,49 @@ class ThemeSerializer(serializers.ModelSerializer):
     classes_names = serializers.SerializerMethodField()
     seances_count = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    # Écriture : upload image + affectation des classes (lecture via *_names/_url).
+    image = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    classes = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Classe.objects.all(), required=False
+    )
+    # Affectation des formateurs (écriture = ids ; lecture détaillée via instructors_detail).
+    instructors = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(), required=False
+    )
+    instructors_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = Theme
         fields = [
             "id", "title", "is_visible", "t_type", "t_type_label",
             "sequence", "sequence_numero", "session_year",
-            "categorie", "categorie_name", "classes_names",
-            "seances_count", "image_url", "is_active",
+            "categorie", "categorie_name", "classes", "classes_names",
+            "instructors", "instructors_detail",
+            "seances_count", "image", "image_url", "is_active",
         ]
         # Champs requis à la création uniquement : PATCH partiel reste possible.
         extra_kwargs = {"sequence": {"required": False}, "categorie": {"required": False}}
+
+    def validate(self, attrs):
+        # À la création, séquence + catégorie sont obligatoires (FK non nulles).
+        if self.instance is None:
+            if not attrs.get("sequence"):
+                raise serializers.ValidationError({"sequence": "Séquence requise."})
+            if not attrs.get("categorie"):
+                raise serializers.ValidationError({"categorie": "Catégorie requise."})
+        return attrs
 
     def get_t_type_label(self, obj):
         return dict(Theme.TYPES_CHOICES).get(obj.t_type, "—")
 
     def get_classes_names(self, obj):
         return list(obj.classes.values_list("name", flat=True))
+
+    def get_instructors_detail(self, obj):
+        return [
+            {"id": u.id, "name": (u.get_full_name() or u.username), "email": u.email}
+            for u in obj.instructors.all()
+        ]
 
     def get_seances_count(self, obj):
         return obj.seance_set.count()
@@ -179,28 +206,47 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 
 class ActivityComponentSerializer(serializers.ModelSerializer):
-    """Bloc de contenu (texte + vidéo + image) d'une activité (authoring)."""
+    """Bloc de contenu (texte + vidéo + audio + image) d'une activité (authoring)."""
 
     image_url = serializers.SerializerMethodField(read_only=True)
+    video_file_url = serializers.SerializerMethodField(read_only=True)
+    audio_file_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         from material.models import ActivityComponent
 
         model = ActivityComponent
-        fields = ["id", "activity", "title", "paragraph", "video_url", "image", "image_url", "number"]
+        fields = [
+            "id", "activity", "title", "paragraph",
+            "video_url", "video_file", "video_file_url",
+            "audio_url", "audio_file", "audio_file_url",
+            "image", "image_url", "number",
+        ]
         extra_kwargs = {
             "number": {"required": False},
             "title": {"required": False, "allow_blank": True},
             "paragraph": {"required": False, "allow_blank": True, "allow_null": True},
             "video_url": {"required": False, "allow_blank": True, "allow_null": True},
+            "audio_url": {"required": False, "allow_blank": True, "allow_null": True},
             "image": {"required": False, "allow_null": True, "write_only": True},
+            "video_file": {"required": False, "allow_null": True, "write_only": True},
+            "audio_file": {"required": False, "allow_null": True, "write_only": True},
         }
 
-    def get_image_url(self, obj):
-        if not obj.image:
+    def _abs(self, f):
+        if not f:
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        return request.build_absolute_uri(f.url) if request else f.url
+
+    def get_image_url(self, obj):
+        return self._abs(obj.image)
+
+    def get_video_file_url(self, obj):
+        return self._abs(obj.video_file)
+
+    def get_audio_file_url(self, obj):
+        return self._abs(obj.audio_file)
 
 
 class SessionMiniSerializer(serializers.ModelSerializer):
@@ -236,16 +282,34 @@ class PublicationSerializer(serializers.ModelSerializer):
     children_count = serializers.SerializerMethodField()
     events_count = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    # Écriture : upload image, lien vers formations (themes), hiérarchie (parent).
+    image = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    themes = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Theme.objects.filter(is_deleted=False), required=False
+    )
+    themes_titles = serializers.SerializerMethodField()
+    parent = serializers.PrimaryKeyRelatedField(
+        queryset=Publication.objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = Publication
         fields = [
             "id", "title", "description", "date", "price", "is_private",
             "categorie", "categorie_name", "tags_names",
-            "children_count", "events_count", "image_url",
+            "themes", "themes_titles", "parent",
+            "children_count", "events_count", "image", "image_url",
         ]
         read_only_fields = ["date"]
         extra_kwargs = {"categorie": {"required": False}, "description": {"required": False}}
+
+    def validate(self, attrs):
+        if self.instance is None and not attrs.get("categorie"):
+            raise serializers.ValidationError({"categorie": "Catégorie requise."})
+        return attrs
+
+    def get_themes_titles(self, obj):
+        return [{"id": t.id, "title": t.title} for t in obj.themes.all()]
 
     def get_tags_names(self, obj):
         return list(obj.liste_tags.values_list("name", flat=True))
@@ -363,6 +427,7 @@ class ProfileTokenSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
         token["is_admin"] = is_admin(user)
+        token["is_teacher"] = is_teacher(user)
         return token
 
     def validate(self, attrs):

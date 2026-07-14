@@ -19,6 +19,14 @@ def is_admin(user):
     return bool(user.is_superuser or user.groups.filter(name__icontains="admin").exists())
 
 
+def is_teacher(user):
+    """Vrai si membre du groupe « Teacher » (formateur). Un admin n'est pas un
+    formateur au sens périmètre restreint, mais garde tous les droits par ailleurs."""
+    if not (user and user.is_authenticated):
+        return False
+    return user.groups.filter(name__iexact="Teacher").exists()
+
+
 def _has_app_access(user, app_label):
     """Lecture : au moins une permission sur cette app (comme le Django admin)."""
     if user.is_superuser:
@@ -41,10 +49,13 @@ def has_app_write(user, app_label):
 # - native=True  → écran dédié dans le dashboard Next (rapatrié).
 # - native=False → pont vers le Django admin de l'app (gated par permissions).
 # - admin_only=True → réservé aux profils « admin » (Admin/Second_Admin).
+# - teacher=True → accessible aussi aux formateurs (groupe Teacher), avec un
+#   périmètre restreint à leurs formations affecté au niveau des querysets.
 MODULES = [
     {"key": "cms",         "label": "Contenu du site",       "icon": "bx-layout",       "native": True,  "path": "/",        "admin_only": True},
-    {"key": "agenda",      "label": "Agenda & Événements",   "icon": "bx-calendar",     "native": True,  "path": "/agenda",  "app": "calendarapp"},
-    {"key": "formations",  "label": "Formations",            "icon": "bx-book",         "native": True,  "path": "/formations", "app": "lessonapp"},
+    {"key": "agenda",      "label": "Agenda & Événements",   "icon": "bx-calendar",     "native": True,  "path": "/agenda",  "app": "calendarapp", "teacher": True},
+    {"key": "formations",  "label": "Formations",            "icon": "bx-book",         "native": True,  "path": "/formations", "app": "lessonapp", "teacher": True},
+    {"key": "suivi",       "label": "Suivi apprenants",      "icon": "bx-line-chart",   "native": True,  "path": "/suivi",   "teacher": True},
     {"key": "publications","label": "Publications",          "icon": "bx-news",         "native": True,  "path": "/publications", "app": "contents"},
     {"key": "inscriptions","label": "Inscriptions & Paniers","icon": "bx-cart",         "native": True,  "path": "/inscriptions", "app": "bucket"},
     {"key": "paiements",   "label": "Paiements",             "icon": "bx-credit-card",  "native": True,  "path": "/paiements", "app": "paiement"},
@@ -57,6 +68,11 @@ def module_is_accessible(user, module):
         return is_admin(user)
     if is_admin(user):
         return True
+    # Formateur (auteur limité) : périmètre STRICT aux modules « teacher »
+    # (formations/agenda/suivi), indépendamment des permissions Django héritées
+    # du groupe Teacher — on ne veut pas lui exposer paiements/inscriptions/etc.
+    if is_teacher(user):
+        return bool(module.get("teacher"))
     app = module.get("app")
     return _has_app_access(user, app) if app else False
 
@@ -65,8 +81,12 @@ def module_can_write(user, module):
     """Droit d'écriture (créer/éditer/supprimer) sur ce module pour ce profil."""
     if module.get("admin_only"):
         return is_admin(user)
+    if is_admin(user):
+        return True
+    if is_teacher(user):
+        return bool(module.get("teacher"))
     app = module.get("app")
-    return has_app_write(user, app) if app else is_admin(user)
+    return has_app_write(user, app) if app else False
 
 
 def accessible_modules(user):
@@ -99,6 +119,7 @@ def profile_payload(user):
         "full_name": (user.get_full_name() or user.username),
         "email": user.email,
         "is_admin": is_admin(user),
+        "is_teacher": is_teacher(user),
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
         "groups": groups,

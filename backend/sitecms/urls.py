@@ -38,8 +38,14 @@ from .api import (
     ActivityDocViewSet,
     QuizQuestionViewSet,
     SectionViewSet,
+    SessionViewSet,
+    SequenceViewSet,
+    FormationCategorieViewSet,
+    ClasseViewSet,
     SiteSettingsPublicView,
     SiteSettingsViewSet,
+    SuiviView,
+    TeachersListView,
     ThemeViewSet,
 )
 
@@ -55,6 +61,10 @@ router.register("cms/settings", SiteSettingsViewSet, basename="cms-settings")
 router.register("modules/events", EventViewSet, basename="mod-events")
 router.register("modules/meetings", MeetingViewSet, basename="mod-meetings")
 router.register("modules/themes", ThemeViewSet, basename="mod-themes")
+router.register("modules/sessions", SessionViewSet, basename="mod-sessions")
+router.register("modules/sequences", SequenceViewSet, basename="mod-sequences")
+router.register("modules/formation-categories", FormationCategorieViewSet, basename="mod-formation-categories")
+router.register("modules/classes", ClasseViewSet, basename="mod-classes")
 router.register("modules/seances", SeanceViewSet, basename="mod-seances")
 router.register("modules/activities", ActivityViewSet, basename="mod-activities")
 router.register("modules/components", ActivityComponentViewSet, basename="mod-components")
@@ -73,6 +83,8 @@ urlpatterns = [
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/me/", MeView.as_view(), name="auth-me"),
     path("modules/formations/overview/", FormationsOverviewView.as_view(), name="mod-formations-overview"),
+    path("modules/formations/teachers/", TeachersListView.as_view(), name="mod-formations-teachers"),
+    path("modules/suivi/", SuiviView.as_view(), name="mod-suivi"),
     path("modules/publications/overview/", PublicationsOverviewView.as_view(), name="mod-publications-overview"),
     path("modules/paiements/overview/", PaiementsOverviewView.as_view(), name="mod-paiements-overview"),
     path("modules/inscriptions/overview/", InscriptionsOverviewView.as_view(), name="mod-inscriptions-overview"),

@@ -60,6 +60,30 @@ function VideoEmbed({ url }: { url: string }) {
   );
 }
 
+function AudioBlock({ url }: { url: string }) {
+  // Fichier audio direct → lecteur natif.
+  if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(url)) {
+    return <audio src={url} controls className="mt-2 w-full" />;
+  }
+  // SoundCloud → embed iframe.
+  if (/soundcloud\.com/i.test(url)) {
+    return (
+      <iframe
+        title="Audio"
+        className="mt-2 w-full rounded-lg"
+        height={120}
+        allow="autoplay"
+        src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%231E3A8A&visual=false`}
+      />
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-accent">
+      <i className="bx bx-volume-full text-lg" /> Écouter l’audio
+    </a>
+  );
+}
+
 function ProgressBar({ percent }: { percent: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -74,7 +98,61 @@ function ProgressBar({ percent }: { percent: number }) {
   );
 }
 
+// Détecte la nature d'un fichier depuis son extension / type MIME.
+function fileKind(url: string | null, mime?: string): { kind: string; icon: string; color: string } {
+  const ext = (url || "").split("?")[0].split(".").pop()?.toLowerCase() || "";
+  const m = (mime || "").toLowerCase();
+  if (m.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"].includes(ext))
+    return { kind: "image", icon: "bxs-image", color: "text-emerald-500" };
+  if (m.startsWith("video/") || ["mp4", "webm", "ogg", "mov", "avi", "mkv"].includes(ext))
+    return { kind: "video", icon: "bxs-videos", color: "text-purple-500" };
+  if (m.startsWith("audio/") || ["mp3", "wav", "m4a", "aac", "flac"].includes(ext))
+    return { kind: "audio", icon: "bxs-music", color: "text-pink-500" };
+  if (m === "application/pdf" || ext === "pdf")
+    return { kind: "pdf", icon: "bxs-file-pdf", color: "text-red-500" };
+  if (["doc", "docx", "odt", "rtf"].includes(ext)) return { kind: "word", icon: "bxs-file-doc", color: "text-blue-600" };
+  if (["xls", "xlsx", "ods", "csv"].includes(ext)) return { kind: "excel", icon: "bxs-spreadsheet", color: "text-green-600" };
+  if (["ppt", "pptx", "odp"].includes(ext)) return { kind: "ppt", icon: "bxs-slideshow", color: "text-orange-500" };
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { kind: "archive", icon: "bxs-file-archive", color: "text-amber-600" };
+  return { kind: "other", icon: "bxs-file", color: "text-muted" };
+}
+
 function DocRow({ d }: { d: LearnerDoc }) {
+  const { kind, icon, color } = fileKind(d.url, d.mime_type);
+  const badge = (
+    <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
+      {DOC_TYPE[d.m_type] || "Document"}
+    </span>
+  );
+
+  // Médias : aperçu inline directement dans l'espace apprenant.
+  if (d.url && (kind === "image" || kind === "video" || kind === "audio")) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-line/70 bg-white text-sm">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <i className={`bx ${icon} text-xl ${color}`} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium text-ink">{d.title}</span>
+            {d.description && <span className="block truncate text-xs text-muted">{d.description}</span>}
+          </span>
+          {badge}
+          <a href={d.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-muted hover:text-brand" title="Ouvrir / télécharger">
+            <i className="bx bx-download" />
+          </a>
+        </div>
+        <div className="bg-brand-soft/40 px-4 pb-4">
+          {kind === "image" && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={d.url} alt={d.title} className="max-h-96 w-auto rounded-lg" />
+          )}
+          {kind === "video" && <video controls src={d.url} className="max-h-96 w-full rounded-lg" />}
+          {kind === "audio" && <audio controls src={d.url} className="w-full" />}
+        </div>
+      </div>
+    );
+  }
+
+  // Autres formats (PDF, Word, Excel, PowerPoint, archives…) : ouverture / téléchargement.
   return (
     <a
       href={d.url || "#"}
@@ -82,15 +160,13 @@ function DocRow({ d }: { d: LearnerDoc }) {
       rel="noopener noreferrer"
       className="flex items-center gap-3 rounded-xl border border-line/70 bg-white px-4 py-3 text-sm transition hover:border-brand hover:shadow-hbc-sm"
     >
-      <i className="bx bxs-file-pdf text-xl text-accent" />
+      <i className={`bx ${icon} text-xl ${color}`} />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium text-ink">{d.title}</span>
         {d.description && <span className="block truncate text-xs text-muted">{d.description}</span>}
       </span>
-      <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
-        {DOC_TYPE[d.m_type] || "Document"}
-      </span>
-      <i className="bx bx-link-external text-muted" />
+      {badge}
+      <i className={`bx ${kind === "pdf" ? "bx-link-external" : "bx-download"} text-muted`} />
     </a>
   );
 }
@@ -229,7 +305,7 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
         {a.completed && <i className="bx bxs-check-circle ml-auto text-lg text-green-600" title="Terminé" />}
       </h4>
 
-      {/* Blocs de contenu (texte / image / vidéo) */}
+      {/* Blocs de contenu (texte / image / vidéo / audio) */}
       {a.components.map((c) => (
         <div key={c.id} className="mb-3">
           {c.title && <p className="font-medium text-ink">{c.title}</p>}
@@ -239,6 +315,9 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
             <img src={c.image} alt={c.title} className="mt-2 max-w-full rounded-lg" />
           )}
           {c.video_url && <VideoEmbed url={c.video_url} />}
+          {c.video_file && <video src={c.video_file} controls className="mt-2 w-full rounded-lg" />}
+          {c.audio_url && <AudioBlock url={c.audio_url} />}
+          {c.audio_file && <audio src={c.audio_file} controls className="mt-2 w-full" />}
         </div>
       ))}
 

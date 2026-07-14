@@ -191,6 +191,11 @@ class Component(models.Model):
 	image = models.ImageField(upload_to='img',null=True)
 	# Vidéo pédagogique : lien YouTube / Vimeo / fichier direct (.mp4). Embed côté front.
 	video_url = models.URLField(max_length=500, null=True, blank=True)
+	# Vidéo uploadée (fichier stocké sur le serveur, en plus de l'embed video_url).
+	video_file = models.FileField(upload_to='video', null=True, blank=True)
+	# Audio pédagogique : lien (SoundCloud / .mp3) OU fichier uploadé.
+	audio_url = models.URLField(max_length=500, null=True, blank=True)
+	audio_file = models.FileField(upload_to='audio', null=True, blank=True)
 	number = models.IntegerField()
       
   

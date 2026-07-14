@@ -64,6 +64,7 @@ def _doc_payload(request, doc, index):
         "description": doc.description,
         "url": _abs(request, url),
         "m_type": doc.m_type,  # 1=Cours 2=Exercice 3=Réponse 4=Correction
+        "mime_type": getattr(getattr(doc, "document", None), "mime_type", "") or "",
     }
 
 
@@ -131,7 +132,7 @@ def build_theme_content(theme, request, user=None):
                         "options": options,
                     })
 
-            # Blocs de contenu (texte / image)
+            # Blocs de contenu (texte / image / vidéo / audio — embed ou fichier)
             components = [
                 {
                     "id": c.pk,
@@ -139,6 +140,9 @@ def build_theme_content(theme, request, user=None):
                     "paragraph": c.paragraph,
                     "image": _abs(request, c.image.url) if c.image else None,
                     "video_url": c.video_url or None,
+                    "video_file": _abs(request, c.video_file.url) if c.video_file else None,
+                    "audio_url": c.audio_url or None,
+                    "audio_file": _abs(request, c.audio_file.url) if c.audio_file else None,
                     "number": c.number,
                 }
                 for c in ActivityComponent.objects.filter(activity=activity).order_by("number")

@@ -18,6 +18,7 @@ const TITLES: { prefix: string; label: string }[] = [
   { prefix: "/pages", label: "Pages" },
   { prefix: "/agenda", label: "Agenda & Événements" },
   { prefix: "/formations", label: "Formations" },
+  { prefix: "/suivi", label: "Suivi apprenants" },
   { prefix: "/publications", label: "Publications" },
   { prefix: "/inscriptions", label: "Inscriptions & Paniers" },
   { prefix: "/paiements", label: "Paiements" },
@@ -69,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 profile?.is_admin ? "bg-accent/10 text-accent" : "bg-brand-soft text-brand"
               }`}
             >
-              {profile?.is_admin ? "Administrateur" : "Apprenant"}
+              {profile?.is_admin ? "Administrateur" : profile?.is_teacher ? "Formateur" : "Apprenant"}
             </span>
           </div>
         </header>

@@ -150,6 +150,11 @@ class Payment(TimestampedModel):
     )
     gateway_initiated_at = models.DateTimeField(null=True, blank=True)
     motif_rejet = models.TextField(blank=True)
+    # Téléphone du payeur (mobile money), tel que saisi à l'initiation. Sert au
+    # rapprochement de secours du webhook Tara (par téléphone + montant), Tara ne
+    # renvoyant pas toujours notre identifiant. `Member`/`User` n'ayant pas de
+    # champ téléphone, on le stocke ici, sur le Payment lui-même.
+    payer_phone = models.CharField(max_length=32, blank=True, db_index=True)
 
     # CH-3 (refonte 2026) — Épargne classique : sous-canal « placement ».
     # Vrai uniquement si type == EPARGNE_CLASSIQUE ET que le membre coche

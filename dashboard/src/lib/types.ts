@@ -108,10 +108,17 @@ export interface Profile {
   full_name: string;
   email: string;
   is_admin: boolean;
+  is_teacher?: boolean;
   is_staff: boolean;
   is_superuser: boolean;
   groups: string[];
   modules: ModuleItem[];
+}
+
+export interface TeacherItem {
+  id: number;
+  name: string;
+  email: string;
 }
 
 export interface EventItem {
@@ -151,7 +158,10 @@ export interface ThemeItem {
   session_year: string | null;
   categorie: number | null;
   categorie_name: string | null;
+  classes?: number[];
   classes_names: string[];
+  instructors?: number[];
+  instructors_detail?: { id: number; name: string; email: string }[];
   seances_count: number;
   image_url: string | null;
   is_active: boolean;
@@ -183,6 +193,9 @@ export interface ComponentItem {
   title: string;
   paragraph: string | null;
   video_url: string | null;
+  video_file_url?: string | null;
+  audio_url?: string | null;
+  audio_file_url?: string | null;
   image_url: string | null;
   number: number;
 }
@@ -193,6 +206,7 @@ export interface ActivityDocItem {
   title: string;
   url: string | null;
   m_type: number;
+  mime_type?: string;
 }
 
 export interface QuizOptionEdit {
@@ -218,6 +232,32 @@ export interface FormationsOverview {
   classes: { id: number; name: string }[];
 }
 
+export interface SuiviQuiz {
+  activity_id: number;
+  title: string;
+  score: number;
+  max_score: number;
+  percent: number;
+}
+export interface SuiviLearner {
+  id: number;
+  name: string;
+  email: string;
+  progress: { done: number; total: number; percent: number };
+  quizzes: SuiviQuiz[];
+}
+export interface SuiviFormation {
+  id: number;
+  title: string;
+  activities_total: number;
+  quiz_count: number;
+  learners_count: number;
+  learners: SuiviLearner[];
+}
+export interface SuiviResponse {
+  formations: SuiviFormation[];
+}
+
 export interface PublicationItem {
   id: number;
   title: string;
@@ -228,6 +268,8 @@ export interface PublicationItem {
   categorie: number | null;
   categorie_name: string | null;
   tags_names: string[];
+  themes_titles?: { id: number; title: string }[];
+  parent?: number | null;
   children_count: number;
   events_count: number;
   image_url: string | null;

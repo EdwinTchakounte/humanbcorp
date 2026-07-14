@@ -13,6 +13,9 @@ class Theme(Abstract):
     sequence = models.ForeignKey(Sequence,  on_delete=models.CASCADE, default=None)
     categorie = models.ForeignKey(Categorie, on_delete=models.CASCADE, default=None)
     classes = models.ManyToManyField(Classe)
+    # Formateurs affectés à cette formation (rôle Teacher). Un formateur ne voit /
+    # n'édite que les formations où il figure ici (les admins voient tout).
+    instructors = models.ManyToManyField('auth.User', blank=True, related_name='formations_animees')
     COURS = 1
     EXAMEN = 2
     TYPES_CHOICES = ( (COURS, 'Cours'),(EXAMEN, 'Examen'))

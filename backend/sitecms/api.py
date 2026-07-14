@@ -8,11 +8,13 @@
 import requests
 from django.conf import settings
 from django.core.mail import send_mail
+from django.db.models import Q
 from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
@@ -25,7 +27,7 @@ from contents.models import Publication, Category, Tags, Space
 from paiement.models import Paiement
 from bucket.models import Inscription, Order
 from chat.models import Project, ChatMessage
-from .roles import is_admin, module_is_accessible, has_app_write, profile_payload, MODULES
+from .roles import is_admin, is_teacher, module_is_accessible, module_can_write, profile_payload, MODULES
 from .serializers_modules import (
     EventSerializer,
     MeetingSerializer,
@@ -94,10 +96,36 @@ class HasModuleAccess(permissions.BasePermission):
             return False
         if request.method in permissions.SAFE_METHODS:
             return True
-        if module.get("admin_only"):
-            return is_admin(request.user)
-        app = module.get("app")
-        return has_app_write(request.user, app) if app else is_admin(request.user)
+        return module_can_write(request.user, module)
+
+
+# ---------------------------------------------------------------------------
+# Périmètre « formateur » (auteur limité) : un Teacher ne voit / n'édite que les
+# formations (Theme) où il est affecté ; un admin voit tout.
+# ---------------------------------------------------------------------------
+def themes_for(user):
+    """Queryset des thèmes accessibles à ce profil (tout pour admin, affectés pour teacher)."""
+    qs = Theme.objects.filter(is_deleted=False)
+    if is_admin(user):
+        return qs
+    if is_teacher(user):
+        return qs.filter(instructors=user)
+    return qs.none()
+
+
+def can_edit_theme(user, theme):
+    """Droit d'édition sur une formation (et son contenu) pour ce profil."""
+    if theme is None:
+        return False
+    if is_admin(user):
+        return True
+    return is_teacher(user) and theme.instructors.filter(pk=user.pk).exists()
+
+
+def _assert_theme_access(user, theme):
+    """Lève 403 si le profil n'a pas le droit d'éditer le contenu de cette formation."""
+    if not can_edit_theme(user, theme):
+        raise PermissionDenied("Formation hors de votre périmètre.")
 
 
 # ---------------------------------------------------------------------------
@@ -369,9 +397,16 @@ class EventViewSet(_ModuleViewSet):
 
     def get_queryset(self):
         qs = Event.objects.filter(is_deleted=False).select_related("user")
-        # Un profil non-admin ne voit que ses propres événements (logique de l'app de base).
-        if not is_admin(self.request.user):
-            qs = qs.filter(user=self.request.user)
+        user = self.request.user
+        if not is_admin(user):
+            if is_teacher(user):
+                # Le formateur voit ses propres événements + ceux rattachés à ses formations.
+                from calendarapp.models import EventTheme
+
+                ev_ids = EventTheme.objects.filter(theme__in=themes_for(user)).values_list("event_id", flat=True)
+                qs = qs.filter(Q(user=user) | Q(id__in=list(ev_ids)))
+            else:
+                qs = qs.filter(user=user)
         return qs.order_by("-start_time")
 
     def perform_create(self, serializer):
@@ -424,11 +459,12 @@ class ThemeViewSet(_ModuleViewSet):
 
     module_key = "formations"
     serializer_class = ThemeSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        qs = Theme.objects.filter(is_deleted=False).select_related(
+        qs = themes_for(self.request.user).select_related(
             "categorie", "sequence", "sequence__session"
-        ).prefetch_related("classes")
+        ).prefetch_related("classes", "instructors")
         session = self.request.query_params.get("session")
         if session:
             qs = qs.filter(sequence__session_id=session)
@@ -436,6 +472,87 @@ class ThemeViewSet(_ModuleViewSet):
         if categorie:
             qs = qs.filter(categorie_id=categorie)
         return qs.order_by("-id")
+
+    def perform_create(self, serializer):
+        # L'affectation des formateurs (instructors) est réservée aux admins.
+        if not is_admin(self.request.user):
+            serializer.validated_data.pop("instructors", None)
+        theme = serializer.save()
+        # Un formateur qui crée une formation s'y affecte pour la retrouver dans son périmètre.
+        if is_teacher(self.request.user) and not is_admin(self.request.user):
+            theme.instructors.add(self.request.user)
+
+    def perform_update(self, serializer):
+        # Un formateur ne peut pas réaffecter/retirer les formateurs de sa formation.
+        if not is_admin(self.request.user):
+            serializer.validated_data.pop("instructors", None)
+        serializer.save()
+
+
+# --- Hiérarchie des formations : axes de classement (CRUD léger) ----------
+class _HierarchyViewSet(_ModuleViewSet):
+    """Base commune Session/Séquence/Catégorie/Classe (taxonomie PARTAGÉE).
+
+    Création autorisée à tout profil ayant le module (dont les formateurs, pour
+    l'ajout inline). En revanche l'édition/suppression est réservée aux **admins** :
+    ces objets sont partagés entre formations, et un `delete` cascaderait sur les
+    Themes d'autres formateurs (Theme.sequence/categorie = CASCADE).
+    """
+
+    module_key = "formations"
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def _admin_only(self):
+        if not is_admin(self.request.user):
+            raise PermissionDenied("Édition/suppression réservée aux administrateurs (élément partagé).")
+
+    def update(self, request, *args, **kwargs):
+        self._admin_only()
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        self._admin_only()
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._admin_only()
+        return super().destroy(request, *args, **kwargs)
+
+
+class SessionViewSet(_HierarchyViewSet):
+    serializer_class = SessionMiniSerializer
+
+    def get_queryset(self):
+        return Session.objects.filter(is_deleted=False).order_by("-year", "-id")
+
+
+class SequenceViewSet(_HierarchyViewSet):
+    serializer_class = SequenceMiniSerializer
+
+    def get_queryset(self):
+        qs = Sequence.objects.filter(is_deleted=False).select_related("session")
+        session = self.request.query_params.get("session")
+        if session:
+            qs = qs.filter(session_id=session)
+        return qs.order_by("session_id", "numero")
+
+
+class FormationCategorieViewSet(_HierarchyViewSet):
+    """Catégorie pédagogique (lessonapp.Categorie) rattachée aux thèmes."""
+
+    serializer_class = CategorieMiniSerializer
+
+    def get_queryset(self):
+        return Categorie.objects.filter(is_deleted=False).order_by("name")
+
+
+class ClasseViewSet(_HierarchyViewSet):
+    serializer_class = ClasseMiniSerializer
+
+    def get_queryset(self):
+        return Classe.objects.filter(is_deleted=False).order_by("name")
 
 
 class SeanceViewSet(_ModuleViewSet):
@@ -445,11 +562,20 @@ class SeanceViewSet(_ModuleViewSet):
     serializer_class = SeanceSerializer
 
     def get_queryset(self):
-        qs = Seance.objects.filter(is_deleted=False)
+        qs = Seance.objects.filter(is_deleted=False, theme__in=themes_for(self.request.user))
         theme = self.request.query_params.get("theme")
         if theme:
             qs = qs.filter(theme_id=theme)
         return qs.order_by("id")
+
+    def perform_create(self, serializer):
+        _assert_theme_access(self.request.user, serializer.validated_data.get("theme"))
+        serializer.save()
+
+    def perform_update(self, serializer):
+        theme = serializer.validated_data.get("theme") or serializer.instance.theme
+        _assert_theme_access(self.request.user, theme)
+        serializer.save()
 
 
 class ActivityViewSet(_ModuleViewSet):
@@ -459,13 +585,25 @@ class ActivityViewSet(_ModuleViewSet):
     serializer_class = ActivitySerializer
 
     def get_queryset(self):
-        qs = Activity.objects.filter(is_deleted=False)
+        qs = Activity.objects.filter(
+            is_deleted=False, seance__theme__in=themes_for(self.request.user)
+        )
         seance = self.request.query_params.get("seance")
         if seance:
             qs = qs.filter(seance_id=seance)
         return qs.order_by("id")
 
     def perform_create(self, serializer):
+        seance = serializer.validated_data.get("seance")
+        _assert_theme_access(self.request.user, getattr(seance, "theme", None))
+        self._create_with_bloc(serializer)
+
+    def perform_update(self, serializer):
+        seance = serializer.validated_data.get("seance") or serializer.instance.seance
+        _assert_theme_access(self.request.user, getattr(seance, "theme", None))
+        serializer.save()
+
+    def _create_with_bloc(self, serializer):
         # Le modèle Activity exige un Bloc ; on en crée un discret par activité
         # pour masquer cette complexité héritée à l'éditeur.
         from lessonapp.models.bloc import Bloc
@@ -488,7 +626,9 @@ class ActivityComponentViewSet(_ModuleViewSet):
     def get_queryset(self):
         from material.models import ActivityComponent
 
-        qs = ActivityComponent.objects.all()
+        qs = ActivityComponent.objects.filter(
+            activity__seance__theme__in=themes_for(self.request.user)
+        )
         activity = self.request.query_params.get("activity")
         if activity:
             qs = qs.filter(activity_id=activity)
@@ -498,6 +638,7 @@ class ActivityComponentViewSet(_ModuleViewSet):
         from material.models import ActivityComponent
 
         activity = serializer.validated_data.get("activity")
+        _assert_theme_access(self.request.user, getattr(getattr(activity, "seance", None), "theme", None))
         n = ActivityComponent.objects.filter(activity=activity).count() + 1
         serializer.save(number=n)
 
@@ -515,7 +656,7 @@ class ActivityDocViewSet(viewsets.ViewSet):
     def list(self, request):
         from material.models import MaterialActivityDoc
 
-        qs = MaterialActivityDoc.objects.all()
+        qs = MaterialActivityDoc.objects.filter(activity__seance__theme__in=themes_for(request.user))
         activity = request.query_params.get("activity")
         if activity:
             qs = qs.filter(activity_id=activity)
@@ -527,7 +668,10 @@ class ActivityDocViewSet(viewsets.ViewSet):
                 url = None
             if url and url.startswith("/"):
                 url = request.build_absolute_uri(url)
-            out.append({"id": d.id, "title": d.title, "url": url, "m_type": d.m_type, "activity": d.activity_id})
+            out.append({
+                "id": d.id, "title": d.title, "url": url, "m_type": d.m_type,
+                "activity": d.activity_id, "mime_type": getattr(d.document, "mime_type", "") or "",
+            })
         return Response(out)
 
     def create(self, request):
@@ -544,6 +688,7 @@ class ActivityDocViewSet(viewsets.ViewSet):
         activity = Activity.objects.filter(pk=activity_id).first()
         if activity is None:
             return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        _assert_theme_access(request.user, getattr(getattr(activity, "seance", None), "theme", None))
         try:
             m_type = int(request.data.get("m_type", 1) or 1)
         except (TypeError, ValueError):
@@ -583,6 +728,7 @@ class ActivityDocViewSet(viewsets.ViewSet):
         d = MaterialActivityDoc.objects.filter(pk=pk).first()
         if d is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        _assert_theme_access(request.user, getattr(getattr(d.activity, "seance", None), "theme", None))
         doc = d.document
         d.delete()
         if doc:
@@ -618,13 +764,23 @@ class QuizQuestionViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [HasModuleAccess]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     module_key = "formations"
 
-    def list(self, request):
+    def _question_theme(self, question):
         from lessonapp.models import Activityquestion
+
+        aq = Activityquestion.objects.filter(question=question).select_related("activity__seance__theme").first()
+        return getattr(getattr(getattr(aq, "activity", None), "seance", None), "theme", None) if aq else None
+
+    def list(self, request):
+        from lessonapp.models import Activity, Activityquestion
 
         activity = request.query_params.get("activity")
         if not activity:
+            return Response([])
+        act = Activity.objects.filter(pk=activity).first()
+        if act is None or not can_edit_theme(request.user, getattr(getattr(act, "seance", None), "theme", None)):
             return Response([])
         aqs = (
             Activityquestion.objects.filter(activity_id=activity)
@@ -645,28 +801,80 @@ class QuizQuestionViewSet(viewsets.ViewSet):
                 title=title, is_answer=bool(o.get("is_answer")), input_type=input_type, question=question
             )
 
-    def create(self, request):
-        from lessonapp.models import Activity, Question, Activityquestion
+    def _persist_question(self, activity, data, user):
+        """Crée Bloc + Question + Activityquestion + options depuis un dict à plat."""
+        from lessonapp.models import Question, Activityquestion
         from lessonapp.models.bloc import Bloc
+
+        title = (data.get("title") or "").strip()
+        bloc = Bloc.objects.create(title=title[:400], created_by=user, categorie=Bloc.QUESTION)
+        q = Question.objects.create(title=title, description=(data.get("description") or ""), bloc=bloc)
+        n = Activityquestion.objects.filter(activity=activity).count() + 1
+        try:
+            points = int(data.get("points", 1) or 1)
+        except (TypeError, ValueError):
+            points = 1
+        aq = Activityquestion.objects.create(activity=activity, question=q, points=points, number=n)
+        try:
+            input_type = int(data.get("input_type", 2) or 2)
+        except (TypeError, ValueError):
+            input_type = 2
+        self._write_options(q, input_type, data.get("options"))
+        return q, aq
+
+    def create(self, request):
+        from lessonapp.models import Activity
 
         d = request.data
         activity = Activity.objects.filter(pk=d.get("activity")).first()
         if activity is None:
             return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
-        title = (d.get("title") or "").strip()
-        if not title:
+        _assert_theme_access(request.user, getattr(getattr(activity, "seance", None), "theme", None))
+        if not (d.get("title") or "").strip():
             return Response({"detail": "Intitulé de la question requis."}, status=status.HTTP_400_BAD_REQUEST)
-        bloc = Bloc.objects.create(title=title[:400], created_by=request.user, categorie=Bloc.QUESTION)
-        q = Question.objects.create(title=title, description=(d.get("description") or ""), bloc=bloc)
-        n = Activityquestion.objects.filter(activity=activity).count() + 1
-        try:
-            points = int(d.get("points", 1) or 1)
-        except (TypeError, ValueError):
-            points = 1
-        aq = Activityquestion.objects.create(activity=activity, question=q, points=points, number=n)
-        input_type = int(d.get("input_type", 2) or 2)
-        self._write_options(q, input_type, d.get("options"))
+        q, aq = self._persist_question(activity, d, request.user)
         return Response(_quiz_question_payload(q, aq), status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="template")
+    def template(self, request):
+        """GET .../quiz-questions/template/?fmt=csv|xlsx → gabarit d'import prérempli."""
+        from django.http import HttpResponse
+        from .quiz_import import build_template
+
+        fmt = "xlsx" if request.query_params.get("fmt") == "xlsx" else "csv"
+        data, ctype, fname = build_template(fmt)
+        resp = HttpResponse(data, content_type=ctype)
+        resp["Content-Disposition"] = f'attachment; filename="{fname}"'
+        return resp
+
+    @action(detail=False, methods=["post"], url_path="import")
+    def import_file(self, request):
+        """POST .../quiz-questions/import/ (multipart: activity, file) → import en masse.
+
+        Formats : CSV, Excel (.xlsx), JSON. Renvoie le nombre importé + les erreurs par ligne.
+        """
+        from lessonapp.models import Activity
+        from .quiz_import import parse_quiz_file
+
+        activity = Activity.objects.filter(pk=request.data.get("activity")).first()
+        if activity is None:
+            return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        _assert_theme_access(request.user, getattr(getattr(activity, "seance", None), "theme", None))
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "Fichier requis (champ « file »)."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            questions, errors = parse_quiz_file(upload.name, upload.read())
+        except Exception as exc:  # noqa: BLE001 — fichier corrompu / format inattendu
+            return Response({"detail": f"Fichier illisible : {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+        created = [
+            _quiz_question_payload(*self._persist_question(activity, q, request.user))
+            for q in questions
+        ]
+        return Response(
+            {"imported": len(created), "errors": errors, "questions": created},
+            status=status.HTTP_201_CREATED,
+        )
 
     def _update(self, request, pk):
         from lessonapp.models import Question, Activityquestion
@@ -674,6 +882,7 @@ class QuizQuestionViewSet(viewsets.ViewSet):
         q = Question.objects.filter(pk=pk).first()
         if q is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        _assert_theme_access(request.user, self._question_theme(q))
         d = request.data
         if "title" in d:
             q.title = (d.get("title") or "").strip() or q.title
@@ -704,6 +913,7 @@ class QuizQuestionViewSet(viewsets.ViewSet):
         q = Question.objects.filter(pk=pk).first()
         if q is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        _assert_theme_access(request.user, self._question_theme(q))
         bloc = q.bloc
         q.delete()  # cascade Activityquestion + InputQuestionBox
         if bloc:
@@ -722,9 +932,11 @@ class FormationsOverviewView(APIView):
 
     def get(self, request):
         ctx = {"request": request}
+        # Le compteur de formations respecte le périmètre (un formateur ne voit
+        # que les siennes) — cohérent avec la liste filtrée en dessous.
         return Response({
             "counts": {
-                "themes": Theme.objects.filter(is_deleted=False).count(),
+                "themes": themes_for(request.user).count(),
                 "sessions": Session.objects.filter(is_deleted=False).count(),
                 "sequences": Sequence.objects.filter(is_deleted=False).count(),
                 "classes": Classe.objects.filter(is_deleted=False).count(),
@@ -737,14 +949,128 @@ class FormationsOverviewView(APIView):
         })
 
 
+class TeachersListView(APIView):
+    """GET /modules/formations/teachers/ → formateurs (groupe Teacher) pour l'affectation."""
+
+    permission_classes = [HasModuleAccess]
+    module_key = "formations"
+
+    def get(self, request):
+        from django.contrib.auth.models import User
+
+        # L'affectation des formateurs est un acte d'admin → liste réservée aux admins.
+        if not is_admin(request.user):
+            raise PermissionDenied("Réservé aux administrateurs.")
+        users = (
+            User.objects.filter(groups__name__iexact="Teacher")
+            .distinct()
+            .order_by("first_name", "username")
+        )
+        return Response([
+            {"id": u.id, "name": (u.get_full_name() or u.username), "email": u.email}
+            for u in users
+        ])
+
+
+class SuiviView(APIView):
+    """GET /modules/suivi/ → progression + scores quiz des apprenants, par formation.
+
+    Admin : toutes les formations. Formateur : ses formations affectées.
+    Filtre optionnel `?theme=<id>`.
+    """
+
+    permission_classes = [HasModuleAccess]
+    module_key = "suivi"
+
+    def get(self, request):
+        from lessonapp.models import Activity
+        from material.models import ActivityProgress, QuizAttempt
+
+        themes = themes_for(request.user).order_by("-id")
+        theme_filter = request.query_params.get("theme")
+        if theme_filter:
+            themes = themes.filter(pk=theme_filter)
+
+        formations = []
+        for theme in themes:
+            activities = list(Activity.objects.filter(seance__theme=theme, is_deleted=False))
+            act_ids = [a.id for a in activities]
+            quiz_ids = [a.id for a in activities if a.a_type == Activity.QUIZZ]
+            act_titles = {a.id: a.title for a in activities}
+            total = len(activities)
+
+            # Apprenants inscrits (CONFIRMED) à une publication contenant ce thème.
+            learners = {}
+            for ins in Inscription.objects.filter(
+                publication__themes=theme, status=Inscription.CONFIRMED, is_deleted=False
+            ).select_related("participant"):
+                u = ins.participant
+                if u and u.id not in learners:
+                    learners[u.id] = u
+            lids = list(learners.keys())
+
+            # Activités terminées par apprenant (1 requête).
+            done_counts = {}
+            if lids and act_ids:
+                for lid, _aid in ActivityProgress.objects.filter(
+                    learner_id__in=lids, activity_id__in=act_ids, completed=True
+                ).values_list("learner_id", "activity_id"):
+                    done_counts[lid] = done_counts.get(lid, 0) + 1
+
+            # Dernière tentative de quiz par (apprenant, activité) — ordering -created_at.
+            latest = {}
+            if lids and quiz_ids:
+                for att in QuizAttempt.objects.filter(
+                    learner_id__in=lids, activity_id__in=quiz_ids
+                ).order_by("activity_id", "-created_at"):
+                    key = (att.learner_id, att.activity_id)
+                    latest.setdefault(key, att)
+
+            rows = []
+            for lid, u in learners.items():
+                done = done_counts.get(lid, 0)
+                quizzes = []
+                for qid in quiz_ids:
+                    att = latest.get((lid, qid))
+                    if att:
+                        quizzes.append({
+                            "activity_id": qid,
+                            "title": act_titles.get(qid, "Quiz"),
+                            "score": att.score,
+                            "max_score": att.max_score,
+                            "percent": round(100 * att.score / att.max_score) if att.max_score else 0,
+                        })
+                rows.append({
+                    "id": u.id,
+                    "name": u.get_full_name() or u.first_name or u.username,
+                    "email": u.email,
+                    "progress": {
+                        "done": done, "total": total,
+                        "percent": round(100 * done / total) if total else 0,
+                    },
+                    "quizzes": quizzes,
+                })
+            rows.sort(key=lambda r: (r["name"] or "").lower())
+            formations.append({
+                "id": theme.id,
+                "title": theme.title,
+                "activities_total": total,
+                "quiz_count": len(quiz_ids),
+                "learners_count": len(rows),
+                "learners": rows,
+            })
+        return Response({"formations": formations})
+
+
 class PublicationViewSet(_ModuleViewSet):
     """Module Publications : contenus (contents.Publication)."""
 
     module_key = "publications"
     serializer_class = PublicationSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        qs = Publication.objects.select_related("categorie").prefetch_related("liste_tags")
+        qs = Publication.objects.select_related("categorie").prefetch_related("liste_tags", "themes")
         categorie = self.request.query_params.get("categorie")
         if categorie:
             qs = qs.filter(categorie_id=categorie)
@@ -924,7 +1250,7 @@ class OrderViewSet(_ModuleViewSet):
         )
         try:
             payment_url, ref, raw = init_payin_for_payment(payment, phone=phone, network=network)
-            payment.save(update_fields=["reference_externe", "gateway_initiated_at", "updated_at"])
+            payment.save(update_fields=["reference_externe", "gateway_initiated_at", "payer_phone", "updated_at"])
         except Exception as exc:  # noqa: BLE001 — remonte l'échec provider au front
             payment.statut = Payment.Statut.REJETE
             payment.motif_rejet = str(exc)[:500]

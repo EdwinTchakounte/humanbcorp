@@ -309,7 +309,7 @@ def inscription_pay(request, token):
     )
     try:
         payment_url, ref, raw = init_payin_for_payment(payment, phone=phone, network=network)
-        payment.save(update_fields=["reference_externe", "gateway_initiated_at", "updated_at"])
+        payment.save(update_fields=["reference_externe", "gateway_initiated_at", "payer_phone", "updated_at"])
     except Exception as exc:  # noqa: BLE001 — remonte l'échec provider au front
         payment.statut = Payment.Statut.REJETE
         payment.motif_rejet = str(exc)[:500]

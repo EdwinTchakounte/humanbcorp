@@ -59,10 +59,30 @@ def init_payin_for_payment(
     result = provider.init_payin(payment, phone=phone, network=network)
     payment.reference_externe = result.provider_reference
     payment.gateway_initiated_at = timezone.now()
+    # Mémorise le téléphone (chiffres uniquement) pour le rapprochement de secours
+    # du webhook. Le caller doit inclure `payer_phone` dans son `save(update_fields=…)`.
+    if phone:
+        payment.payer_phone = "".join(c for c in str(phone) if c.isdigit())
     return result.payment_url, result.provider_reference, result.raw or {}
 
 
 @transaction.atomic
+def _webhook_amount(raw_payload: dict) -> int | None:
+    """Montant (XAF entier) présent dans le webhook Tara, si disponible.
+
+    Tara renvoie ``productPrice`` (le montant qu'on a envoyé à l'init) ; on tolère
+    quelques alias. Sert à désambiguïser le fallback par téléphone.
+    """
+    for key in ("productPrice", "amount", "montant", "productAmount", "price"):
+        v = raw_payload.get(key)
+        if v is not None:
+            try:
+                return int(float(str(v)))
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def handle_webhook_event(
     payment_idempotency_key: str | uuid.UUID,
     new_status: str,
@@ -125,18 +145,34 @@ def handle_webhook_event(
         digits_only = "".join(c for c in phone_raw if c.isdigit())
         local_8_digits = digits_only[-9:] if len(digits_only) >= 9 else digits_only
         recent_cutoff = timezone.now() - timedelta(minutes=30)
-        candidates = (
+        base = (
             Payment.objects.select_for_update()
             .filter(
                 statut=Payment.Statut.EN_ATTENTE,
                 created_at__gte=recent_cutoff,
-                member__phone__icontains=local_8_digits,
+                payer_phone__icontains=local_8_digits,
             )
             .order_by("-created_at")
         )
-        payment = candidates.first()
+        # Désambiguïsation par MONTANT : si Tara fournit le montant (productPrice),
+        # on ne retient que les paiements de ce montant. Évite de confirmer la
+        # mauvaise commande quand deux paiements sont en attente sur le même
+        # numéro (typiquement des formations de prix différents).
+        webhook_amount = _webhook_amount(raw_payload)
+        candidates = base
+        if webhook_amount is not None and base.filter(montant=webhook_amount).exists():
+            candidates = base.filter(montant=webhook_amount)
+        matches = list(candidates[:2])
+        payment = matches[0] if matches else None
         if payment is not None:
-            match_strategy = "phone_recent"
+            match_strategy = "phone_amount" if webhook_amount is not None else "phone_recent"
+            if len(matches) > 1:
+                logger.warning(
+                    "[TARA] webhook AMBIGU — plusieurs paiements EN_ATTENTE "
+                    "(phone=%s montant=%s) ; confirmation du plus récent (id=%s). "
+                    "À vérifier manuellement.",
+                    raw_payload.get("phoneNumber"), webhook_amount, payment.id,
+                )
 
     if payment is None:
         logger.warning(
@@ -417,15 +453,18 @@ def _hook_inscription_order(payment: Payment, _raw: dict) -> None:
         order.status = Order.TOTAL_PAID if fully_paid else Order.SEMI_PAID
         order.save()
 
-        # Confirme les inscriptions liées + vide le panier (comme l'origine).
+        # L'accès au contenu (inscriptions CONFIRMED) n'est accordé QUE lorsque la
+        # commande est intégralement payée. Sur paiement partiel (SEMI_PAID), les
+        # inscriptions restent WAITING : pas d'accès tant que le solde n'est pas réglé.
         confirmed = 0
-        for oi in OrderInscription.objects.select_related("inscription").filter(order=order):
-            insc = oi.inscription
-            if insc.status != Inscription.CONFIRMED:
-                insc.status = Inscription.CONFIRMED
-                insc.save(update_fields=["status"])
-                confirmed += 1
-        _remove_order_inscriptions_from_bucket(order)
+        if fully_paid:
+            for oi in OrderInscription.objects.select_related("inscription").filter(order=order):
+                insc = oi.inscription
+                if insc.status != Inscription.CONFIRMED:
+                    insc.status = Inscription.CONFIRMED
+                    insc.save(update_fields=["status"])
+                    confirmed += 1
+            _remove_order_inscriptions_from_bucket(order)
 
         record_audit(
             action="order.paid",

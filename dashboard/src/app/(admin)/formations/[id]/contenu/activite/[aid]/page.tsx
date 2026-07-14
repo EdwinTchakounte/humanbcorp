@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, listAll } from "@/lib/api";
+import { api, listAll, apiBase, tokens } from "@/lib/api";
 import { Modal, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import type { ActivityItem, ComponentItem, ActivityDocItem, QuizQuestionItem, QuizOptionEdit } from "@/lib/types";
@@ -19,7 +19,16 @@ const INPUT_TYPES = [
   { value: "1", label: "Choix multiple (plusieurs bonnes réponses)" },
 ];
 
-type CompDraft = { id?: number; title: string; paragraph: string; video_url: string; imageFile: File | null };
+type CompDraft = {
+  id?: number;
+  title: string;
+  paragraph: string;
+  video_url: string;
+  audio_url: string;
+  imageFile: File | null;
+  videoFile: File | null;
+  audioFile: File | null;
+};
 type DocDraft = { title: string; url: string; m_type: string; file: File | null };
 type QDraft = { id?: number; title: string; description: string; points: string; input_type: string; options: QuizOptionEdit[] };
 
@@ -40,6 +49,10 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
   const [qDraft, setQDraft] = useState<QDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  // Import de quiz par fichier
+  const [impOpen, setImpOpen] = useState(false);
+  const [impFile, setImpFile] = useState<File | null>(null);
+  const [impResult, setImpResult] = useState<{ imported: number; errors: string[] } | null>(null);
 
   const isQuiz = activity?.a_type === 1;
 
@@ -94,6 +107,38 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
       setSaving(false);
     }
   }
+  async function downloadTemplate(fmt: "csv" | "xlsx") {
+    const res = await fetch(`${apiBase()}/api/v1/modules/quiz-questions/template/?fmt=${fmt}`, {
+      headers: { Authorization: `Bearer ${tokens.access}` },
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fmt === "xlsx" ? "modele_quiz.xlsx" : "modele_quiz.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function runImport() {
+    if (!impFile) return;
+    setSaving(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.set("activity", String(activityId));
+      fd.set("file", impFile);
+      const res = await api<{ imported: number; errors: string[] }>("/modules/quiz-questions/import/", { method: "POST", body: fd, isForm: true });
+      setImpResult(res);
+      setImpFile(null);
+      await loadQuestions();
+    } catch (e) {
+      setErr(String(e).slice(0, 300));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function delQuestion(q: QuizQuestionItem) {
     if (!confirm(`Supprimer la question « ${q.title} » ?`)) return;
     await api(`/modules/quiz-questions/${q.id}/`, { method: "DELETE" });
@@ -108,20 +153,17 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
     setSaving(true);
     setErr("");
     try {
-      if (cDraft.imageFile) {
-        const fd = new FormData();
-        fd.set("activity", String(activityId));
-        fd.set("title", cDraft.title);
-        fd.set("paragraph", cDraft.paragraph);
-        fd.set("video_url", cDraft.video_url);
-        fd.set("image", cDraft.imageFile);
-        if (cDraft.id) await api(`/modules/components/${cDraft.id}/`, { method: "PATCH", body: fd, isForm: true });
-        else await api("/modules/components/", { method: "POST", body: fd, isForm: true });
-      } else {
-        const body = { activity: activityId, title: cDraft.title, paragraph: cDraft.paragraph, video_url: cDraft.video_url };
-        if (cDraft.id) await api(`/modules/components/${cDraft.id}/`, { method: "PATCH", body });
-        else await api("/modules/components/", { method: "POST", body });
-      }
+      const fd = new FormData();
+      fd.set("activity", String(activityId));
+      fd.set("title", cDraft.title);
+      fd.set("paragraph", cDraft.paragraph);
+      fd.set("video_url", cDraft.video_url);
+      fd.set("audio_url", cDraft.audio_url);
+      if (cDraft.imageFile) fd.set("image", cDraft.imageFile);
+      if (cDraft.videoFile) fd.set("video_file", cDraft.videoFile);
+      if (cDraft.audioFile) fd.set("audio_file", cDraft.audioFile);
+      if (cDraft.id) await api(`/modules/components/${cDraft.id}/`, { method: "PATCH", body: fd, isForm: true });
+      else await api("/modules/components/", { method: "POST", body: fd, isForm: true });
       setCDraft(null);
       await loadComps();
     } catch (e) {
@@ -186,12 +228,17 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-brand-deep">Questions du quiz</h2>
             {writable && (
-              <button
-                onClick={() => setQDraft({ title: "", description: "", points: "1", input_type: "2", options: [{ title: "", is_answer: true }, { title: "", is_answer: false }] })}
-                className="btn-brand text-sm"
-              >
-                <i className="bx bx-plus" /> Question
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => { setImpResult(null); setImpFile(null); setImpOpen(true); }} className="btn-ghost text-sm" title="Importer depuis un fichier CSV / Excel / JSON">
+                  <i className="bx bx-upload" /> Importer
+                </button>
+                <button
+                  onClick={() => setQDraft({ title: "", description: "", points: "1", input_type: "2", options: [{ title: "", is_answer: true }, { title: "", is_answer: false }] })}
+                  className="btn-brand text-sm"
+                >
+                  <i className="bx bx-plus" /> Question
+                </button>
+              </div>
             )}
           </div>
           {questions.length === 0 ? (
@@ -235,7 +282,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-brand-deep">Blocs de contenu</h2>
           {writable && (
-            <button onClick={() => setCDraft({ title: "", paragraph: "", video_url: "", imageFile: null })} className="btn-brand text-sm">
+            <button onClick={() => setCDraft({ title: "", paragraph: "", video_url: "", audio_url: "", imageFile: null, videoFile: null, audioFile: null })} className="btn-brand text-sm">
               <i className="bx bx-plus" /> Bloc
             </button>
           )}
@@ -258,7 +305,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
                 </div>
                 {writable && (
                   <div className="flex gap-1">
-                    <button onClick={() => setCDraft({ id: c.id, title: c.title || "", paragraph: c.paragraph || "", video_url: c.video_url || "", imageFile: null })} className="btn-ghost text-xs">
+                    <button onClick={() => setCDraft({ id: c.id, title: c.title || "", paragraph: c.paragraph || "", video_url: c.video_url || "", audio_url: c.audio_url || "", imageFile: null, videoFile: null, audioFile: null })} className="btn-ghost text-xs">
                       <i className="bx bx-edit" />
                     </button>
                     <button onClick={() => delComp(c)} className="btn-ghost text-xs text-red-500">
@@ -303,7 +350,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
             ))}
           </div>
         )}
-        {writable && <p className="mt-3 text-xs text-muted">Astuce : hébergez le PDF (Drive, site…) et collez son lien. L’upload de fichier se fait via l’admin.</p>}
+        {writable && <p className="mt-3 text-xs text-muted">Uploadez directement le fichier (tous formats) ou collez un lien externe (Drive, site…).</p>}
       </section>
 
       {/* Modale bloc */}
@@ -322,7 +369,27 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
           <div className="space-y-4">
             <TextField label="Titre (optionnel)" value={cDraft.title} onChange={(v) => setCDraft({ ...cDraft, title: v })} />
             <TextArea label="Texte" value={cDraft.paragraph} onChange={(v) => setCDraft({ ...cDraft, paragraph: v })} rows={4} />
-            <TextField label="Lien vidéo (YouTube / Vimeo / .mp4)" value={cDraft.video_url} onChange={(v) => setCDraft({ ...cDraft, video_url: v })} placeholder="https://youtu.be/…" />
+
+            <div className="rounded-lg border border-line p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-500"><i className="bx bx-movie-play" /> Vidéo</p>
+              <TextField label="Lien vidéo (YouTube / Vimeo / .mp4)" value={cDraft.video_url} onChange={(v) => setCDraft({ ...cDraft, video_url: v })} placeholder="https://youtu.be/…" />
+              <div className="mt-2">
+                <label className="label">…ou uploader une vidéo</label>
+                <input type="file" accept="video/*" onChange={(e) => setCDraft({ ...cDraft, videoFile: e.target.files?.[0] ?? null })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
+                {cDraft.videoFile && <p className="mt-1 text-xs text-emerald-600">{cDraft.videoFile.name}</p>}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-line p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-violet-500"><i className="bx bx-volume-full" /> Audio</p>
+              <TextField label="Lien audio (SoundCloud / .mp3)" value={cDraft.audio_url} onChange={(v) => setCDraft({ ...cDraft, audio_url: v })} placeholder="https://…/audio.mp3" />
+              <div className="mt-2">
+                <label className="label">…ou uploader un audio</label>
+                <input type="file" accept="audio/*" onChange={(e) => setCDraft({ ...cDraft, audioFile: e.target.files?.[0] ?? null })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
+                {cDraft.audioFile && <p className="mt-1 text-xs text-emerald-600">{cDraft.audioFile.name}</p>}
+              </div>
+            </div>
+
             <div>
               <label className="label">Image (optionnel)</label>
               <input type="file" accept="image/*" onChange={(e) => setCDraft({ ...cDraft, imageFile: e.target.files?.[0] ?? null })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
@@ -348,8 +415,9 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
           <div className="space-y-4">
             <TextField label="Titre" value={dDraft.title} onChange={(v) => setDDraft({ ...dDraft, title: v })} />
             <div>
-              <label className="label">Fichier à uploader (PDF, DOC…)</label>
+              <label className="label">Fichier à uploader (PDF, Word, Excel, PowerPoint, image, vidéo, audio, archive…)</label>
               <input type="file" onChange={(e) => setDDraft({ ...dDraft, file: e.target.files?.[0] ?? null })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
+              {dDraft.file && <p className="mt-1 text-xs text-emerald-600">{dDraft.file.name}</p>}
             </div>
             <div className="text-center text-xs text-muted">— ou —</div>
             <TextField label="Lien du document (URL)" value={dDraft.url} onChange={(v) => setDDraft({ ...dDraft, url: v })} placeholder="https://…/fichier.pdf" />
@@ -421,6 +489,57 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
             {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
         )}
+      </Modal>
+
+      {/* Modale import de quiz */}
+      <Modal
+        open={impOpen}
+        title="Importer des questions"
+        onClose={() => setImpOpen(false)}
+        footer={
+          <>
+            <button onClick={() => setImpOpen(false)} className="btn-ghost">Fermer</button>
+            <button onClick={runImport} disabled={saving || !impFile} className="btn-brand disabled:opacity-50">
+              {saving ? "Import…" : "Importer"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Chargez un fichier <strong>CSV</strong>, <strong>Excel (.xlsx)</strong> ou <strong>JSON</strong> contenant vos questions.
+            Chaque ligne = une question, avec ses options et la (les) bonne(s) réponse(s).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => downloadTemplate("csv")} className="btn-ghost text-xs"><i className="bx bx-download" /> Modèle CSV</button>
+            <button onClick={() => downloadTemplate("xlsx")} className="btn-ghost text-xs"><i className="bx bx-download" /> Modèle Excel</button>
+          </div>
+          <div>
+            <label className="label">Fichier de questions</label>
+            <input
+              type="file"
+              accept=".csv,.xlsx,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(e) => { setImpFile(e.target.files?.[0] ?? null); setImpResult(null); }}
+              className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand"
+            />
+            {impFile && <p className="mt-1 text-xs text-emerald-600">{impFile.name}</p>}
+          </div>
+          {impResult && (
+            <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              <i className="bx bx-check-circle" /> {impResult.imported} question(s) importée(s).
+              {impResult.errors?.length > 0 && (
+                <ul className="mt-1 list-disc pl-5 text-xs text-amber-700">
+                  {impResult.errors.slice(0, 8).map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          <p className="text-xs text-muted">
+            Colonnes attendues (CSV/Excel) : <code>question, option1…option6, correct, points, type</code>.
+            <br />« correct » = n° des bonnes réponses (ex. « 2 » ou « 1,3 ») · « type » = radio (unique) ou checkbox (multiple).
+          </p>
+        </div>
       </Modal>
     </div>
   );

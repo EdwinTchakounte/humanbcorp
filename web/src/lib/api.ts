@@ -220,6 +220,7 @@ export interface LearnerDoc {
   description: string;
   url: string | null;
   m_type: number;
+  mime_type?: string;
 }
 export interface LearnerComponent {
   id: number;
@@ -227,6 +228,9 @@ export interface LearnerComponent {
   paragraph: string | null;
   image: string | null;
   video_url: string | null;
+  video_file: string | null;
+  audio_url: string | null;
+  audio_file: string | null;
   number: number;
 }
 export interface QuizResult {

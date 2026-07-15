@@ -157,13 +157,18 @@ def ajax_get_all_paiements_data(request):
 
 def ajax_get_order_data(request):
 	orders_dicts = []
-	#orders =  Order.objects.filter(buyer=request.user).order_by("status")
-	if request.user.groups.filter(name='Simple_Customer').exists() or request.user.groups.filter(name='Parent').exists() or request.user.groups.filter(name='Teacher').exists() or request.user.groups.filter(name='Second_Admin').exists():
-		# il serait plus juste de choisir uniquement les orders venant publications cree par user.id
-		orders = Order.objects.filter(buyer=request.user.id).order_by('status')
+	# Fail-closed. La branche « else » servait toutes les commandes (identité des
+	# acheteurs, montants, contenu acheté) : un visiteur anonyme, n'appartenant à
+	# aucun des groupes testés, y atterrissait et récupérait l'intégralité du
+	# chiffre d'affaires. L'accès complet doit être accordé, pas obtenu par défaut.
+	from sitecms.roles import is_admin as _is_admin
 
+	if not request.user.is_authenticated:
+		return JsonResponse([], safe=False)
+	if _is_admin(request.user):
+		orders = Order.objects.all().order_by('status')
 	else:
-		orders =  Order.objects.all().order_by('status')
+		orders = Order.objects.filter(buyer=request.user.id).order_by('status')
 
 	
 	for order in orders:

@@ -1,5 +1,6 @@
 from django.shortcuts import render,  redirect
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse
+from sitecms.roles import is_admin as _is_admin
 from django.contrib.sites.shortcuts import get_current_site
 from registration.models import RegistrationManager, RegistrationProfile
 from registration.forms import  RegistrationForm
@@ -32,10 +33,18 @@ def new_user_view(request, template="registration_form.html"):
 
 @csrf_protect
 def admin_new_user_view(request, template="registration_form.html"):
+	# Fail-closed. Cette vue crée un compte DANS LE GROUPE DEMANDÉ puis ouvre une
+	# session dessus. Sans authentification, `group_type` valait « Admin » par
+	# défaut : n'importe quel visiteur pouvait se fabriquer un administrateur et
+	# s'y connecter (le groupe généré, « None_Admin », étant reconnu comme admin
+	# par sitecms.roles.is_admin, qui teste `name__icontains="admin"`).
+	if not (request.user.is_authenticated and _is_admin(request.user)):
+		return HttpResponseForbidden("Réservé aux administrateurs.")
+
 	group_type = "Admin"
 	if request.user.groups.filter(name__icontains="Second_Admin").exists():
 		group_type = "Second_Admin"
-	
+
 	if request.method == 'POST':
 		form = RegistrationForm(request.POST, group_type=group_type, user_id=request.user.id)
 		if form.is_valid():
@@ -69,7 +78,12 @@ def new_participant(request):
 
 
 
-def ajax_get_users(request): 
+def ajax_get_users(request):
+	# Cette vue renvoyait l'annuaire complet (username + e-mail de tous les
+	# comptes) à un visiteur anonyme. Elle sert la recherche d'utilisateur du
+	# back-office : réservée aux administrateurs.
+	if not (request.user.is_authenticated and _is_admin(request.user)):
+		return JsonResponse([], safe=False)
 	username_query = request.GET.get('username_query', '')
 	users = User.objects.filter(username__startswith=username_query)
 	#users = User.objects.all()

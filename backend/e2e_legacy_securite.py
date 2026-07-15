@@ -99,6 +99,72 @@ if u:
          isinstance(data, list) and not any(d.get("admin") for d in data),
          f"{len(data) if isinstance(data, list) else '-'} enr.")
 
+# ── 4. Annuaire des comptes ─────────────────────────────────────────────
+print("\n── 4. L'annuaire des comptes n'est pas public ──")
+r, data = get("/registration/ajax_get_users/")
+line("Anonyme : aucun compte listé", data == [], f"{len(data) if isinstance(data, list) else data}")
+line("Aucun e-mail dans la réponse", "@" not in r.content.decode(errors="ignore"))
+r, data = get("/registration/ajax_get_users/", admin)
+line("L'administrateur garde l'annuaire", isinstance(data, list) and len(data) > 0,
+     f"{len(data) if isinstance(data, list) else '-'} compte(s)")
+if u:
+    r, data = get("/registration/ajax_get_users/", u)
+    line("Un client n'obtient pas l'annuaire", data == [], str(data)[:40])
+
+# ── 5. Commandes ────────────────────────────────────────────────────────
+print("\n── 5. Les commandes ne sont pas publiques ──")
+r, data = get("/paiement/ajax_get_order_data")
+line("Anonyme : aucune commande", data == [], f"{len(data) if isinstance(data, list) else data}")
+r, data = get("/paiement/ajax_get_order_data", admin)
+line("L'administrateur garde toutes les commandes", isinstance(data, list) and len(data) > 0,
+     f"{len(data) if isinstance(data, list) else '-'} commande(s)")
+if u:
+    r, data = get("/paiement/ajax_get_order_data", u)
+    autres = [o for o in data if o.get("created_by_id") != u.id] if isinstance(data, list) else []
+    line("Un client ne voit aucune commande d'autrui", not autres, f"{len(autres)} fuite(s)")
+
+# ── 6. Création de compte administrateur ────────────────────────────────
+print("\n── 6. Personne ne se fabrique un compte admin ──")
+# La vue créait le compte DANS le groupe demandé puis ouvrait une session
+# dessus ; `group_type` valait « Admin » par défaut pour un anonyme, et le
+# groupe généré (« None_Admin ») était reconnu par is_admin (name__icontains).
+from django.contrib.auth.models import Group as _G
+
+_USERNAME = "e2e_intrus_zz"
+User.objects.filter(username=_USERNAME).delete()
+groupes_avant = set(_G.objects.values_list("name", flat=True))
+grp = _G.objects.filter(name__iexact="Admin").first()
+
+c_anon = Client()
+r = c_anon.post("/registration/admin_new_user/", {
+    "firstname": "Intrus", "username": _USERNAME, "email": "intrus@evil.test",
+    "password1": "Intrus@2026xyz", "password2": "Intrus@2026xyz",
+    "group": grp.id if grp else "",
+})
+line("Anonyme : création de compte admin refusée", r.status_code == 403, f"HTTP {r.status_code}")
+line("…et aucun compte n'a été créé", not User.objects.filter(username=_USERNAME).exists())
+line("…ni aucun groupe fabriqué au passage",
+     set(_G.objects.values_list("name", flat=True)) == groupes_avant)
+
+if teacher:
+    c_t = Client()
+    c_t.force_login(teacher)
+    r = c_t.post("/registration/admin_new_user/", {
+        "firstname": "T", "username": _USERNAME, "email": "t@evil.test",
+        "password1": "Tt@2026abcd", "password2": "Tt@2026abcd", "group": grp.id if grp else "",
+    })
+    line("Un formateur non plus", r.status_code == 403, f"HTTP {r.status_code}")
+
+r = Client()
+r.force_login(admin)
+line("L'administrateur garde l'accès au formulaire",
+     r.get("/registration/admin_new_user/").status_code == 200)
+
+# Nettoyage (le test ne doit rien laisser derrière lui).
+User.objects.filter(username=_USERNAME).delete()
+for nom in set(_G.objects.values_list("name", flat=True)) - groupes_avant:
+    _G.objects.filter(name=nom).delete()
+
 print("\n" + "=" * 72)
 print(f"  RÉSULTAT : {step - fails}/{step} étapes OK" + ("" if not fails else f"  ({fails} échec(s))"))
 print("=" * 72 + "\n")

@@ -136,6 +136,41 @@ def _next_order(model, **parent):
     return (last or 0) + 1
 
 
+def _learners_impacted(activities):
+    """Nombre d'apprenants distincts ayant déjà travaillé sur ces activités."""
+    from material.models import ActivityProgress, QuizAttempt
+
+    ids = set(ActivityProgress.objects.filter(activity__in=activities).values_list("learner_id", flat=True))
+    ids |= set(QuizAttempt.objects.filter(activity__in=activities).values_list("learner_id", flat=True))
+    return len(ids)
+
+
+def _protected_destroy(request, obj, activities, label):
+    """Retire un élément du programme sans détruire le travail des apprenants.
+
+    Le contenu est partagé entre toutes les cohortes d'une formation : une
+    suppression frappe donc aussi les sessions passées, déjà payées. Et comme
+    `QuizAttempt`/`ActivityProgress` pointent l'activité en CASCADE, une
+    suppression sèche effacerait scores et progressions. On marque donc
+    `is_deleted` (les lectures filtrent dessus) et on exige une confirmation
+    explicite dès qu'un apprenant a déjà travaillé sur le contenu visé.
+    """
+    impacted = _learners_impacted(activities)
+    if impacted and request.query_params.get("force") != "true":
+        return Response(
+            {
+                "detail": f"{impacted} apprenant(s) ont déjà travaillé sur {label}. "
+                          "Confirmez pour le retirer du programme (leurs scores sont conservés).",
+                "learners_impacted": impacted,
+                "requires_confirmation": True,
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+    obj.is_deleted = True
+    obj.save(update_fields=["is_deleted"])
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 def _reorder_siblings(qs, pk, direction):
     """Échange le rang d'un élément avec celui de son voisin (`up` / `down`).
 
@@ -643,6 +678,15 @@ class SeanceViewSet(_ModuleViewSet):
         _assert_theme_access(self.request.user, theme)
         serializer.save()
 
+    def destroy(self, request, *args, **kwargs):
+        seance = self.get_object()
+        _assert_theme_access(request.user, seance.theme)
+        return _protected_destroy(
+            request, seance,
+            Activity.objects.filter(seance=seance),
+            f"la séance « {seance.title} »",
+        )
+
     @action(detail=True, methods=["post"], url_path="reorder")
     def reorder(self, request, pk=None):
         """POST /modules/seances/<id>/reorder/ {"direction": "up"|"down"}."""
@@ -680,6 +724,15 @@ class ActivityViewSet(_ModuleViewSet):
         seance = serializer.validated_data.get("seance") or serializer.instance.seance
         _assert_theme_access(self.request.user, getattr(seance, "theme", None))
         serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        activity = self.get_object()
+        _assert_theme_access(request.user, getattr(activity.seance, "theme", None))
+        return _protected_destroy(
+            request, activity,
+            Activity.objects.filter(pk=activity.pk),
+            f"l'activité « {activity.title} »",
+        )
 
     @action(detail=True, methods=["post"], url_path="reorder")
     def reorder(self, request, pk=None):

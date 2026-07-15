@@ -150,9 +150,34 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
       setSaving(false);
     }
   }
+  // Le contenu est partagé par toutes les cohortes, y compris les sessions déjà
+  // vendues : le back répond 409 dès que des apprenants ont travaillé dessus.
+  // On relaie alors le nombre d'impactés et on redemande confirmation.
+  async function removeWithGuard(path: string, label: string) {
+    if (!confirm(`Retirer ${label} du programme ?`)) return false;
+    try {
+      await api(path, { method: "DELETE" });
+      return true;
+    } catch (e) {
+      const msg = String(e);
+      if (!msg.includes("409")) {
+        setErr(msg);
+        return false;
+      }
+      let detail = "Des apprenants ont déjà travaillé sur ce contenu.";
+      try {
+        detail = JSON.parse(msg.slice(msg.indexOf("{"))).detail ?? detail;
+      } catch {
+        /* corps non JSON : on garde le message générique */
+      }
+      if (!confirm(`${detail}\n\nConfirmer le retrait ?`)) return false;
+      await api(`${path}?force=true`, { method: "DELETE" });
+      return true;
+    }
+  }
+
   async function delSeance(s: SeanceItem) {
-    if (!confirm(`Supprimer la séance « ${s.title} » et ses activités ?`)) return;
-    await api(`/modules/seances/${s.id}/`, { method: "DELETE" });
+    if (!(await removeWithGuard(`/modules/seances/${s.id}/`, `la séance « ${s.title} » et ses activités`))) return;
     await loadSeances();
   }
 
@@ -175,8 +200,7 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
     }
   }
   async function delActivity(a: ActivityItem) {
-    if (!confirm(`Supprimer l'activité « ${a.title} » ?`)) return;
-    await api(`/modules/activities/${a.id}/`, { method: "DELETE" });
+    if (!(await removeWithGuard(`/modules/activities/${a.id}/`, `l'activité « ${a.title} »`))) return;
     await loadActs(a.seance);
     await loadSeances();
   }

@@ -98,14 +98,16 @@ def build_theme_content(theme, request, user=None):
     theme_done = theme_total = 0
 
     seances_out = []
-    for si, seance in enumerate(Seance.objects.filter(theme=theme), start=1):
+    # `is_deleted` : une séance retirée du programme ne doit plus être servie,
+    # mais ses données (progressions, scores) restent en base.
+    for si, seance in enumerate(Seance.objects.filter(theme=theme, is_deleted=False), start=1):
         seance_docs = [
             _doc_payload(request, d, i)
             for i, d in enumerate(MaterialSeanceDoc.objects.filter(seance=seance), start=1)
         ]
 
         activities_out = []
-        for ai, activity in enumerate(Activity.objects.filter(seance=seance), start=1):
+        for ai, activity in enumerate(Activity.objects.filter(seance=seance, is_deleted=False), start=1):
             # Documents rattachés à l'activité (PDF/liens) — tout type d'activité.
             docs = [
                 _doc_payload(request, d, i)
@@ -409,10 +411,12 @@ def _publication_progress(user, pub) -> dict:
     # is_deleted, une formation supprimée gonflerait le dénominateur et la
     # progression n'atteindrait jamais 100 %.
     live_themes = pub.themes.filter(is_deleted=False)
-    total = Activity.objects.filter(seance__theme__in=live_themes).count()
+    live = {"is_deleted": False, "seance__is_deleted": False, "seance__theme__in": live_themes}
+    total = Activity.objects.filter(**live).count()
     done = (
         ActivityProgress.objects.filter(
-            learner=user, completed=True, activity__seance__theme__in=live_themes
+            learner=user, completed=True,
+            **{f"activity__{k}": v for k, v in live.items()},
         ).count()
         if user is not None else 0
     )

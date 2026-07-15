@@ -136,13 +136,23 @@ def add_inscription_into_order(request, bucket, inscription, order):
 def ajax_get_reservations(request):
 	reservations_list = []
 	admin = False
-	if request.user.groups.filter(name='Simple_Customer').exists():
-		reservations = Reservation.objects.filter(inscription__participant=request.user)
-	elif request.user.groups.filter(name='Parent').exists():
-		reservations = Reservation.objects.filter(created_by = request.user)
-	else:
+	user = request.user
+	# Fail-closed. Un visiteur anonyme n'appartient à aucun groupe : il tombait
+	# donc dans la branche « else », prévue pour les administrateurs, et
+	# récupérait TOUTES les réservations — e-mails et téléphones des parents —
+	# sans la moindre authentification, en étant qui plus est marqué admin=True.
+	# Le privilège doit être accordé explicitement, jamais obtenu par défaut.
+	if not user.is_authenticated:
+		return JsonResponse([], safe=False)
+	if user.groups.filter(name='Simple_Customer').exists():
+		reservations = Reservation.objects.filter(inscription__participant=user)
+	elif user.groups.filter(name='Parent').exists():
+		reservations = Reservation.objects.filter(created_by=user)
+	elif user.is_superuser or user.is_staff or user.groups.filter(name__icontains='admin').exists():
 		reservations = Reservation.objects.all()
 		admin = True
+	else:
+		reservations = Reservation.objects.none()
 	
 	
 	
@@ -186,6 +196,10 @@ def ajax_get_reservations(request):
 
 
 def  ajax_get_reservated_users(request):
+    # Anonyme : `created_by=AnonymousUser` lève un TypeError (500 exposant la
+    # trace). Rien à renvoyer à qui n'est pas connecté.
+    if not request.user.is_authenticated:
+        return JsonResponse([], safe=False)
     reservations = Reservation.objects.filter(created_by=request.user)
     users_results = []
     seen_ids = set()  # Pour éviter les doublons

@@ -435,25 +435,31 @@ class EventViewSet(_ModuleViewSet):
         user = self.request.user
         if not is_admin(user):
             if is_teacher(user):
-                # Le formateur voit ses propres événements + ceux rattachés à ses formations.
-                from calendarapp.models import EventTheme
-
-                ev_ids = EventTheme.objects.filter(theme__in=themes_for(user)).values_list("event_id", flat=True)
-                qs = qs.filter(Q(user=user) | Q(id__in=list(ev_ids)))
+                # Le formateur voit ses propres créneaux + ceux des cohortes qui
+                # vendent l'une de ses formations.
+                qs = qs.filter(Q(user=user) | Q(publication__themes__in=themes_for(user))).distinct()
             else:
                 qs = qs.filter(user=user)
         return qs.order_by("-start_time")
 
     def _assert_event_theme_access(self, serializer):
-        """Le thème rattaché à un événement doit être dans le périmètre de l'auteur.
+        """La cohorte rattachée à un créneau doit être dans le périmètre de l'auteur.
 
-        Sans ce contrôle, un formateur pourrait rattacher un événement à la
-        formation d'un confrère, puis lire via `/participants/` les nom+e-mail de
-        ses apprenants (l'événement devient visible dans son agenda).
+        Sans ce contrôle, un formateur pourrait rattacher un créneau à la cohorte
+        d'un confrère, puis lire via `/participants/` les nom+e-mail de ses
+        apprenants (le créneau devient visible dans son agenda).
         """
-        theme_id = serializer.validated_data.get("theme")
-        if theme_id:
-            _assert_theme_access(self.request.user, Theme.objects.filter(pk=theme_id).first())
+        publication_id = serializer.validated_data.get("publication")
+        if not publication_id:
+            return
+        pub = Publication.objects.filter(pk=publication_id).first()
+        if pub is None:
+            raise PermissionDenied("Cohorte introuvable.")
+        if is_admin(self.request.user):
+            return
+        # Le formateur doit animer au moins un des programmes vendus par la cohorte.
+        if not pub.themes.filter(pk__in=themes_for(self.request.user)).exists():
+            raise PermissionDenied("Cohorte hors de votre périmètre.")
 
     def perform_create(self, serializer):
         self._assert_event_theme_access(serializer)
@@ -465,18 +471,17 @@ class EventViewSet(_ModuleViewSet):
 
     @action(detail=True, methods=["get"], url_path="participants")
     def participants(self, request, pk=None):
-        """Liste des apprenants inscrits (CONFIRMED) à la formation liée à l'événement."""
+        """Liste des apprenants inscrits (CONFIRMED) à la cohorte de ce créneau."""
         event = self.get_object()
-        from calendarapp.models import EventTheme
         from bucket.models import Inscription
 
-        et = EventTheme.objects.filter(event=event).select_related("theme").first()
-        if not et:
+        pub = event.publication_set.first()
+        if not pub:
             return Response([])
         seen, out = set(), []
         qs = (
             Inscription.objects.filter(
-                publication__themes=et.theme, status=Inscription.CONFIRMED, is_deleted=False
+                publication=pub, status=Inscription.CONFIRMED, is_deleted=False
             )
             .select_related("participant")
             .order_by("participant__first_name")
@@ -504,12 +509,11 @@ class MeetingViewSet(_ModuleViewSet):
         if not is_admin(user):
             if is_teacher(user):
                 # Périmètre aligné sur EventViewSet : sans cette branche, le
-                # formateur voit un événement de sa formation mais pas les
+                # formateur voit un créneau de sa cohorte mais pas les
                 # rendez-vous (visio) qui y sont attachés par un admin.
-                from calendarapp.models import EventTheme
-
-                ev_ids = EventTheme.objects.filter(theme__in=themes_for(user)).values_list("event_id", flat=True)
-                qs = qs.filter(Q(event__user=user) | Q(event_id__in=list(ev_ids)))
+                qs = qs.filter(
+                    Q(event__user=user) | Q(event__publication__themes__in=themes_for(user))
+                ).distinct()
             else:
                 qs = qs.filter(event__user=user)
         return qs.order_by("-created_at")

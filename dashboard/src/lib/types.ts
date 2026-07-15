@@ -132,8 +132,10 @@ export interface EventItem {
   user: number;
   user_name: string;
   created_at: string;
-  theme_id: number | null;
-  theme_title: string | null;
+  // Cohorte (offre vendue) à laquelle appartient ce créneau — le calendrier est
+  // propre à la session, pas au programme.
+  publication_id: number | null;
+  publication_title: string | null;
   participants_count: number;
 }
 

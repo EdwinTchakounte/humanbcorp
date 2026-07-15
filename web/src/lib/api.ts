@@ -283,13 +283,15 @@ export interface LearnerTheme {
   image: string | null;
   objectifs: string[];
   seances: LearnerSeance[];
-  schedule: ScheduleEvent[];
   progress: Progress;
 }
 export interface MyFormation {
   publication_id: number;
   title: string;
   description: string;
+  // Le planning appartient à la cohorte (la session vendue), pas au programme :
+  // deux sessions d'une même formation ont chacune leurs dates.
+  schedule: ScheduleEvent[];
   themes: LearnerTheme[];
 }
 

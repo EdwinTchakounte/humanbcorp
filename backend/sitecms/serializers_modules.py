@@ -20,10 +20,13 @@ ORDER_STATUS = {1: "En attente", 2: "Payée", 3: "Partiellement payée", 4: "Éc
 
 class EventSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.username", read_only=True)
-    # Rattachement à une formation (lessonapp.Theme) via calendarapp.EventTheme.
-    theme = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    theme_id = serializers.SerializerMethodField()
-    theme_title = serializers.SerializerMethodField()
+    # Rattachement à une **cohorte** (contents.Publication) via le M2M
+    # `Publication.events`, déjà alimenté par l'application historique. Le
+    # calendrier appartient à la session vendue, pas au programme : sinon deux
+    # cohortes d'une même formation partagent dates et liens visio.
+    publication = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    publication_id = serializers.SerializerMethodField()
+    publication_title = serializers.SerializerMethodField()
     participants_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -31,7 +34,7 @@ class EventSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "description", "start_time", "end_time",
             "is_test", "is_active", "user", "user_name", "created_at",
-            "theme", "theme_id", "theme_title", "participants_count",
+            "publication", "publication_id", "publication_title", "participants_count",
         ]
         read_only_fields = ["created_at", "user_name"]
         extra_kwargs = {
@@ -39,63 +42,57 @@ class EventSerializer(serializers.ModelSerializer):
             "description": {"required": False, "allow_blank": True},
         }
 
-    def _event_theme(self, obj):
-        from calendarapp.models import EventTheme
+    def _publication(self, obj):
+        # Reverse du M2M `Publication.events` (sans related_name).
+        return obj.publication_set.first()
 
-        return EventTheme.objects.filter(event=obj).select_related("theme").first()
+    def get_publication_id(self, obj):
+        p = self._publication(obj)
+        return p.id if p else None
 
-    def get_theme_id(self, obj):
-        et = self._event_theme(obj)
-        return et.theme_id if et else None
-
-    def get_theme_title(self, obj):
-        et = self._event_theme(obj)
-        return et.theme.title if et else None
+    def get_publication_title(self, obj):
+        p = self._publication(obj)
+        return p.title if p else None
 
     def get_participants_count(self, obj):
-        # Participants = apprenants avec inscription CONFIRMED sur une formation
-        # (Publication) rattachée au thème de l'événement.
-        et = self._event_theme(obj)
-        if not et:
+        # Participants = apprenants confirmés sur la cohorte de ce créneau.
+        p = self._publication(obj)
+        if not p:
             return 0
         from bucket.models import Inscription
 
         return (
             Inscription.objects.filter(
-                publication__themes=et.theme, status=Inscription.CONFIRMED, is_deleted=False
+                publication=p, status=Inscription.CONFIRMED, is_deleted=False
             )
             .values("participant")
             .distinct()
             .count()
         )
 
-    def _sync_theme(self, event, theme_id):
-        from calendarapp.models import EventTheme
-        from lessonapp.models import Theme
+    def _sync_publication(self, event, publication_id):
+        from contents.models import Publication
 
-        # Rattachement inchangé → ne rien toucher : un delete/recreate écraserait
-        # `link_url` (renseigné par le flux legacy) à chaque simple renommage.
-        current = EventTheme.objects.filter(event=event).first()
-        if current and current.theme_id == theme_id:
-            return
-        EventTheme.objects.filter(event=event).delete()
-        if theme_id:
-            t = Theme.objects.filter(pk=theme_id).first()
-            if t:
-                EventTheme.objects.create(event=event, theme=t, link_url="")
+        # `set()` remplace le rattachement sans détruire l'événement ; un créneau
+        # n'appartient qu'à une cohorte à la fois côté back-office.
+        if publication_id:
+            pub = Publication.objects.filter(pk=publication_id).first()
+            event.publication_set.set([pub] if pub else [])
+        else:
+            event.publication_set.clear()
 
     def create(self, validated_data):
-        theme_id = validated_data.pop("theme", None)
+        publication_id = validated_data.pop("publication", None)
         event = super().create(validated_data)
-        self._sync_theme(event, theme_id)
+        self._sync_publication(event, publication_id)
         return event
 
     def update(self, instance, validated_data):
-        has_theme = "theme" in validated_data
-        theme_id = validated_data.pop("theme", None)
+        has_pub = "publication" in validated_data
+        publication_id = validated_data.pop("publication", None)
         event = super().update(instance, validated_data)
-        if has_theme:
-            self._sync_theme(event, theme_id)
+        if has_pub:
+            self._sync_publication(event, publication_id)
         return event
 
 

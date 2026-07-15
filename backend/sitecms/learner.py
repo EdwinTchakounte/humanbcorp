@@ -181,50 +181,51 @@ def build_theme_content(theme, request, user=None):
             "activities": activities_out,
         })
 
-    # Planning : événements du calendrier rattachés à ce thème (EventTheme) + visio.
-    schedule = []
-    try:
-        from calendarapp.models import EventTheme, Meeting
-
-        for et in (
-            EventTheme.objects.filter(theme=theme)
-            .select_related("event")
-            .order_by("event__start_time")
-        ):
-            ev = et.event
-            # On n'expose à l'apprenant que les créneaux réels et publiés : un
-            # événement de test ou désactivé ne doit pas apparaître (avec son
-            # lien visio) dans le planning d'une formation vendue.
-            if not ev or ev.is_deleted or ev.is_test or not ev.is_active:
-                continue
-            meetings = [
-                {"m_type": m.m_type, "link_url": m.link_url}
-                for m in Meeting.objects.filter(event=ev, is_deleted=False)
-            ]
-            schedule.append({
-                "id": ev.id,
-                "title": ev.title,
-                "start_time": ev.start_time,
-                "end_time": ev.end_time,
-                "meetings": meetings,
-            })
-    except Exception:  # noqa: BLE001 — planning best-effort
-        schedule = []
-
     image = getattr(theme, "image", None)
-    return {
+    return {  # NB : le planning n'est pas ici — il appartient à la cohorte
         "id": theme.pk,
         "title": theme.title,
         "image": _abs(request, image.url) if image else None,
         "objectifs": objectifs,
         "seances": seances_out,
-        "schedule": schedule,
         "progress": {
             "done": theme_done,
             "total": theme_total,
             "percent": round(100 * theme_done / theme_total) if theme_total else 0,
         },
     }
+
+
+def build_schedule(publication):
+    """Planning d'une **cohorte** : ses créneaux d'agenda et leurs visios.
+
+    Le calendrier appartient à l'offre vendue (`Publication.events`), pas au
+    programme (`Theme`) : deux sessions d'une même formation ont chacune leurs
+    dates. Le rattachement historique par `EventTheme` faisait voir à chaque
+    apprenant le planning de toutes les autres sessions, liens visio compris.
+    """
+    from calendarapp.models import Meeting
+
+    events = list(
+        publication.events.filter(is_deleted=False, is_active=True)
+        .exclude(is_test=True)  # is_test est nullable : exclude() couvre NULL et False
+        .order_by("start_time")
+    )
+    # Une seule requête pour toutes les visios, au lieu d'une par créneau.
+    meetings = {}
+    for m in Meeting.objects.filter(event__in=events, is_deleted=False):
+        meetings.setdefault(m.event_id, []).append({"m_type": m.m_type, "link_url": m.link_url})
+
+    return [
+        {
+            "id": ev.id,
+            "title": ev.title,
+            "start_time": ev.start_time,
+            "end_time": ev.end_time,
+            "meetings": meetings.get(ev.id, []),
+        }
+        for ev in events
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +304,7 @@ def my_formation(request, token, publication_id):
         "publication_id": pub.id,
         "title": pub.title,
         "description": pub.description,
+        "schedule": build_schedule(pub),
         "themes": themes,
     })
 

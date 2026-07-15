@@ -5,7 +5,7 @@ import { api, listAll } from "@/lib/api";
 import { Modal, Pagination, PAGE_SIZE, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import EventCalendar from "@/components/EventCalendar";
-import type { EventItem, MeetingItem, ThemeItem } from "@/lib/types";
+import type { EventItem, MeetingItem, PublicationItem } from "@/lib/types";
 
 // Aligné sur calendarapp.Meeting.TYPES_CHOICES (0=Google Meet, 1=Zoom, 2=Présentiel).
 const MEETING_TYPES: Record<number, string> = { 0: "Google Meet", 1: "Zoom", 2: "Présentiel" };
@@ -22,8 +22,8 @@ function toLocalInput(iso: string) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
-type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; theme: string };
-const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", theme: "" };
+type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; publication: string };
+const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", publication: "" };
 
 const MEETING_TYPE_OPTIONS = [
   { value: "0", label: "Google Meet" },
@@ -37,7 +37,7 @@ export default function AgendaPage() {
   const writable = canWrite("agenda");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
-  const [themes, setThemes] = useState<ThemeItem[]>([]);
+  const [pubs, setPubs] = useState<PublicationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [mPage, setMPage] = useState(1);
@@ -85,11 +85,11 @@ export default function AgendaPage() {
     const [e, m, t] = await Promise.all([
       listAll<EventItem>("/modules/events/"),
       listAll<MeetingItem>("/modules/meetings/"),
-      listAll<ThemeItem>("/modules/themes/"),
+      listAll<PublicationItem>("/modules/publications/"),
     ]);
     setEvents(e);
     setMeetings(m);
-    setThemes(t);
+    setPubs(t);
   }
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -117,7 +117,7 @@ export default function AgendaPage() {
       description: e.description,
       start_time: toLocalInput(e.start_time),
       end_time: toLocalInput(e.end_time),
-      theme: e.theme_id ? String(e.theme_id) : "",
+      publication: e.publication_id ? String(e.publication_id) : "",
     });
   }
 
@@ -135,7 +135,7 @@ export default function AgendaPage() {
         description: draft.description,
         start_time: new Date(draft.start_time).toISOString(),
         end_time: new Date(draft.end_time).toISOString(),
-        theme: draft.theme ? Number(draft.theme) : null,
+        publication: draft.publication ? Number(draft.publication) : null,
       };
       if (draft.id) await api(`/modules/events/${draft.id}/`, { method: "PATCH", body });
       else await api("/modules/events/", { method: "POST", body });
@@ -227,12 +227,12 @@ export default function AgendaPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="truncate font-medium text-brand-deep">{e.title}</span>
-                          {e.theme_title && (
+                          {e.publication_title && (
                             <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
-                              <i className="bx bx-book" /> {e.theme_title}
+                              <i className="bx bx-book" /> {e.publication_title}
                             </span>
                           )}
-                          {e.theme_title && (
+                          {e.publication_title && (
                             <button
                               onClick={() => showParticipants(e)}
                               className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/20"
@@ -360,10 +360,10 @@ export default function AgendaPage() {
               </div>
             </div>
             <SelectField
-              label="Formation liée (optionnel)"
-              value={draft.theme}
-              onChange={(v) => setDraft({ ...draft, theme: v })}
-              options={[{ value: "", label: "— Aucune —" }, ...themes.map((t) => ({ value: String(t.id), label: t.title }))]}
+              label="Session concernée (optionnel)"
+              value={draft.publication}
+              onChange={(v) => setDraft({ ...draft, publication: v })}
+              options={[{ value: "", label: "— Aucune —" }, ...pubs.map((t) => ({ value: String(t.id), label: t.title }))]}
             />
             {err && <p className="text-sm text-red-600">{err}</p>}
             {!isAdmin && (
@@ -426,7 +426,7 @@ export default function AgendaPage() {
         {parts && (
           <div>
             <p className="mb-3 text-sm text-muted">
-              Apprenants inscrits (confirmés) à <strong>{parts.event.theme_title}</strong>.
+              Apprenants inscrits (confirmés) à <strong>{parts.event.publication_title}</strong>.
             </p>
             {parts.list.length === 0 ? (
               <p className="text-sm text-muted">Aucun participant confirmé.</p>

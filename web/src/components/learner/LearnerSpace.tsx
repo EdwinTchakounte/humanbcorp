@@ -518,6 +518,37 @@ export default function LearnerSpace({ token }: { token: string }) {
                     <p className="text-muted">Le contenu de cette formation n’est pas encore disponible.</p>
                   ) : (
                     <div className="space-y-8">
+                      {content.schedule.length > 0 && (
+                        <div className="rounded-xl border border-brand/20 bg-brand-soft/40 p-4">
+                          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-deep">
+                            <i className="bx bx-calendar" /> Planning des séances
+                          </p>
+                          <ul className="space-y-2">
+                            {content.schedule.map((ev) => {
+                              const link = ev.meetings.find((m) => m.link_url)?.link_url;
+                              // Le badge doit décrire la visio qu'on propose de rejoindre,
+                              // pas un autre rendez-vous du même créneau.
+                              const shown = ev.meetings.find((m) => m.link_url) ?? ev.meetings[0];
+                              return (
+                                <li key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                  <span className="font-medium text-ink">{ev.title}</span>
+                                  <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
+                                  {shown && (
+                                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand">
+                                      {MEET_TYPE[shown.m_type] ?? ""}
+                                    </span>
+                                  )}
+                                  {link && (
+                                    <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent">
+                                      <i className="bx bx-video" /> Rejoindre
+                                    </a>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
                       {content.themes.map((th) => (
                         <div key={th.id}>
                           <h2 className="mb-2 text-2xl">{th.title}</h2>
@@ -533,34 +564,6 @@ export default function LearnerSpace({ token }: { token: string }) {
                                 {th.objectifs.map((o, i) => (
                                   <li key={i}>{o}</li>
                                 ))}
-                              </ul>
-                            </div>
-                          )}
-                          {th.schedule.length > 0 && (
-                            <div className="mb-4 rounded-xl border border-brand/20 bg-brand-soft/40 p-4">
-                              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-deep">
-                                <i className="bx bx-calendar" /> Planning des séances
-                              </p>
-                              <ul className="space-y-2">
-                                {th.schedule.map((ev) => {
-                                  const link = ev.meetings.find((m) => m.link_url)?.link_url;
-                                  return (
-                                    <li key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                      <span className="font-medium text-ink">{ev.title}</span>
-                                      <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
-                                      {ev.meetings[0] && (
-                                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand">
-                                          {MEET_TYPE[ev.meetings[0].m_type] ?? ""}
-                                        </span>
-                                      )}
-                                      {link && (
-                                        <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent">
-                                          <i className="bx bx-video" /> Rejoindre
-                                        </a>
-                                      )}
-                                    </li>
-                                  );
-                                })}
                               </ul>
                             </div>
                           )}

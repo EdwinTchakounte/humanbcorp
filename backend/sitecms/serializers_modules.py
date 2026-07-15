@@ -73,6 +73,11 @@ class EventSerializer(serializers.ModelSerializer):
         from calendarapp.models import EventTheme
         from lessonapp.models import Theme
 
+        # Rattachement inchangé → ne rien toucher : un delete/recreate écraserait
+        # `link_url` (renseigné par le flux legacy) à chaque simple renommage.
+        current = EventTheme.objects.filter(event=event).first()
+        if current and current.theme_id == theme_id:
+            return
         EventTheme.objects.filter(event=event).delete()
         if theme_id:
             t = Theme.objects.filter(pk=theme_id).first()
@@ -182,7 +187,12 @@ class SeanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Seance
-        fields = ["id", "title", "theme", "s_type", "s_type_label", "activities_count", "is_active"]
+        fields = [
+            "id", "title", "theme", "s_type", "s_type_label", "activities_count",
+            "is_active", "order",
+        ]
+        # `order` est piloté par la création et l'action `reorder`, jamais saisi.
+        read_only_fields = ["order"]
 
     def get_s_type_label(self, obj):
         return SEANCE_TYPES.get(obj.s_type, "—")
@@ -198,7 +208,8 @@ class ActivitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Activity
-        fields = ["id", "title", "seance", "a_type", "a_type_label", "state", "is_active"]
+        fields = ["id", "title", "seance", "a_type", "a_type_label", "state", "is_active", "order"]
+        read_only_fields = ["order"]
         extra_kwargs = {"state": {"required": False}}
 
     def get_a_type_label(self, obj):

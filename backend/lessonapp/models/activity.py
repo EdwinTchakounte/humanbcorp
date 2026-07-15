@@ -22,9 +22,12 @@ class Activity(Abstract):
     CLOSED = 3
     TYPES_CHOICES2 = ( (INIT, 'Init'), (OPEN, 'Open'), (CLOSED, 'Closed'))
     state = models.IntegerField(TYPES_CHOICES2, default=1)
-    
+    # Rang de l'activité dans sa séance (cf. Seance.order).
+    order = models.PositiveIntegerField(default=0, db_index=True)
 
-  
+    class Meta:
+        ordering = ["order", "id"]
+
     def __unicode__(self):
         return "%s" % (self.title)
         

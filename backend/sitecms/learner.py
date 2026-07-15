@@ -192,7 +192,10 @@ def build_theme_content(theme, request, user=None):
             .order_by("event__start_time")
         ):
             ev = et.event
-            if not ev or getattr(ev, "is_deleted", False):
+            # On n'expose à l'apprenant que les créneaux réels et publiés : un
+            # événement de test ou désactivé ne doit pas apparaître (avec son
+            # lien visio) dans le planning d'une formation vendue.
+            if not ev or ev.is_deleted or ev.is_test or not ev.is_active:
                 continue
             meetings = [
                 {"m_type": m.m_type, "link_url": m.link_url}
@@ -289,7 +292,13 @@ def my_formation(request, token, publication_id):
         )
 
     pub = ins.publication
-    themes = [build_theme_content(t, request, user=user) for t in pub.themes.all()]
+    # `is_deleted` est un soft-delete : sans ce filtre, une formation supprimée
+    # resterait servie aux apprenants tant que le M2M Publication↔Theme n'est
+    # pas dénoué à la main.
+    themes = [
+        build_theme_content(t, request, user=user)
+        for t in pub.themes.filter(is_deleted=False)
+    ]
     return Response({
         "publication_id": pub.id,
         "title": pub.title,
@@ -394,10 +403,14 @@ def _publication_progress(user, pub) -> dict:
     from lessonapp.models import Activity
     from material.models import ActivityProgress
 
-    total = Activity.objects.filter(seance__theme__in=pub.themes.all()).count()
+    # Même périmètre que le contenu servi (cf. `my_formation`) : sans le filtre
+    # is_deleted, une formation supprimée gonflerait le dénominateur et la
+    # progression n'atteindrait jamais 100 %.
+    live_themes = pub.themes.filter(is_deleted=False)
+    total = Activity.objects.filter(seance__theme__in=live_themes).count()
     done = (
         ActivityProgress.objects.filter(
-            learner=user, completed=True, activity__seance__theme__in=pub.themes.all()
+            learner=user, completed=True, activity__seance__theme__in=live_themes
         ).count()
         if user is not None else 0
     )

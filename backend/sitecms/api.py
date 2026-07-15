@@ -128,6 +128,41 @@ def _assert_theme_access(user, theme):
         raise PermissionDenied("Formation hors de votre périmètre.")
 
 
+def _next_order(model, **parent):
+    """Rang à attribuer à un nouvel élément : à la suite de ses frères."""
+    from django.db.models import Max
+
+    last = model.objects.filter(is_deleted=False, **parent).aggregate(m=Max("order"))["m"]
+    return (last or 0) + 1
+
+
+def _reorder_siblings(qs, pk, direction):
+    """Échange le rang d'un élément avec celui de son voisin (`up` / `down`).
+
+    Le swap se fait sur la fratrie **réellement triée** plutôt que sur `order ± 1`,
+    ce qui reste correct même si les rangs comportent des trous (suppressions) ou
+    des ex æquo hérités de données anciennes.
+    """
+    siblings = list(qs)
+    idx = next((i for i, o in enumerate(siblings) if o.pk == pk), None)
+    if idx is None:
+        return False
+    swap = idx - 1 if direction == "up" else idx + 1
+    if swap < 0 or swap >= len(siblings):
+        return False  # déjà en butée : rien à faire
+    a, b = siblings[idx], siblings[swap]
+    # Les rangs peuvent être égaux (données pré-migration) : on renumérote alors
+    # la fratrie entière pour repartir sur une base saine.
+    if a.order == b.order:
+        for rank, obj in enumerate(siblings, start=1):
+            type(obj).objects.filter(pk=obj.pk).update(order=rank)
+        a.refresh_from_db(fields=["order"])
+        b.refresh_from_db(fields=["order"])
+    type(a).objects.filter(pk=a.pk).update(order=b.order)
+    type(b).objects.filter(pk=b.pk).update(order=a.order)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Endpoints publics (vitrine)
 # ---------------------------------------------------------------------------
@@ -409,8 +444,24 @@ class EventViewSet(_ModuleViewSet):
                 qs = qs.filter(user=user)
         return qs.order_by("-start_time")
 
+    def _assert_event_theme_access(self, serializer):
+        """Le thème rattaché à un événement doit être dans le périmètre de l'auteur.
+
+        Sans ce contrôle, un formateur pourrait rattacher un événement à la
+        formation d'un confrère, puis lire via `/participants/` les nom+e-mail de
+        ses apprenants (l'événement devient visible dans son agenda).
+        """
+        theme_id = serializer.validated_data.get("theme")
+        if theme_id:
+            _assert_theme_access(self.request.user, Theme.objects.filter(pk=theme_id).first())
+
     def perform_create(self, serializer):
+        self._assert_event_theme_access(serializer)
         serializer.save(user=serializer.validated_data.get("user") or self.request.user)
+
+    def perform_update(self, serializer):
+        self._assert_event_theme_access(serializer)
+        serializer.save()
 
     @action(detail=True, methods=["get"], url_path="participants")
     def participants(self, request, pk=None):
@@ -449,8 +500,18 @@ class MeetingViewSet(_ModuleViewSet):
 
     def get_queryset(self):
         qs = Meeting.objects.filter(is_deleted=False).select_related("event")
-        if not is_admin(self.request.user):
-            qs = qs.filter(event__user=self.request.user)
+        user = self.request.user
+        if not is_admin(user):
+            if is_teacher(user):
+                # Périmètre aligné sur EventViewSet : sans cette branche, le
+                # formateur voit un événement de sa formation mais pas les
+                # rendez-vous (visio) qui y sont attachés par un admin.
+                from calendarapp.models import EventTheme
+
+                ev_ids = EventTheme.objects.filter(theme__in=themes_for(user)).values_list("event_id", flat=True)
+                qs = qs.filter(Q(event__user=user) | Q(event_id__in=list(ev_ids)))
+            else:
+                qs = qs.filter(event__user=user)
         return qs.order_by("-created_at")
 
 
@@ -566,16 +627,29 @@ class SeanceViewSet(_ModuleViewSet):
         theme = self.request.query_params.get("theme")
         if theme:
             qs = qs.filter(theme_id=theme)
-        return qs.order_by("id")
+        return qs  # tri par Seance.Meta.ordering = ["order", "id"]
 
     def perform_create(self, serializer):
-        _assert_theme_access(self.request.user, serializer.validated_data.get("theme"))
-        serializer.save()
+        theme = serializer.validated_data.get("theme")
+        _assert_theme_access(self.request.user, theme)
+        serializer.save(order=_next_order(Seance, theme=theme))
 
     def perform_update(self, serializer):
         theme = serializer.validated_data.get("theme") or serializer.instance.theme
         _assert_theme_access(self.request.user, theme)
         serializer.save()
+
+    @action(detail=True, methods=["post"], url_path="reorder")
+    def reorder(self, request, pk=None):
+        """POST /modules/seances/<id>/reorder/ {"direction": "up"|"down"}."""
+        seance = self.get_object()  # get_queryset() ⇒ périmètre déjà appliqué
+        _assert_theme_access(request.user, seance.theme)
+        moved = _reorder_siblings(
+            Seance.objects.filter(is_deleted=False, theme=seance.theme),
+            seance.pk,
+            request.data.get("direction"),
+        )
+        return Response({"moved": moved})
 
 
 class ActivityViewSet(_ModuleViewSet):
@@ -591,7 +665,7 @@ class ActivityViewSet(_ModuleViewSet):
         seance = self.request.query_params.get("seance")
         if seance:
             qs = qs.filter(seance_id=seance)
-        return qs.order_by("id")
+        return qs  # tri par Activity.Meta.ordering = ["order", "id"]
 
     def perform_create(self, serializer):
         seance = serializer.validated_data.get("seance")
@@ -603,6 +677,18 @@ class ActivityViewSet(_ModuleViewSet):
         _assert_theme_access(self.request.user, getattr(seance, "theme", None))
         serializer.save()
 
+    @action(detail=True, methods=["post"], url_path="reorder")
+    def reorder(self, request, pk=None):
+        """POST /modules/activities/<id>/reorder/ {"direction": "up"|"down"}."""
+        activity = self.get_object()
+        _assert_theme_access(request.user, getattr(activity.seance, "theme", None))
+        moved = _reorder_siblings(
+            Activity.objects.filter(is_deleted=False, seance=activity.seance),
+            activity.pk,
+            request.data.get("direction"),
+        )
+        return Response({"moved": moved})
+
     def _create_with_bloc(self, serializer):
         # Le modèle Activity exige un Bloc ; on en crée un discret par activité
         # pour masquer cette complexité héritée à l'éditeur.
@@ -613,7 +699,10 @@ class ActivityViewSet(_ModuleViewSet):
             created_by=self.request.user,
             categorie=Bloc.ACTIVITY,
         )
-        serializer.save(bloc=bloc)
+        serializer.save(
+            bloc=bloc,
+            order=_next_order(Activity, seance=serializer.validated_data.get("seance")),
+        )
 
 
 class ActivityComponentViewSet(_ModuleViewSet):

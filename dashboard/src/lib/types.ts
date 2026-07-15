@@ -175,6 +175,7 @@ export interface SeanceItem {
   s_type_label: string;
   activities_count: number;
   is_active: boolean;
+  order: number;
 }
 
 export interface ActivityItem {
@@ -185,6 +186,7 @@ export interface ActivityItem {
   a_type_label: string;
   state: number;
   is_active: boolean;
+  order: number;
 }
 
 export interface ComponentItem {

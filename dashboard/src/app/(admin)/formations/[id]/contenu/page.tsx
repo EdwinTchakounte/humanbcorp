@@ -46,6 +46,23 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
   async function loadSeances() {
     setSeances(await listAll<SeanceItem>(`/modules/seances/?theme=${themeId}`));
   }
+
+  // Réordonnancement : le rang est calculé côté serveur (échange avec le voisin),
+  // on se contente de recharger la fratrie concernée.
+  const [moving, setMoving] = useState(false);
+  async function move(kind: "seances" | "activities", id: number, direction: "up" | "down", seanceId?: number) {
+    if (moving) return;
+    setMoving(true);
+    try {
+      await api(`/modules/${kind}/${id}/reorder/`, { method: "POST", body: { direction } });
+      if (kind === "seances") await loadSeances();
+      else if (seanceId) await loadActs(seanceId);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setMoving(false);
+    }
+  }
   async function loadActs(seanceId: number) {
     setActs((m) => ({ ...m, [seanceId]: [] }));
     const list = await listAll<ActivityItem>(`/modules/activities/?seance=${seanceId}`);
@@ -204,6 +221,12 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
                 </button>
                 {writable && (
                   <div className="flex gap-1">
+                    <button onClick={() => move("seances", s.id, "up")} disabled={i === 0 || moving} className="btn-ghost text-xs disabled:opacity-30" title="Monter la séance">
+                      <i className="bx bx-chevron-up" />
+                    </button>
+                    <button onClick={() => move("seances", s.id, "down")} disabled={i === seances.length - 1 || moving} className="btn-ghost text-xs disabled:opacity-30" title="Descendre la séance">
+                      <i className="bx bx-chevron-down" />
+                    </button>
                     <button onClick={() => setSDraft({ id: s.id, title: s.title, s_type: String(s.s_type) })} className="btn-ghost text-xs" title="Modifier">
                       <i className="bx bx-edit" />
                     </button>
@@ -221,7 +244,7 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
                   ) : (
                     <div className="space-y-2">
                       {acts[s.id].length === 0 && <p className="text-sm text-muted">Aucune activité.</p>}
-                      {acts[s.id].map((a) => {
+                      {acts[s.id].map((a, ai) => {
                         const isOpen = openActs.has(a.id);
                         const kids = leaves[a.id];
                         return (
@@ -238,6 +261,12 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
                               </Link>
                               {writable && (
                                 <div className="flex gap-1">
+                                  <button onClick={() => move("activities", a.id, "up", s.id)} disabled={ai === 0 || moving} className="btn-ghost text-xs disabled:opacity-30" title="Monter l'activité">
+                                    <i className="bx bx-chevron-up" />
+                                  </button>
+                                  <button onClick={() => move("activities", a.id, "down", s.id)} disabled={ai === acts[s.id].length - 1 || moving} className="btn-ghost text-xs disabled:opacity-30" title="Descendre l'activité">
+                                    <i className="bx bx-chevron-down" />
+                                  </button>
                                   <button onClick={() => setADraft({ id: a.id, seance: s.id, title: a.title, a_type: String(a.a_type) })} className="btn-ghost text-xs" title="Modifier">
                                     <i className="bx bx-edit" />
                                   </button>

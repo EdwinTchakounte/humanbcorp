@@ -100,14 +100,21 @@ def ajax_get_users(request):
 	return JsonResponse(users_results, safe=False)
 	
 	
-def ajax_get_user(request, user_id): 
-	user = User.objects.get(id=user_id)
-	response_data = {}
-	response_data['id'] = user.id
-	response_data['username'] = user.username
-	response_data['email'] = user.email
-	response_data['password'] = user.password
-	return JsonResponse(response_data)
+def ajax_get_user(request, user_id):
+	# Cette vue exposait le HASH du mot de passe, à un visiteur anonyme et pour
+	# n'importe quel id : il suffisait d'incrémenter pour récolter toutes les
+	# empreintes et les casser hors ligne. Le hash ne ressort plus du tout —
+	# aucun écran n'en a l'usage, pas même côté administrateur.
+	if not (request.user.is_authenticated and _is_admin(request.user)):
+		return JsonResponse({}, status=403)
+	user = User.objects.filter(id=user_id).first()
+	if not user:
+		return JsonResponse({}, status=404)
+	return JsonResponse({
+		"id": user.id,
+		"username": user.username,
+		"email": user.email,
+	})
 
 
 

@@ -111,6 +111,20 @@ if u:
     r, data = get("/registration/ajax_get_users/", u)
     line("Un client n'obtient pas l'annuaire", data == [], str(data)[:40])
 
+# ── 4bis. Fiche utilisateur : jamais le hash du mot de passe ────────────
+print("\n── 4bis. La fiche d'un compte n'expose pas son mot de passe ──")
+r, data = get(f"/registration/ajax_get_user/{admin.id}")
+line("Anonyme : fiche utilisateur refusée", r.status_code == 403, f"HTTP {r.status_code}")
+line("Aucun hash dans la réponse", "pbkdf2" not in r.content.decode(errors="ignore"))
+r, data = get(f"/registration/ajax_get_user/{admin.id}", admin)
+line("L'administrateur garde la fiche", r.status_code == 200 and (data or {}).get("id") == admin.id,
+     f"HTTP {r.status_code}")
+line("…mais le hash n'y figure plus (aucun écran n'en a l'usage)",
+     "password" not in (data or {}), str(sorted((data or {}).keys())))
+if u:
+    r, _ = get(f"/registration/ajax_get_user/{admin.id}", u)
+    line("Un client ne consulte pas la fiche d'autrui", r.status_code == 403, f"HTTP {r.status_code}")
+
 # ── 5. Commandes ────────────────────────────────────────────────────────
 print("\n── 5. Les commandes ne sont pas publiques ──")
 r, data = get("/paiement/ajax_get_order_data")

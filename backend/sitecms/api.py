@@ -128,6 +128,31 @@ def _assert_theme_access(user, theme):
         raise PermissionDenied("Formation hors de votre périmètre.")
 
 
+def publications_for(user):
+    """Sessions (cohortes) **animées** par ce profil.
+
+    À distinguer de `themes_for`, qui répond « quels programmes peut-il
+    éditer ? ». Ici la question est « quelles cohortes anime-t-il ? » — c'est
+    elle qui gouverne l'accès aux apprenants (suivi) et au calendrier : deux
+    sessions d'une même formation peuvent avoir deux animateurs différents.
+    """
+    qs = Publication.objects.all()
+    if is_admin(user):
+        return qs
+    if is_teacher(user):
+        return qs.filter(instructors=user)
+    return qs.none()
+
+
+def _assert_publication_access(user, publication):
+    if publication is None:
+        raise PermissionDenied("Session introuvable.")
+    if is_admin(user):
+        return
+    if not publications_for(user).filter(pk=publication.pk).exists():
+        raise PermissionDenied("Session hors de votre périmètre.")
+
+
 def _next_order(model, **parent):
     """Rang à attribuer à un nouvel élément : à la suite de ses frères."""
     from django.db.models import Max
@@ -470,9 +495,10 @@ class EventViewSet(_ModuleViewSet):
         user = self.request.user
         if not is_admin(user):
             if is_teacher(user):
-                # Le formateur voit ses propres créneaux + ceux des cohortes qui
-                # vendent l'une de ses formations.
-                qs = qs.filter(Q(user=user) | Q(publication__themes__in=themes_for(user))).distinct()
+                # Le formateur voit ses propres créneaux + ceux des cohortes
+                # qu'il ANIME (pas de toutes celles qui vendent son programme :
+                # il n'a rien à faire dans le planning de la session d'un autre).
+                qs = qs.filter(Q(user=user) | Q(publication__in=publications_for(user))).distinct()
             else:
                 qs = qs.filter(user=user)
         return qs.order_by("-start_time")
@@ -487,14 +513,9 @@ class EventViewSet(_ModuleViewSet):
         publication_id = serializer.validated_data.get("publication")
         if not publication_id:
             return
-        pub = Publication.objects.filter(pk=publication_id).first()
-        if pub is None:
-            raise PermissionDenied("Cohorte introuvable.")
-        if is_admin(self.request.user):
-            return
-        # Le formateur doit animer au moins un des programmes vendus par la cohorte.
-        if not pub.themes.filter(pk__in=themes_for(self.request.user)).exists():
-            raise PermissionDenied("Cohorte hors de votre périmètre.")
+        _assert_publication_access(
+            self.request.user, Publication.objects.filter(pk=publication_id).first()
+        )
 
     def perform_create(self, serializer):
         self._assert_event_theme_access(serializer)
@@ -547,7 +568,7 @@ class MeetingViewSet(_ModuleViewSet):
                 # formateur voit un créneau de sa cohorte mais pas les
                 # rendez-vous (visio) qui y sont attachés par un admin.
                 qs = qs.filter(
-                    Q(event__user=user) | Q(event__publication__themes__in=themes_for(user))
+                    Q(event__user=user) | Q(event__publication__in=publications_for(user))
                 ).distinct()
             else:
                 qs = qs.filter(event__user=user)
@@ -1119,10 +1140,15 @@ class TeachersListView(APIView):
 
 
 class SuiviView(APIView):
-    """GET /modules/suivi/ → progression + scores quiz des apprenants, par formation.
+    """GET /modules/suivi/ → progression + scores quiz des apprenants, par session.
 
-    Admin : toutes les formations. Formateur : ses formations affectées.
-    Filtre optionnel `?theme=<id>`.
+    Le suivi est groupé par **cohorte**, pas par programme : une formation
+    vendue en mars et en juin a deux groupes d'apprenants distincts, et deux
+    animateurs potentiellement différents. Grouper par programme les aurait
+    mélangés et aurait montré à chaque formateur les apprenants de l'autre.
+
+    Admin : toutes les sessions. Formateur : les sessions qu'il anime.
+    Filtre optionnel `?publication=<id>`.
     """
 
     permission_classes = [HasModuleAccess]
@@ -1132,23 +1158,30 @@ class SuiviView(APIView):
         from lessonapp.models import Activity
         from material.models import ActivityProgress, QuizAttempt
 
-        themes = themes_for(request.user).order_by("-id")
-        theme_filter = request.query_params.get("theme")
-        if theme_filter:
-            themes = themes.filter(pk=theme_filter)
+        publications = (
+            publications_for(request.user).prefetch_related("themes").order_by("-id")
+        )
+        pub_filter = request.query_params.get("publication")
+        if pub_filter:
+            publications = publications.filter(pk=pub_filter)
 
         formations = []
-        for theme in themes:
-            activities = list(Activity.objects.filter(seance__theme=theme, is_deleted=False))
+        for pub in publications:
+            themes = pub.themes.filter(is_deleted=False)
+            activities = list(
+                Activity.objects.filter(
+                    seance__theme__in=themes, seance__is_deleted=False, is_deleted=False
+                )
+            )
             act_ids = [a.id for a in activities]
             quiz_ids = [a.id for a in activities if a.a_type == Activity.QUIZZ]
             act_titles = {a.id: a.title for a in activities}
             total = len(activities)
 
-            # Apprenants inscrits (CONFIRMED) à une publication contenant ce thème.
+            # Apprenants confirmés sur CETTE session.
             learners = {}
             for ins in Inscription.objects.filter(
-                publication__themes=theme, status=Inscription.CONFIRMED, is_deleted=False
+                publication=pub, status=Inscription.CONFIRMED, is_deleted=False
             ).select_related("participant"):
                 u = ins.participant
                 if u and u.id not in learners:
@@ -1198,8 +1231,13 @@ class SuiviView(APIView):
                 })
             rows.sort(key=lambda r: (r["name"] or "").lower())
             formations.append({
-                "id": theme.id,
-                "title": theme.title,
+                "id": pub.id,
+                "title": pub.title,
+                "mode": pub.mode,
+                "date_debut": pub.date_debut,
+                "date_fin": pub.date_fin,
+                # Le programme derrière la session, pour situer le contenu suivi.
+                "programmes": [t.title for t in themes],
                 "activities_total": total,
                 "quiz_count": len(quiz_ids),
                 "learners_count": len(rows),

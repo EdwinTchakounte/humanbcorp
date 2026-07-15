@@ -67,6 +67,14 @@ class Publication(models.Model):
     # Vide = accès à vie. L'ancrage dépend du mode : la fin de session pour une
     # cohorte, la date d'inscription en accès libre (il n'y a pas de fin).
     acces_duree_mois = models.PositiveIntegerField(null=True, blank=True)
+    # Formateurs qui **animent** cette session. À distinguer de
+    # `Theme.instructors`, qui désigne les **auteurs** du programme : écrire un
+    # cours et animer une cohorte ne sont pas le même métier, et une même
+    # formation vendue en mars et en juin peut être animée par deux personnes
+    # différentes. C'est ce rattachement qui cloisonne le suivi et l'agenda.
+    instructors = models.ManyToManyField(
+        "auth.User", blank=True, related_name="sessions_animees"
+    )
 
     def places_restantes(self):
         """Places encore disponibles, ou None si la capacité est illimitée."""

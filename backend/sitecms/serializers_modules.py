@@ -136,17 +136,13 @@ class ThemeSerializer(serializers.ModelSerializer):
             "instructors", "instructors_detail",
             "seances_count", "image", "image_url", "is_active",
         ]
-        # Champs requis à la création uniquement : PATCH partiel reste possible.
-        extra_kwargs = {"sequence": {"required": False}, "categorie": {"required": False}}
-
-    def validate(self, attrs):
-        # À la création, séquence + catégorie sont obligatoires (FK non nulles).
-        if self.instance is None:
-            if not attrs.get("sequence"):
-                raise serializers.ValidationError({"sequence": "Séquence requise."})
-            if not attrs.get("categorie"):
-                raise serializers.ValidationError({"categorie": "Catégorie requise."})
-        return attrs
+        # Séquence et catégorie sont un héritage scolaire (année → trimestre),
+        # devenu facultatif : une formation professionnelle n'appartient pas à
+        # un trimestre. C'est la cohorte (Publication) qui porte le calendrier.
+        extra_kwargs = {
+            "sequence": {"required": False, "allow_null": True},
+            "categorie": {"required": False, "allow_null": True},
+        }
 
     def get_t_type_label(self, obj):
         return dict(Theme.TYPES_CHOICES).get(obj.t_type, "—")
@@ -291,6 +287,11 @@ class PublicationSerializer(serializers.ModelSerializer):
     events_count = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     places_restantes = serializers.SerializerMethodField()
+    # Animateurs de la session (à distinguer des auteurs du programme).
+    instructors = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(), required=False
+    )
+    instructors_detail = serializers.SerializerMethodField()
     # Écriture : upload image, lien vers formations (themes), hiérarchie (parent).
     image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     themes = serializers.PrimaryKeyRelatedField(
@@ -309,13 +310,19 @@ class PublicationSerializer(serializers.ModelSerializer):
             "themes", "themes_titles", "parent",
             "children_count", "events_count", "image", "image_url",
             "mode", "date_debut", "date_fin", "capacite", "acces_duree_mois",
-            "places_restantes",
+            "places_restantes", "instructors", "instructors_detail",
         ]
         read_only_fields = ["date"]
         extra_kwargs = {"categorie": {"required": False}, "description": {"required": False}}
 
     def get_places_restantes(self, obj):
         return obj.places_restantes()
+
+    def get_instructors_detail(self, obj):
+        return [
+            {"id": u.id, "name": u.get_full_name() or u.username, "email": u.email}
+            for u in obj.instructors.all()
+        ]
 
     def validate(self, attrs):
         if self.instance is None and not attrs.get("categorie"):

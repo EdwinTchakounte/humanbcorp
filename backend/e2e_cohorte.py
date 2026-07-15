@@ -136,6 +136,7 @@ print("\n── 4. Sécurité : un formateur ne rattache pas un créneau hors p�
 formateur = User.objects.filter(username="formateur1").first()
 if formateur:
     formateur.formations_animees.clear()
+    formateur.sessions_animees.clear()
     fc = APIClient()
     fc.force_authenticate(user=formateur)
     payload = {"title": f"Sonde {SFX}", "start_time": timezone.now(), "end_time": timezone.now(),
@@ -143,12 +144,20 @@ if formateur:
     r = fc.post("/api/v1/modules/events/", payload, format="json")
     line("Formateur non affecté : rattachement refusé", r.status_code == 403, f"{r.status_code}")
 
+    # Écrire le programme ne suffit pas : le calendrier appartient à la session,
+    # donc il faut ANIMER la cohorte (Publication.instructors) pour y toucher.
     theme.instructors.add(formateur)
     r = fc.post("/api/v1/modules/events/", payload, format="json")
-    line("Formateur affecté au programme vendu : autorisé", r.status_code == 201, f"{r.status_code}")
+    line("Auteur du programme mais pas animateur : toujours refusé", r.status_code == 403,
+         f"{r.status_code}")
+
+    mars.instructors.add(formateur)
+    r = fc.post("/api/v1/modules/events/", payload, format="json")
+    line("Animateur de la session : autorisé", r.status_code == 201, f"{r.status_code}")
     if r.status_code == 201:
         Event.objects.filter(pk=r.data["id"]).delete()
     formateur.formations_animees.clear()
+    formateur.sessions_animees.clear()
 
 # ── Nettoyage ────────────────────────────────────────────────────────────
 Inscription.objects.filter(participant__in=[appr_mars, appr_juin]).delete()

@@ -55,6 +55,13 @@ function LearnerRow({ l }: { l: SuiviLearner }) {
   );
 }
 
+// « 12 mars → 20 mars 2026 », ou la seule date de début si la fin manque.
+function fmtSession(debut: string, fin?: string | null) {
+  const o: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+  const d = new Date(debut).toLocaleDateString("fr-FR", o);
+  return fin ? `${d} → ${new Date(fin).toLocaleDateString("fr-FR", o)}` : `dès le ${d}`;
+}
+
 function FormationBlock({ f }: { f: SuiviFormation }) {
   const [open, setOpen] = useState(true);
   const avg = useMemo(
@@ -69,6 +76,17 @@ function FormationBlock({ f }: { f: SuiviFormation }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold text-brand-deep">{f.title}</div>
+          {/* On suit une session, pas un programme : les dates la situent, et le
+              programme rappelle quel contenu est suivi. */}
+          <div className="flex flex-wrap gap-x-3 text-xs text-muted">
+            {f.date_debut && (
+              <span><i className="bx bx-calendar" /> {fmtSession(f.date_debut, f.date_fin)}</span>
+            )}
+            {f.mode === 2 && <span><i className="bx bx-infinite" /> Accès libre</span>}
+            {!!f.programmes?.length && (
+              <span className="truncate"><i className="bx bx-book-open" /> {f.programmes.join(", ")}</span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-x-3 text-xs text-muted">
             <span><i className="bx bx-group" /> {f.learners_count} apprenant(s)</span>
             <span><i className="bx bx-play-circle" /> {f.activities_total} activité(s)</span>

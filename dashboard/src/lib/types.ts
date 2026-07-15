@@ -253,6 +253,11 @@ export interface SuiviLearner {
 export interface SuiviFormation {
   id: number;
   title: string;
+  // Le suivi est groupé par session (cohorte), pas par programme.
+  mode?: number;
+  date_debut?: string | null;
+  date_fin?: string | null;
+  programmes?: string[];
   activities_total: number;
   quiz_count: number;
   learners_count: number;
@@ -284,6 +289,9 @@ export interface PublicationItem {
   capacite?: number | null;
   acces_duree_mois?: number | null;
   places_restantes?: number | null;
+  // Animateurs de la session (≠ auteurs du programme, cf. ThemeItem.instructors).
+  instructors?: number[];
+  instructors_detail?: { id: number; name: string; email: string }[];
 }
 
 export interface PublicationsOverview {

@@ -61,6 +61,7 @@ formateur.is_staff = False
 formateur.save()
 formateur.groups.add(teacher_group)
 formateur.formations_animees.clear()  # périmètre propre à chaque run (pas d'accumulation)
+formateur.sessions_animees.clear()
 line("Formateur 'formateur1' (groupe Teacher)", formateur.groups.filter(name="Teacher").exists(),
      f"{'créé' if created else 'existant'}")
 
@@ -243,12 +244,15 @@ r = client.post(f"/api/v1/site/mon-espace/{tok2}/activite/{content_act}/terminer
 line("Apprenant 2 termine le cours (sans quiz)", r.status_code in (200, 201))
 
 # ── 5. Suivi (admin) ─────────────────────────────────────────────────────
+# Le suivi est groupé par SESSION (cohorte), pas par programme : une formation
+# vendue deux fois a deux groupes d'apprenants distincts.
 print("\n── 5. Suivi côté admin ──")
-r = admin_client.get(f"/api/v1/modules/suivi/?theme={theme_id}")
+pub.instructors.add(formateur)  # le formateur anime cette session
+r = admin_client.get(f"/api/v1/modules/suivi/?publication={pub.id}")
 line("GET /modules/suivi/ (admin)", r.status_code == 200)
 formations = r.data.get("formations", [])
 f0 = formations[0] if formations else {}
-line("Formation présente dans le suivi", f0.get("id") == theme_id, f0.get("title", ""))
+line("Session présente dans le suivi", f0.get("id") == pub.id, f0.get("title", ""))
 line("2 apprenants suivis", f0.get("learners_count") == 2, f"count={f0.get('learners_count')}")
 byname = {l["name"]: l for l in f0.get("learners", [])}
 a1 = next((l for l in f0.get("learners", []) if l["email"] == "apprenant1@hbc.test"), {})
@@ -265,7 +269,7 @@ print("\n── 6. Suivi côté formateur ──")
 r = teach.get("/api/v1/modules/suivi/")
 line("GET /modules/suivi/ (formateur)", r.status_code == 200)
 tf = r.data.get("formations", [])
-line("Formateur ne voit QUE sa formation dans le suivi", len(tf) == 1 and tf[0]["id"] == theme_id,
+line("Formateur ne voit QUE la session qu'il anime", len(tf) == 1 and tf[0]["id"] == pub.id,
      f"{[x['id'] for x in tf]}")
 line("Formateur voit les scores de ses apprenants", tf and tf[0].get("learners_count") == 2)
 

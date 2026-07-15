@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, listAll } from "@/lib/api";
 import { Toggle, Pagination, PAGE_SIZE, Modal, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
-import type { PublicationItem, PublicationsOverview, ThemeItem } from "@/lib/types";
+import type { TeacherItem, PublicationItem, PublicationsOverview, ThemeItem } from "@/lib/types";
 
 function fmtPrice(p: string) {
   const n = Number(p);
@@ -28,6 +28,7 @@ const EMPTY = {
   date_fin: "",
   capacite: "",
   acces_duree_mois: "",
+  instructors: [] as number[],
 };
 
 // ISO (UTC) -> valeur d'un <input type="datetime-local">, en heure locale.
@@ -39,9 +40,14 @@ function toLocalInput(iso: string | null | undefined) {
 }
 
 export default function PublicationsPage() {
-  const { canWrite } = useAuth();
+  const { canWrite, profile } = useAuth();
+  const isAdmin = !!profile?.is_admin;
   const writable = canWrite("publications");
   const [items, setItems] = useState<PublicationItem[]>([]);
+  const [teachers, setTeachers] = useState<TeacherItem[]>([]);
+  useEffect(() => {
+    api<TeacherItem[]>("/modules/formations/teachers/").then(setTeachers).catch(() => {});
+  }, []);
   const [overview, setOverview] = useState<PublicationsOverview | null>(null);
   const [themes, setThemes] = useState<ThemeItem[]>([]);
   const [categorie, setCategorie] = useState("");
@@ -108,6 +114,7 @@ export default function PublicationsPage() {
       date_fin: toLocalInput(p.date_fin),
       capacite: p.capacite == null ? "" : String(p.capacite),
       acces_duree_mois: p.acces_duree_mois == null ? "" : String(p.acces_duree_mois),
+      instructors: p.instructors ?? (p.instructors_detail ?? []).map((i) => i.id),
     });
     setErr("");
     setOpen(true);
@@ -140,6 +147,7 @@ export default function PublicationsPage() {
         if (cohorte && form.date_fin) fd.set("date_fin", iso(form.date_fin) as string);
         if (form.capacite.trim()) fd.set("capacite", form.capacite);
         if (form.acces_duree_mois.trim()) fd.set("acces_duree_mois", form.acces_duree_mois);
+        if (isAdmin) form.instructors.forEach((i) => fd.append("instructors", String(i)));
         if (form.categorie) fd.set("categorie", form.categorie);
         if (form.parent) fd.set("parent", form.parent);
         form.themes.forEach((t) => fd.append("themes", String(t)));
@@ -159,6 +167,7 @@ export default function PublicationsPage() {
           capacite: num(form.capacite),
           acces_duree_mois: num(form.acces_duree_mois),
         };
+        if (isAdmin) body.instructors = form.instructors;
         if (form.categorie) body.categorie = Number(form.categorie);
         if (form.parent) body.parent = Number(form.parent);
         await api(path, { method, body });
@@ -378,6 +387,35 @@ export default function PublicationsPage() {
                 ? "L'accès se ferme ce nombre de mois après la fin de session."
                 : "L'accès se ferme ce nombre de mois après l'achat (pas de fin de session en accès libre)."}
             </p>
+
+            {/* Animateur(s) de CETTE session — distinct de l'auteur du programme,
+                défini côté Formations. C'est ce rattachement qui donne accès au
+                suivi des apprenants et au planning de la session. */}
+            {isAdmin && (
+              <div className="mt-4 border-t border-line/70 pt-3">
+                <label className="label">Formateur(s) qui animent cette session</label>
+                <div className="flex flex-wrap gap-2">
+                  {teachers.map((t) => {
+                    const on = form.instructors.includes(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, instructors: on ? f.instructors.filter((x) => x !== t.id) : [...f.instructors, t.id] }))}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${on ? "bg-accent text-white" : "bg-brand-soft text-brand hover:bg-brand/10"}`}
+                        title={t.email}
+                      >
+                        {on && <i className="bx bx-check" />} {t.name}
+                      </button>
+                    );
+                  })}
+                  {teachers.length === 0 && <span className="text-xs text-muted">Aucun formateur (groupe « Teacher ») encore.</span>}
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  Ils verront les apprenants et le planning de cette session — pas ceux des autres sessions du même programme.
+                </p>
+              </div>
+            )}
           </div>
 
           <div>

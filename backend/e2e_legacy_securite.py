@@ -1,17 +1,22 @@
-"""E2E de non-régression : l'application historique ne fuit pas de données.
+"""E2E de non-régression sur l'application historique (débranchée).
 
-L'ancienne app Django (templates) est toujours routée à côté de l'API. Ses vues
-décidaient des droits par appartenance à un groupe, avec une branche « else »
-réservée aux administrateurs — or un visiteur ANONYME n'appartient à aucun
-groupe et tombait donc dans cette branche : il obtenait toutes les réservations
-(e-mails et téléphones des parents), marqué `admin=True`, sans authentification.
+Cette app Django à templates a été écrite sans modèle d'autorisation : les
+droits s'y déduisaient de l'appartenance à un groupe, avec une branche « else »
+réservée aux administrateurs — où tout visiteur ANONYME atterrissait, n'étant
+membre d'aucun groupe. Sept failles exploitables sans session en sont sorties.
 
-Le privilège doit être accordé explicitement, jamais obtenu par défaut.
+Elle est désormais débranchée (Algomaat/urls.py). Ce test vérifie DEUX niveaux :
+
+  1. les routes ne répondent plus du tout — c'est ce qui ferme la classe entière ;
+  2. les vues elles-mêmes restent fail-closed, appelées en direct. Ce second
+     niveau garde sa valeur le jour où quelqu'un rebranche une route : la
+     protection ne doit pas reposer sur le seul urls.py.
 
 Lancer : POSTGRES_DB= DEBUG=True ../.venv_local/bin/python e2e_legacy_securite.py
 """
 import json
 import os
+from decimal import Decimal
 
 import django
 
@@ -20,11 +25,17 @@ django.setup()
 
 from django.conf import settings
 settings.ALLOWED_HOSTS = ["*"]
-from django.contrib.auth.models import Group, User
-from django.test import Client
+from django.contrib.auth.models import AnonymousUser, Group, User
+from django.test import Client, RequestFactory
+from django.utils import timezone
+
+from bucket.models import Order
+from calendarapp.models import Event
+from paiement.models import PaiementEntrant
 
 OK, KO = "\033[92mOK\033[0m", "\033[91mKO\033[0m"
 step = fails = 0
+rf = RequestFactory()
 
 
 def line(label, ok, extra=""):
@@ -36,192 +47,133 @@ def line(label, ok, extra=""):
     return ok
 
 
-def get(url, user=None):
-    c = Client()
-    if user:
-        c.force_login(user)
-    r = c.get(url)
+def call(vue, methode="get", chemin="/x", user=None, data=None, *args, **kwargs):
+    """Appelle une vue EN DIRECT (hors routage) pour tester sa protection propre."""
+    req = getattr(rf, methode)(chemin, data or {})
+    req.user = user or AnonymousUser()
+    return vue(req, *args, **kwargs)
+
+
+def corps(resp):
     try:
-        data = json.loads(r.content)
-    except Exception:  # noqa: BLE001 — page HTML (erreur) plutôt que JSON
-        data = None
-    return r, data
+        return json.loads(resp.content)
+    except Exception:  # noqa: BLE001 — réponse HTML ou vide
+        return None
 
 
 print("\n" + "=" * 72)
-print("  E2E SÉCURITÉ DE L'APP HISTORIQUE — HBC-RH")
+print("  E2E SÉCURITÉ DE L'APP HISTORIQUE (DÉBRANCHÉE) — HBC-RH")
 print("=" * 72)
 
-URL_RES = "/bucket/ajax_get_reservations"
-URL_USERS = "/bucket/ajax_get_reservated_users"
-
-# ── 1. Anonyme : rien, jamais ────────────────────────────────────────────
-print("\n── 1. Un visiteur anonyme n'obtient aucune donnée ──")
-r, data = get(URL_RES)
-line("Réservations : réponse servie sans erreur", r.status_code == 200, f"{r.status_code}")
-line("Réservations : aucune donnée pour l'anonyme", data == [], str(data)[:60])
-
-r, data = get(URL_USERS)
-line("Utilisateurs réservataires : pas de 500 sur l'anonyme", r.status_code == 200, f"{r.status_code}")
-line("Utilisateurs réservataires : liste vide", data == [], str(data)[:60])
-
-# Le cœur du sujet : aucune donnée personnelle ne doit sortir sans session.
-r, data = get(URL_RES)
-brut = r.content.decode(errors="ignore")
-line("Aucun e-mail exposé à l'anonyme", "@" not in brut, brut[:60])
-line("L'anonyme n'est jamais marqué admin", '"admin": true' not in brut.lower())
-
-# ── 2. L'usage légitime reste intact ────────────────────────────────────
-print("\n── 2. Les accès légitimes ne sont pas cassés ──")
 admin = User.objects.filter(is_superuser=True).first()
-r, data = get(URL_RES, admin)
-line("L'administrateur voit toujours les réservations", r.status_code == 200 and isinstance(data, list),
-     f"{r.status_code} / {len(data) if isinstance(data, list) else '-'} enr.")
-if data:
-    line("…et il est bien marqué admin", data[0].get("admin") is True)
-
-# ── 3. Un profil non-admin n'hérite pas des droits admin ────────────────
-print("\n── 3. Aucun profil n'obtient « admin » par défaut ──")
 teacher = User.objects.filter(username="formateur1").first()
+cust_group = Group.objects.filter(name="Simple_Customer").first()
+client = cust_group.user_set.first() if cust_group else None
+
+# ── 1. Les routes ne répondent plus ─────────────────────────────────────
+print("\n── 1. L'application historique n'est plus routée ──")
+c = Client()
+ROUTES = [
+    "/", "/about/", "/administration/", "/d/", "/bucket/",
+    "/bucket/ajax_get_reservations", "/registration/ajax_get_users/",
+    "/registration/ajax_get_user/2", "/registration/admin_new_user/",
+    "/paiement/ajax_get_order_data", "/paiement/entrant/",
+    "/calendarapp/delete_event/1/", "/lessonapp/", "/chat/",
+    "/publications/search/", "/spaces/show_all_spaces/", "/accounts/login/",
+]
+injoignables = [u for u in ROUTES if c.get(u).status_code == 404]
+line(f"Les {len(ROUTES)} routes historiques renvoient 404",
+     len(injoignables) == len(ROUTES),
+     f"{len(injoignables)}/{len(ROUTES)} — restantes : {[u for u in ROUTES if u not in injoignables]}")
+
+# ── 2. L'API et l'admin Django survivent ────────────────────────────────
+print("\n── 2. Ce qui doit vivre n'a pas été emporté ──")
+for url, attendu, label in [
+    ("/api/v1/site/formations/", 200, "catalogue public"),
+    ("/api/v1/site/nav/", 200, "navigation vitrine"),
+    ("/api/v1/site/settings/", 200, "réglages du site"),
+    ("/api/v1/site/documents/", 200, "documents publics"),
+    ("/api/v1/modules/suivi/", 401, "suivi (auth exigée)"),
+]:
+    r = c.get(url)
+    line(f"API — {label}", r.status_code == attendu, f"HTTP {r.status_code}")
+line("Admin Django accessible (redirige vers son login)", c.get("/admin/").status_code == 302)
+# L'admin appelle get_absolute_url pour « Voir sur le site » : sans garde-fou,
+# le débranchement de calendarapp le ferait tomber en NoReverseMatch.
+ev = Event.objects.first()
+line("Event.get_absolute_url ne casse plus l'admin (NoReverseMatch)",
+     ev is None or ev.get_absolute_url() is None)
+
+# ── 3. Défense en profondeur : les vues restent fail-closed ─────────────
+# Rebrancher une route ne doit pas rouvrir les failles : on appelle les vues
+# directement, hors routage.
+print("\n── 3. Même rebranchées, les vues refusent l'anonyme ──")
+from bucket.views import ajax_get_reservations
+from paiement.views import ajax_get_order_data, paiement_entrant
+from registration.views import admin_new_user_view, ajax_get_user, ajax_get_users
+from calendarapp.views.other_views import delete_event
+
+line("Réservations : rien pour l'anonyme", corps(call(ajax_get_reservations)) == [])
+line("Annuaire des comptes : rien pour l'anonyme", corps(call(ajax_get_users)) == [])
+r = call(ajax_get_user, user=AnonymousUser(), user_id=admin.id)
+line("Fiche utilisateur : refusée à l'anonyme", r.status_code == 403, f"HTTP {r.status_code}")
+line("Commandes : rien pour l'anonyme", corps(call(ajax_get_order_data)) == [])
+
+# Le hash du mot de passe ne doit sortir pour personne, admin compris.
+r = call(ajax_get_user, user=admin, user_id=admin.id)
+d = corps(r) or {}
+line("Fiche utilisateur : l'admin la consulte", r.status_code == 200 and d.get("id") == admin.id)
+line("…sans jamais exposer le hash du mot de passe", "password" not in d, str(sorted(d.keys())))
+
+# Création de compte administrateur.
+r = call(admin_new_user_view, "post", user=AnonymousUser(), data={"username": "x"})
+line("Création de compte admin : refusée à l'anonyme", r.status_code == 403, f"HTTP {r.status_code}")
 if teacher:
-    r, data = get(URL_RES, teacher)
-    # Avant : le formateur n'étant ni Simple_Customer ni Parent, il tombait dans
-    # la branche « else » et voyait TOUTES les réservations.
-    line("Le formateur ne récupère pas toutes les réservations",
-         isinstance(data, list) and not any(d.get("admin") for d in data),
-         f"{len(data) if isinstance(data, list) else '-'} enr.")
+    r = call(admin_new_user_view, "post", user=teacher, data={"username": "x"})
+    line("…refusée au formateur également", r.status_code == 403, f"HTTP {r.status_code}")
+line("Aucun groupe « None_Admin » n'existe en base",
+     not Group.objects.filter(name__icontains="None_").exists())
 
-cust = Group.objects.filter(name="Simple_Customer").first()
-u = cust.user_set.first() if cust else None
-if u:
-    r, data = get(URL_RES, u)
-    line("Un client ne voit que son propre périmètre",
-         isinstance(data, list) and not any(d.get("admin") for d in data),
-         f"{len(data) if isinstance(data, list) else '-'} enr.")
-
-# ── 4. Annuaire des comptes ─────────────────────────────────────────────
-print("\n── 4. L'annuaire des comptes n'est pas public ──")
-r, data = get("/registration/ajax_get_users/")
-line("Anonyme : aucun compte listé", data == [], f"{len(data) if isinstance(data, list) else data}")
-line("Aucun e-mail dans la réponse", "@" not in r.content.decode(errors="ignore"))
-r, data = get("/registration/ajax_get_users/", admin)
-line("L'administrateur garde l'annuaire", isinstance(data, list) and len(data) > 0,
-     f"{len(data) if isinstance(data, list) else '-'} compte(s)")
-if u:
-    r, data = get("/registration/ajax_get_users/", u)
-    line("Un client n'obtient pas l'annuaire", data == [], str(data)[:40])
-
-# ── 4bis. Fiche utilisateur : jamais le hash du mot de passe ────────────
-print("\n── 4bis. La fiche d'un compte n'expose pas son mot de passe ──")
-r, data = get(f"/registration/ajax_get_user/{admin.id}")
-line("Anonyme : fiche utilisateur refusée", r.status_code == 403, f"HTTP {r.status_code}")
-line("Aucun hash dans la réponse", "pbkdf2" not in r.content.decode(errors="ignore"))
-r, data = get(f"/registration/ajax_get_user/{admin.id}", admin)
-line("L'administrateur garde la fiche", r.status_code == 200 and (data or {}).get("id") == admin.id,
-     f"HTTP {r.status_code}")
-line("…mais le hash n'y figure plus (aucun écran n'en a l'usage)",
-     "password" not in (data or {}), str(sorted((data or {}).keys())))
-if u:
-    r, _ = get(f"/registration/ajax_get_user/{admin.id}", u)
-    line("Un client ne consulte pas la fiche d'autrui", r.status_code == 403, f"HTTP {r.status_code}")
-
-# ── 5. Commandes ────────────────────────────────────────────────────────
-print("\n── 5. Les commandes ne sont pas publiques ──")
-r, data = get("/paiement/ajax_get_order_data")
-line("Anonyme : aucune commande", data == [], f"{len(data) if isinstance(data, list) else data}")
-r, data = get("/paiement/ajax_get_order_data", admin)
-line("L'administrateur garde toutes les commandes", isinstance(data, list) and len(data) > 0,
-     f"{len(data) if isinstance(data, list) else '-'} commande(s)")
-if u:
-    r, data = get("/paiement/ajax_get_order_data", u)
-    autres = [o for o in data if o.get("created_by_id") != u.id] if isinstance(data, list) else []
-    line("Un client ne voit aucune commande d'autrui", not autres, f"{len(autres)} fuite(s)")
-
-# ── 6. Création de compte administrateur ────────────────────────────────
-print("\n── 6. Personne ne se fabrique un compte admin ──")
-# La vue créait le compte DANS le groupe demandé puis ouvrait une session
-# dessus ; `group_type` valait « Admin » par défaut pour un anonyme, et le
-# groupe généré (« None_Admin ») était reconnu par is_admin (name__icontains).
-from django.contrib.auth.models import Group as _G
-
-_USERNAME = "e2e_intrus_zz"
-User.objects.filter(username=_USERNAME).delete()
-groupes_avant = set(_G.objects.values_list("name", flat=True))
-grp = _G.objects.filter(name__iexact="Admin").first()
-
-c_anon = Client()
-r = c_anon.post("/registration/admin_new_user/", {
-    "firstname": "Intrus", "username": _USERNAME, "email": "intrus@evil.test",
-    "password1": "Intrus@2026xyz", "password2": "Intrus@2026xyz",
-    "group": grp.id if grp else "",
-})
-line("Anonyme : création de compte admin refusée", r.status_code == 403, f"HTTP {r.status_code}")
-line("…et aucun compte n'a été créé", not User.objects.filter(username=_USERNAME).exists())
-line("…ni aucun groupe fabriqué au passage",
-     set(_G.objects.values_list("name", flat=True)) == groupes_avant)
-
-if teacher:
-    c_t = Client()
-    c_t.force_login(teacher)
-    r = c_t.post("/registration/admin_new_user/", {
-        "firstname": "T", "username": _USERNAME, "email": "t@evil.test",
-        "password1": "Tt@2026abcd", "password2": "Tt@2026abcd", "group": grp.id if grp else "",
-    })
-    line("Un formateur non plus", r.status_code == 403, f"HTTP {r.status_code}")
-
-r = Client()
-r.force_login(admin)
-line("L'administrateur garde l'accès au formulaire",
-     r.get("/registration/admin_new_user/").status_code == 200)
-
-# Nettoyage (le test ne doit rien laisser derrière lui).
-User.objects.filter(username=_USERNAME).delete()
-for nom in set(_G.objects.values_list("name", flat=True)) - groupes_avant:
-    _G.objects.filter(name=nom).delete()
-
-# ── 7. Écritures anonymes (routes POST) ─────────────────────────────────
-print("\n── 7. Un anonyme n'écrit rien : ni destruction, ni encaissement ──")
-from decimal import Decimal
-
-from django.utils import timezone
-from calendarapp.models import Event
-from bucket.models import Order
-from paiement.models import PaiementEntrant
-
-anon = Client()
-c_admin = Client()
-c_admin.force_login(admin)
-
-# 7a. Suppression d'événement : POST anonyme suffisait à détruire le planning
-# d'une cohorte (liens visio compris), par simple id.
+# Destruction d'événement.
 ev = Event.objects.create(user=admin, title="e2e-securite-jetable", description="",
                           start_time=timezone.now(), end_time=timezone.now())
-r = anon.post(f"/calendarapp/delete_event/{ev.id}/")
-line("Anonyme : suppression d'événement refusée", r.status_code == 403, f"HTTP {r.status_code}")
+r = call(delete_event, "post", user=AnonymousUser(), event_id=ev.id)
+line("Suppression d'événement : refusée à l'anonyme", r.status_code == 403, f"HTTP {r.status_code}")
 line("…et l'événement est intact", Event.objects.filter(pk=ev.id).exists())
-r = c_admin.post(f"/calendarapp/delete_event/{ev.id}/")
-line("L'administrateur supprime toujours", r.status_code == 200 and not Event.objects.filter(pk=ev.id).exists(),
-     f"HTTP {r.status_code}")
+r = call(delete_event, "post", user=admin, event_id=ev.id)
+line("L'administrateur supprime toujours",
+     r.status_code == 200 and not Event.objects.filter(pk=ev.id).exists(), f"HTTP {r.status_code}")
 Event.objects.filter(pk=ev.id).delete()
 
-# 7b. Encaissement : le GET redirigeait vers le login (illusion de protection)
-# mais le POST exécutait le corps — un anonyme marquait une commande payée.
+# Encaissement : un POST anonyme marquait une commande payée sans paiement.
 order = Order.objects.create(buyer=admin, status=Order.PENDING, total_amount=Decimal("50000"))
-avant_p = PaiementEntrant.objects.count()
-r = anon.post("/paiement/entrant/", {"payerId": admin.id, "orderId": order.id, "tranche_name": "0"})
+avant = PaiementEntrant.objects.count()
+r = call(paiement_entrant, "post", user=AnonymousUser(),
+         data={"payerId": admin.id, "orderId": order.id, "tranche_name": "0"})
 order.refresh_from_db()
-line("Anonyme : encaissement refusé", r.status_code == 403, f"HTTP {r.status_code}")
+line("Encaissement : refusé à l'anonyme", r.status_code == 403, f"HTTP {r.status_code}")
 line("…la commande reste impayée", order.status == Order.PENDING, f"statut={order.status}")
-line("…et aucun paiement n'a été fabriqué", PaiementEntrant.objects.count() == avant_p)
+line("…et aucun paiement n'a été fabriqué", PaiementEntrant.objects.count() == avant)
 if teacher:
-    r = Client()
-    r.force_login(teacher)
-    resp = r.post("/paiement/entrant/", {"payerId": admin.id, "orderId": order.id, "tranche_name": "0"})
+    r = call(paiement_entrant, "post", user=teacher,
+             data={"payerId": admin.id, "orderId": order.id, "tranche_name": "0"})
     order.refresh_from_db()
-    line("Un formateur non plus", resp.status_code == 403 and order.status == Order.PENDING,
-         f"HTTP {resp.status_code}")
+    line("…refusé au formateur également", r.status_code == 403 and order.status == Order.PENDING,
+         f"HTTP {r.status_code}")
 PaiementEntrant.objects.filter(order=order).delete()
 order.delete()
+
+# ── 4. Les accès légitimes ne sont pas cassés ───────────────────────────
+print("\n── 4. L'administrateur garde ses accès ──")
+line("Annuaire complet", len(corps(call(ajax_get_users, user=admin)) or []) > 0,
+     f"{len(corps(call(ajax_get_users, user=admin)) or [])} compte(s)")
+line("Commandes complètes", len(corps(call(ajax_get_order_data, user=admin)) or []) > 0,
+     f"{len(corps(call(ajax_get_order_data, user=admin)) or [])} commande(s)")
+if client:
+    d = corps(call(ajax_get_order_data, user=client)) or []
+    autres = [o for o in d if o.get("created_by_id") != client.id]
+    line("Un client ne voit aucune commande d'autrui", not autres, f"{len(autres)} fuite(s)")
+    line("…et n'obtient pas l'annuaire", corps(call(ajax_get_users, user=client)) == [])
 
 print("\n" + "=" * 72)
 print(f"  RÉSULTAT : {step - fails}/{step} étapes OK" + ("" if not fails else f"  ({fails} échec(s))"))

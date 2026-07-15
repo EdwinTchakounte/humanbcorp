@@ -16,31 +16,48 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from . import views
-from .views import DashboardView
 
+# ---------------------------------------------------------------------------
+# Backend découplé : ce projet n'expose plus que l'API. La vitrine et le
+# back-office sont servis par les applications Next.js (web/ et dashboard/).
+#
+# L'ancienne application Django à templates (bucket, lessonapp, calendarapp,
+# material, contents, chat, paiement, registration, homepage) a été DÉBRANCHÉE.
+# Elle a été écrite sans modèle d'autorisation : les droits s'y déduisaient de
+# l'appartenance à un groupe, avec une branche « else » réservée aux
+# administrateurs — où tout visiteur anonyme atterrissait. Sept failles
+# exploitables sans session en sont sorties (prise de contrôle administrateur,
+# hash des mots de passe, annuaire des comptes, commandes, réservations, fraude
+# au paiement, destruction d'événements), et 18 vues en écriture non protégées
+# n'ont jamais été vérifiées. Colmater vue par vue ne pouvait rien garantir ;
+# débrancher ferme la classe entière.
+#
+# Le code reste en place : réactiver une route se fait en la décommentant.
+# Voir e2e_legacy_securite.py pour les non-régressions correspondantes.
+# ---------------------------------------------------------------------------
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/', include('sitecms.urls')),
     path('api/v1/', include('recruitment.urls')),
     path('api/v1/payments/', include('apps_coop.payments.urls')),
     path('api/v1/notifications/', include('apps_coop.notifications.urls')),
-    path('administration/', views.administration),
-    path('', views.homepage),
-    path('about/', views.about),
-    path('bucket/', include('bucket.urls')),
-    path('registration/', include('registration.urls')),
-    path('spaces/', include('contents.urls.spaces')),
-    path('publications/', include('contents.urls.publications')),
-    path('relations/', include('contents.urls.relations')),
-    path("d/", DashboardView.as_view(), name="dashboard"),
-    path("", include("calendarapp.urls")),
-    path('material/', include('material.urls')),
-    path('lessonapp/', include('lessonapp.urls')),
-    path('chat/', include('chat.urls')),
-    path('accounts/', include('allauth.urls')),
-    path('paiement/', include('paiement.urls')),
-    path("calendarapp/", include("calendarapp.urls")),
+    # --- Application historique (débranchée) --------------------------------
+    # path('administration/', views.administration),
+    # path('', views.homepage),
+    # path('about/', views.about),
+    # path('bucket/', include('bucket.urls')),
+    # path('registration/', include('registration.urls')),
+    # path('spaces/', include('contents.urls.spaces')),
+    # path('publications/', include('contents.urls.publications')),
+    # path('relations/', include('contents.urls.relations')),
+    # path("d/", DashboardView.as_view(), name="dashboard"),
+    # path("", include("calendarapp.urls")),
+    # path('material/', include('material.urls')),
+    # path('lessonapp/', include('lessonapp.urls')),
+    # path('chat/', include('chat.urls')),
+    # path('accounts/', include('allauth.urls')),
+    # path('paiement/', include('paiement.urls')),
+    # path("calendarapp/", include("calendarapp.urls")),
     ]
     
 

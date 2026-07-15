@@ -1,6 +1,6 @@
 from datetime import datetime
 from django.db import models
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from abstracts.models import Abstract
 #from accounts.models import User
@@ -46,10 +46,17 @@ class Event(Abstract):
     def __str__(self):
         return self.title
 
+    # Les pages de l'ancienne application ne sont plus routées : ces deux
+    # helpers ne résolvent donc plus rien. On renvoie None / le titre nu plutôt
+    # que de laisser une NoReverseMatch faire tomber l'admin Django, qui appelle
+    # get_absolute_url pour son lien « Voir sur le site ».
     def get_absolute_url(self):
-        return reverse("calendarapp:event-detail", args=(self.id,))
+        try:
+            return reverse("calendarapp:event-detail", args=(self.id,))
+        except NoReverseMatch:
+            return None
 
     @property
     def get_html_url(self):
-        url = reverse("calendarapp:event-detail", args=(self.id,))
-        return f'<a href="{url}"> {self.title} </a>'
+        url = self.get_absolute_url()
+        return f'<a href="{url}"> {self.title} </a>' if url else self.title

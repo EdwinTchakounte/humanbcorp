@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.template import RequestContext
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 import json as simplejson
 from django.core import serializers
 from django.db.models import Case, When, Value, IntegerField
@@ -32,6 +32,17 @@ def remove_inscriptions_from_bucket(order):
 
 
 def paiement_entrant(request):
+	# Fail-closed. Cette vue enregistre un encaissement : elle crée un
+	# PaiementEntrant « réussi » et passe la commande en payée. Elle n'avait
+	# AUCUN contrôle d'accès. Le GET redirigeait vers le login — ce qui donnait
+	# l'illusion d'une protection — mais le POST exécutait le corps : un anonyme
+	# marquait n'importe quelle commande comme intégralement réglée, sans payer.
+	# C'est un geste de back-office : administrateurs uniquement.
+	from sitecms.roles import is_admin as _is_admin
+
+	if not (request.user.is_authenticated and _is_admin(request.user)):
+		return HttpResponseForbidden("Réservé aux administrateurs.")
+
 	if request.method == 'POST':
 		payerId = request.POST.get('payerId')
 		payer = User.objects.get(id=payerId)

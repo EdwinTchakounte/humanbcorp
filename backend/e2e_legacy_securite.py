@@ -179,6 +179,50 @@ User.objects.filter(username=_USERNAME).delete()
 for nom in set(_G.objects.values_list("name", flat=True)) - groupes_avant:
     _G.objects.filter(name=nom).delete()
 
+# ── 7. Écritures anonymes (routes POST) ─────────────────────────────────
+print("\n── 7. Un anonyme n'écrit rien : ni destruction, ni encaissement ──")
+from decimal import Decimal
+
+from django.utils import timezone
+from calendarapp.models import Event
+from bucket.models import Order
+from paiement.models import PaiementEntrant
+
+anon = Client()
+c_admin = Client()
+c_admin.force_login(admin)
+
+# 7a. Suppression d'événement : POST anonyme suffisait à détruire le planning
+# d'une cohorte (liens visio compris), par simple id.
+ev = Event.objects.create(user=admin, title="e2e-securite-jetable", description="",
+                          start_time=timezone.now(), end_time=timezone.now())
+r = anon.post(f"/calendarapp/delete_event/{ev.id}/")
+line("Anonyme : suppression d'événement refusée", r.status_code == 403, f"HTTP {r.status_code}")
+line("…et l'événement est intact", Event.objects.filter(pk=ev.id).exists())
+r = c_admin.post(f"/calendarapp/delete_event/{ev.id}/")
+line("L'administrateur supprime toujours", r.status_code == 200 and not Event.objects.filter(pk=ev.id).exists(),
+     f"HTTP {r.status_code}")
+Event.objects.filter(pk=ev.id).delete()
+
+# 7b. Encaissement : le GET redirigeait vers le login (illusion de protection)
+# mais le POST exécutait le corps — un anonyme marquait une commande payée.
+order = Order.objects.create(buyer=admin, status=Order.PENDING, total_amount=Decimal("50000"))
+avant_p = PaiementEntrant.objects.count()
+r = anon.post("/paiement/entrant/", {"payerId": admin.id, "orderId": order.id, "tranche_name": "0"})
+order.refresh_from_db()
+line("Anonyme : encaissement refusé", r.status_code == 403, f"HTTP {r.status_code}")
+line("…la commande reste impayée", order.status == Order.PENDING, f"statut={order.status}")
+line("…et aucun paiement n'a été fabriqué", PaiementEntrant.objects.count() == avant_p)
+if teacher:
+    r = Client()
+    r.force_login(teacher)
+    resp = r.post("/paiement/entrant/", {"payerId": admin.id, "orderId": order.id, "tranche_name": "0"})
+    order.refresh_from_db()
+    line("Un formateur non plus", resp.status_code == 403 and order.status == Order.PENDING,
+         f"HTTP {resp.status_code}")
+PaiementEntrant.objects.filter(order=order).delete()
+order.delete()
+
 print("\n" + "=" * 72)
 print(f"  RÉSULTAT : {step - fails}/{step} étapes OK" + ("" if not fails else f"  ({fails} échec(s))"))
 print("=" * 72 + "\n")

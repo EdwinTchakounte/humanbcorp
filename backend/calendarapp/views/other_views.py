@@ -672,7 +672,17 @@ class CalendarViewNew(LoginRequiredMixin, generic.View):
 
 
 def delete_event(request, event_id):
+	# Fail-closed. Aucun contrôle : un POST anonyme suffisait à supprimer
+	# n'importe quel événement par son id — donc le planning d'une cohorte, liens
+	# visio compris. On exige une session, et la suppression est réservée au
+	# propriétaire de l'événement ou à un administrateur.
+	from sitecms.roles import is_admin as _is_admin
+
+	if not request.user.is_authenticated:
+		return JsonResponse({'message': 'Authentification requise.'}, status=403)
 	event = get_object_or_404(Event, id=event_id)
+	if not (_is_admin(request.user) or event.user_id == request.user.id):
+		return JsonResponse({'message': 'Non autorisé.'}, status=403)
 	if request.method == 'POST':
 		event.delete()
 		return JsonResponse({'message': 'Event sucess delete.'})

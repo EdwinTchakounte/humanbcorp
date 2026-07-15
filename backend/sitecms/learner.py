@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from django.contrib.auth.models import User
 from django.core import signing
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -198,6 +199,21 @@ def build_theme_content(theme, request, user=None):
     }
 
 
+def acces_expire(inscription) -> bool:
+    """L'accès au contenu de cette inscription est-il arrivé à échéance ?
+
+    La durée se configure par offre (`Publication.acces_duree_mois`, vide = à
+    vie) mais ne court pas du même point selon le mode : depuis la fin de
+    session pour une cohorte, depuis l'inscription en accès libre — une offre
+    en accès libre n'ayant pas de date de fin.
+    """
+    pub = getattr(inscription, "publication", None)
+    if pub is None:
+        return False
+    fin = pub.fin_acces(depuis=inscription.created_at)
+    return fin is not None and timezone.now() > fin
+
+
 def build_schedule(publication):
     """Planning d'une **cohorte** : ses créneaux d'agenda et leurs visios.
 
@@ -253,6 +269,9 @@ def my_space(request, token):
         if not pub or pub.id in seen:
             continue
         seen.add(pub.id)
+        # L'offre expirée reste listée (l'apprenant doit comprendre pourquoi elle
+        # est fermée) mais son contenu n'est plus servi — cf. `my_formation`.
+        fin = pub.fin_acces(depuis=ins.created_at)
         formations.append({
             "publication_id": pub.id,
             "title": pub.title,
@@ -260,6 +279,11 @@ def my_space(request, token):
             "image": _abs(request, pub.image.url) if pub.image else None,
             "has_content": pub.themes.exists(),
             "progress": _publication_progress(user, pub),
+            "mode": pub.mode,
+            "date_debut": pub.date_debut,
+            "date_fin": pub.date_fin,
+            "acces_fin": fin,
+            "acces_expire": acces_expire(ins),
         })
     return Response({
         "learner": {"name": user.get_full_name() or user.first_name or user.username, "email": user.email},
@@ -293,6 +317,15 @@ def my_formation(request, token, publication_id):
             {"detail": "Vous n'avez pas accès à cette formation."},
             status=status.HTTP_403_FORBIDDEN,
         )
+    if acces_expire(ins):
+        return Response(
+            {
+                "detail": "Votre accès à cette formation a expiré.",
+                "acces_expire": True,
+                "acces_fin": ins.publication.fin_acces(depuis=ins.created_at),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     pub = ins.publication
     # `is_deleted` est un soft-delete : sans ce filtre, une formation supprimée
@@ -316,12 +349,15 @@ def _learner_can_access_activity(user, activity) -> bool:
     theme = getattr(getattr(activity, "seance", None), "theme", None)
     if theme is None:
         return False
-    return Inscription.objects.filter(
+    inscriptions = Inscription.objects.filter(
         participant=user,
         status=Inscription.CONFIRMED,
         is_deleted=False,
         publication__themes=theme,
-    ).exists()
+    ).select_related("publication")
+    # Une inscription expirée ne donne plus accès : sans ce filtre, un apprenant
+    # dont l'offre est fermée pourrait encore passer les quiz en direct.
+    return any(not acces_expire(ins) for ins in inscriptions)
 
 
 def _score_quiz(activity, answers: dict):

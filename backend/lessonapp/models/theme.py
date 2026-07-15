@@ -10,8 +10,16 @@ class Theme(Abstract):
     title = models.CharField(max_length=400)
     is_visible = models.BooleanField(null=False,default=False)
     image = models.ImageField(upload_to='img',null=True)
-    sequence = models.ForeignKey(Sequence,  on_delete=models.CASCADE, default=None)
-    categorie = models.ForeignKey(Categorie, on_delete=models.CASCADE, default=None)
+    # Héritage scolaire (année → séquence/trimestre) : facultatif désormais. Une
+    # formation professionnelle n'appartient pas à un trimestre ; c'est la
+    # cohorte (contents.Publication) qui porte le calendrier. Conservé nullable
+    # pour ne pas casser l'application historique, toujours routée.
+    sequence = models.ForeignKey(
+        Sequence, on_delete=models.SET_NULL, null=True, blank=True, default=None
+    )
+    categorie = models.ForeignKey(
+        Categorie, on_delete=models.SET_NULL, null=True, blank=True, default=None
+    )
     classes = models.ManyToManyField(Classe)
     # Formateurs affectés à cette formation (rôle Teacher). Un formateur ne voit /
     # n'édite que les formations où il figure ici (les admins voient tout).

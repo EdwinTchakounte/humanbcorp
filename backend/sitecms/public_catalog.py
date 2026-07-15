@@ -57,10 +57,22 @@ class PublicFormationSerializer(serializers.ModelSerializer):
 
     categorie_name = serializers.CharField(source="categorie.name", read_only=True)
     image_url = serializers.SerializerMethodField()
+    # Cohorte : ce que l'acheteur doit voir avant de s'inscrire.
+    places_restantes = serializers.SerializerMethodField()
+    complete = serializers.SerializerMethodField()
 
     class Meta:
         model = Publication
-        fields = ["id", "title", "description", "price", "categorie_name", "image_url", "date"]
+        fields = [
+            "id", "title", "description", "price", "categorie_name", "image_url", "date",
+            "mode", "date_debut", "date_fin", "capacite", "places_restantes", "complete",
+        ]
+
+    def get_places_restantes(self, obj):
+        return obj.places_restantes()
+
+    def get_complete(self, obj):
+        return obj.est_complete()
 
     def get_image_url(self, obj):
         # Renvoie null si l'image est absente OU si le fichier n'existe pas sur le
@@ -209,6 +221,14 @@ def inscription_create(request):
         )
 
     with transaction.atomic():
+        # Verrou de ligne : sans lui, deux inscriptions simultanées sur la
+        # dernière place passeraient toutes les deux le test de capacité.
+        formation = Publication.objects.select_for_update().get(pk=formation.pk)
+        if formation.est_complete():
+            return Response(
+                {"detail": "Cette session est complète.", "complete": True},
+                status=status.HTTP_409_CONFLICT,
+            )
         user = _guest_user(email=email, first_name=first_name, last_name=last_name)
         inscription = Inscription.objects.create(
             participant=user, publication=formation, status=Inscription.WAITING

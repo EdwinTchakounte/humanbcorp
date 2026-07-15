@@ -22,6 +22,10 @@ function fmtDateTime(iso: string) {
   return iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" }) : "";
 }
 
+function fmtDate(iso: string) {
+  return iso ? new Date(iso).toLocaleDateString("fr-FR", { dateStyle: "long" }) : "";
+}
+
 type OnComplete = (activityId: number, completed: boolean) => void;
 
 function toEmbed(url: string): { kind: "iframe" | "video" | "link"; src: string } {
@@ -483,15 +487,21 @@ export default function LearnerSpace({ token }: { token: string }) {
           {space.formations.map((f) => (
             <div key={f.publication_id} className="card overflow-hidden">
               <button
-                onClick={() => f.has_content && openFormation(f.publication_id)}
+                onClick={() => f.has_content && !f.acces_expire && openFormation(f.publication_id)}
                 className="flex w-full items-center gap-4 p-5 text-left"
               >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-2xl text-brand">
-                  <i className="bx bxs-graduation" />
+                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${f.acces_expire ? "bg-gray-100 text-gray-400" : "bg-brand-soft text-brand"}`}>
+                  <i className={`bx ${f.acces_expire ? "bx-lock-alt" : "bxs-graduation"}`} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-lg leading-tight">{f.title}</h3>
-                  {f.has_content && f.progress.total > 0 ? (
+                  {/* L'offre expirée reste listée : l'apprenant doit comprendre
+                      pourquoi elle est fermée plutôt que de la voir disparaître. */}
+                  {f.acces_expire ? (
+                    <p className="truncate text-sm font-medium text-amber-700">
+                      Accès terminé{f.acces_fin ? ` le ${fmtDate(f.acces_fin)}` : ""}
+                    </p>
+                  ) : f.has_content && f.progress.total > 0 ? (
                     <div className="mt-2 max-w-xs">
                       <ProgressBar percent={f.progress.percent} />
                     </div>
@@ -500,8 +510,13 @@ export default function LearnerSpace({ token }: { token: string }) {
                       {f.has_content ? "Contenu disponible" : "Contenu en préparation"}
                     </p>
                   )}
+                  {!f.acces_expire && f.acces_fin && (
+                    <p className="mt-1 text-xs text-muted">
+                      <i className="bx bx-time-five" /> Accès jusqu'au {fmtDate(f.acces_fin)}
+                    </p>
+                  )}
                 </div>
-                {f.has_content && (
+                {f.has_content && !f.acces_expire && (
                   <i
                     className={`bx bx-chevron-down text-2xl text-muted transition ${
                       openId === f.publication_id ? "rotate-180" : ""

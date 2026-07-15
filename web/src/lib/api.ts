@@ -78,6 +78,13 @@ export interface PublicFormation {
   categorie_name: string | null;
   image_url: string | null;
   date: string;
+  // Session vendue : dates et places, ou accès libre (mode 2).
+  mode: number;
+  date_debut: string | null;
+  date_fin: string | null;
+  capacite: number | null;
+  places_restantes: number | null;
+  complete: boolean;
 }
 
 export async function getFormations(): Promise<PublicFormation[]> {
@@ -194,6 +201,12 @@ export interface LearnerFormation {
   image: string | null;
   has_content: boolean;
   progress: Progress;
+  // Session : dates et échéance d'accès (durée configurée sur l'offre).
+  mode: number;
+  date_debut: string | null;
+  date_fin: string | null;
+  acces_fin: string | null;
+  acces_expire: boolean;
 }
 export interface MySpace {
   learner: { name: string; email: string };

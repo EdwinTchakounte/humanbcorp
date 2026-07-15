@@ -290,6 +290,7 @@ class PublicationSerializer(serializers.ModelSerializer):
     children_count = serializers.SerializerMethodField()
     events_count = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    places_restantes = serializers.SerializerMethodField()
     # Écriture : upload image, lien vers formations (themes), hiérarchie (parent).
     image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     themes = serializers.PrimaryKeyRelatedField(
@@ -307,13 +308,49 @@ class PublicationSerializer(serializers.ModelSerializer):
             "categorie", "categorie_name", "tags_names",
             "themes", "themes_titles", "parent",
             "children_count", "events_count", "image", "image_url",
+            "mode", "date_debut", "date_fin", "capacite", "acces_duree_mois",
+            "places_restantes",
         ]
         read_only_fields = ["date"]
         extra_kwargs = {"categorie": {"required": False}, "description": {"required": False}}
 
+    def get_places_restantes(self, obj):
+        return obj.places_restantes()
+
     def validate(self, attrs):
         if self.instance is None and not attrs.get("categorie"):
             raise serializers.ValidationError({"categorie": "Catégorie requise."})
+
+        def champ(nom):
+            # En PATCH partiel, un champ absent garde sa valeur en base.
+            if nom in attrs:
+                return attrs[nom]
+            return getattr(self.instance, nom, None)
+
+        mode = champ("mode") or Publication.COHORTE
+        debut, fin = champ("date_debut"), champ("date_fin")
+        if mode == Publication.COHORTE and debut and fin and fin < debut:
+            raise serializers.ValidationError(
+                {"date_fin": "La fin de session ne peut pas précéder son début."}
+            )
+        if mode == Publication.LIBRE and (debut or fin):
+            raise serializers.ValidationError(
+                {"mode": "Une offre en accès libre n'a pas de dates de session."}
+            )
+        capacite = champ("capacite")
+        if capacite is not None and self.instance is not None:
+            # Réduire la capacité sous le nombre d'inscrits mettrait la session
+            # dans un état incohérent (places restantes négatives).
+            from bucket.models import Inscription
+
+            pris = Inscription.objects.filter(
+                publication=self.instance, is_deleted=False,
+                status__in=[Inscription.WAITING, Inscription.CONFIRMED],
+            ).count()
+            if capacite < pris:
+                raise serializers.ValidationError(
+                    {"capacite": f"{pris} personne(s) déjà inscrite(s) : capacité minimale {pris}."}
+                )
         return attrs
 
     def get_themes_titles(self, obj):

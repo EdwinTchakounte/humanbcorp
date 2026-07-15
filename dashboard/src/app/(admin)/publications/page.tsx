@@ -22,7 +22,21 @@ const EMPTY = {
   is_private: false,
   themes: [] as number[],
   image: null as File | null,
+  // Cohorte : une Publication EST la session vendue.
+  mode: "1",
+  date_debut: "",
+  date_fin: "",
+  capacite: "",
+  acces_duree_mois: "",
 };
+
+// ISO (UTC) -> valeur d'un <input type="datetime-local">, en heure locale.
+function toLocalInput(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function PublicationsPage() {
   const { canWrite } = useAuth();
@@ -89,6 +103,11 @@ export default function PublicationsPage() {
       is_private: p.is_private,
       themes: (p.themes_titles ?? []).map((t) => t.id),
       image: null,
+      mode: String(p.mode ?? 1),
+      date_debut: toLocalInput(p.date_debut),
+      date_fin: toLocalInput(p.date_fin),
+      capacite: p.capacite == null ? "" : String(p.capacite),
+      acces_duree_mois: p.acces_duree_mois == null ? "" : String(p.acces_duree_mois),
     });
     setErr("");
     setOpen(true);
@@ -98,21 +117,51 @@ export default function PublicationsPage() {
     setErr("");
     if (!form.title.trim()) return setErr("Le titre est requis.");
     if (!form.id && !form.categorie) return setErr("Choisis une catégorie.");
+    const cohorte = form.mode === "1";
+    if (cohorte && form.date_debut && form.date_fin && form.date_fin < form.date_debut) {
+      return setErr("La fin de session ne peut pas précéder son début.");
+    }
     setSaving(true);
     try {
-      const fd = new FormData();
-      fd.set("title", form.title.trim());
-      fd.set("description", form.description);
-      fd.set("price", form.price || "0");
-      fd.set("is_private", form.is_private ? "true" : "false");
-      if (form.categorie) fd.set("categorie", form.categorie);
-      if (form.parent) fd.set("parent", form.parent);
-      form.themes.forEach((t) => fd.append("themes", String(t)));
-      if (form.image) fd.set("image", form.image);
-      if (form.id) {
-        await api(`/modules/publications/${form.id}/`, { method: "PATCH", body: fd, isForm: true });
+      const path = form.id ? `/modules/publications/${form.id}/` : "/modules/publications/";
+      const method = form.id ? "PATCH" : "POST";
+      const iso = (v: string) => (v ? new Date(v).toISOString() : null);
+      const num = (v: string) => (v.trim() === "" ? null : Number(v));
+      if (form.image) {
+        // Multipart : obligatoire pour l'upload, mais incapable d'exprimer null —
+        // on n'y transmet donc que les champs renseignés.
+        const fd = new FormData();
+        fd.set("title", form.title.trim());
+        fd.set("description", form.description);
+        fd.set("price", form.price || "0");
+        fd.set("is_private", form.is_private ? "true" : "false");
+        fd.set("mode", form.mode);
+        if (cohorte && form.date_debut) fd.set("date_debut", iso(form.date_debut) as string);
+        if (cohorte && form.date_fin) fd.set("date_fin", iso(form.date_fin) as string);
+        if (form.capacite.trim()) fd.set("capacite", form.capacite);
+        if (form.acces_duree_mois.trim()) fd.set("acces_duree_mois", form.acces_duree_mois);
+        if (form.categorie) fd.set("categorie", form.categorie);
+        if (form.parent) fd.set("parent", form.parent);
+        form.themes.forEach((t) => fd.append("themes", String(t)));
+        fd.set("image", form.image);
+        await api(path, { method, body: fd, isForm: true });
       } else {
-        await api("/modules/publications/", { method: "POST", body: fd, isForm: true });
+        // JSON : permet de VIDER une date ou une capacité (envoi de null).
+        const body: Record<string, unknown> = {
+          title: form.title.trim(),
+          description: form.description,
+          price: form.price || "0",
+          is_private: form.is_private,
+          themes: form.themes,
+          mode: Number(form.mode),
+          date_debut: cohorte ? iso(form.date_debut) : null,
+          date_fin: cohorte ? iso(form.date_fin) : null,
+          capacite: num(form.capacite),
+          acces_duree_mois: num(form.acces_duree_mois),
+        };
+        if (form.categorie) body.categorie = Number(form.categorie);
+        if (form.parent) body.parent = Number(form.parent);
+        await api(path, { method, body });
       }
       setOpen(false);
       setLoading(true);
@@ -292,6 +341,44 @@ export default function PublicationsPage() {
             onChange={(v) => setForm({ ...form, parent: v })}
             options={[{ value: "", label: "— aucune —" }, ...items.filter((x) => x.id !== form.id).map((x) => ({ value: String(x.id), label: x.title }))]}
           />
+
+          <div className="rounded-xl border border-line bg-brand-soft/20 p-4">
+            <p className="mb-3 text-sm font-semibold text-brand-deep">Session</p>
+            <SelectField
+              label="Type d'offre"
+              value={form.mode}
+              onChange={(v) => setForm({ ...form, mode: v, ...(v === "2" ? { date_debut: "", date_fin: "" } : {}) })}
+              options={[
+                { value: "1", label: "Session à dates fixes (cohorte)" },
+                { value: "2", label: "Accès libre (auto-formation)" },
+              ]}
+            />
+            {form.mode === "1" && (
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">Début de session</label>
+                  <input type="datetime-local" className="input" value={form.date_debut}
+                    onChange={(e) => setForm({ ...form, date_debut: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Fin de session</label>
+                  <input type="datetime-local" className="input" value={form.date_fin}
+                    onChange={(e) => setForm({ ...form, date_fin: e.target.value })} />
+                </div>
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <TextField label="Places (vide = illimité)" value={form.capacite}
+                onChange={(v) => setForm({ ...form, capacite: v.replace(/[^0-9]/g, "") })} placeholder="12" />
+              <TextField label="Accès pendant (mois, vide = à vie)" value={form.acces_duree_mois}
+                onChange={(v) => setForm({ ...form, acces_duree_mois: v.replace(/[^0-9]/g, "") })} placeholder="12" />
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {form.mode === "1"
+                ? "L'accès se ferme ce nombre de mois après la fin de session."
+                : "L'accès se ferme ce nombre de mois après l'achat (pas de fin de session en accès libre)."}
+            </p>
+          </div>
 
           <div>
             <label className="label">Image (facultatif)</label>

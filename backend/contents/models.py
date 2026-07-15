@@ -49,6 +49,54 @@ class Publication(models.Model):
     themes = models.ManyToManyField(
         "lessonapp.Theme", blank=True, related_name="publications"
     )
+
+    # --- Cohorte -----------------------------------------------------------
+    # Une Publication EST l'occurrence vendue : « Excel mars » et « Excel juin »
+    # sont deux Publications qui pointent le même programme (`themes`). Ces
+    # champs matérialisent la session ; sans eux la cohorte n'existait que dans
+    # son titre.
+    COHORTE = 1
+    LIBRE = 2
+    MODE_CHOICES = ((COHORTE, "Session à dates fixes"), (LIBRE, "Accès libre"))
+    mode = models.PositiveSmallIntegerField(choices=MODE_CHOICES, default=COHORTE)
+    # Renseignées pour une session à dates fixes ; vides en accès libre.
+    date_debut = models.DateTimeField(null=True, blank=True)
+    date_fin = models.DateTimeField(null=True, blank=True)
+    # Vide = places illimitées.
+    capacite = models.PositiveIntegerField(null=True, blank=True)
+    # Vide = accès à vie. L'ancrage dépend du mode : la fin de session pour une
+    # cohorte, la date d'inscription en accès libre (il n'y a pas de fin).
+    acces_duree_mois = models.PositiveIntegerField(null=True, blank=True)
+
+    def places_restantes(self):
+        """Places encore disponibles, ou None si la capacité est illimitée."""
+        if not self.capacite:
+            return None
+        from bucket.models import Inscription
+
+        pris = Inscription.objects.filter(
+            publication=self, is_deleted=False,
+            status__in=[Inscription.WAITING, Inscription.CONFIRMED],
+        ).count()
+        return max(0, self.capacite - pris)
+
+    def est_complete(self):
+        restantes = self.places_restantes()
+        return restantes is not None and restantes <= 0
+
+    def fin_acces(self, depuis=None):
+        """Date de fin d'accès au contenu, ou None si l'accès est à vie.
+
+        `depuis` = date d'inscription, utilisée comme ancrage en accès libre.
+        """
+        if not self.acces_duree_mois:
+            return None
+        from dateutil.relativedelta import relativedelta
+
+        ancre = self.date_fin if (self.mode == self.COHORTE and self.date_fin) else depuis
+        if ancre is None:
+            return None  # cohorte sans date de fin : on n'invente pas d'échéance
+        return ancre + relativedelta(months=self.acces_duree_mois)
     
 	  
  

@@ -68,6 +68,16 @@ function fmtPrice(v: string, freeLabel: string) {
 
 type Step = "form" | "pay" | "pending" | "done";
 
+// « du 12 mars au 20 mars 2026 » — ou la seule date de début si la fin manque.
+function fmtSession(debut: string, fin: string | null, lang: "fr" | "en") {
+  const loc = lang === "en" ? "en-GB" : "fr-FR";
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
+  const d = new Date(debut).toLocaleDateString(loc, opts);
+  if (!fin) return lang === "en" ? `From ${d}` : `À partir du ${d}`;
+  const f = new Date(fin).toLocaleDateString(loc, opts);
+  return lang === "en" ? `${d} → ${f}` : `Du ${d} au ${f}`;
+}
+
 export default function InscriptionWidget({
   formation,
   lang = "fr",
@@ -150,6 +160,33 @@ export default function InscriptionWidget({
         <span className="text-xl font-bold text-brand">{fmtPrice(formation.price, t.free)}</span>
       </div>
 
+      {/* Session à dates fixes : l'acheteur voit les dates et les places avant
+          de s'engager. Une session pleine n'affiche pas de formulaire — le back
+          refuse de toute façon la dernière place en 409. */}
+      {formation.mode === 1 && (formation.date_debut || formation.places_restantes !== null) && (
+        <div className="mb-5 rounded-xl border border-line/70 bg-brand-soft/30 p-3 text-sm">
+          {formation.date_debut && (
+            <p className="flex items-center gap-1.5 text-ink">
+              <i className="bx bx-calendar text-brand" />
+              {fmtSession(formation.date_debut, formation.date_fin, lang)}
+            </p>
+          )}
+          {formation.places_restantes !== null && !formation.complete && (
+            <p className="mt-1 flex items-center gap-1.5 text-muted">
+              <i className="bx bx-group text-brand" />
+              {formation.places_restantes} {lang === "en" ? "seat(s) left" : "place(s) restante(s)"}
+            </p>
+          )}
+        </div>
+      )}
+
+      {formation.complete ? (
+        <p className="rounded-xl bg-amber-50 p-4 text-sm font-medium text-amber-800">
+          <i className="bx bx-lock-alt" />{" "}
+          {lang === "en" ? "This session is full." : "Cette session est complète."}
+        </p>
+      ) : (
+      <>
       {step === "form" && (
         <form onSubmit={onInscrire} className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -236,6 +273,8 @@ export default function InscriptionWidget({
         <p className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           <i className="bx bx-error-circle text-lg" /> {err}
         </p>
+      )}
+      </>
       )}
     </div>
   );

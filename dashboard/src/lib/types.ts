@@ -277,6 +277,13 @@ export interface PublicationItem {
   children_count: number;
   events_count: number;
   image_url: string | null;
+  // Cohorte : la Publication est la session vendue.
+  mode?: number;
+  date_debut?: string | null;
+  date_fin?: string | null;
+  capacite?: number | null;
+  acces_duree_mois?: number | null;
+  places_restantes?: number | null;
 }
 
 export interface PublicationsOverview {

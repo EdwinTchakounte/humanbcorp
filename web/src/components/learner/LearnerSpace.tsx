@@ -546,7 +546,15 @@ export default function LearnerSpace({ token }: { token: string }) {
                               const shown = ev.meetings.find((m) => m.link_url) ?? ev.meetings[0];
                               return (
                                 <li key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                  <span className="font-medium text-ink">{ev.title}</span>
+                                  {/* Le créneau qui couvre une séance du programme
+                                      l'annonce : l'apprenant relie une date à un
+                                      chapitre plutôt qu'à un titre d'événement. */}
+                                  {ev.seance_order != null && (
+                                    <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">
+                                      Séance {ev.seance_order}
+                                    </span>
+                                  )}
+                                  <span className="font-medium text-ink">{ev.seance_title || ev.title}</span>
                                   <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
                                   {shown && (
                                     <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand">

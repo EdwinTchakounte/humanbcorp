@@ -5,7 +5,7 @@ import { api, listAll } from "@/lib/api";
 import { Modal, Pagination, PAGE_SIZE, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import EventCalendar from "@/components/EventCalendar";
-import type { EventItem, MeetingItem, PublicationItem } from "@/lib/types";
+import type { EventItem, MeetingItem, PublicationItem, SeanceItem } from "@/lib/types";
 
 // Aligné sur calendarapp.Meeting.TYPES_CHOICES (0=Google Meet, 1=Zoom, 2=Présentiel).
 const MEETING_TYPES: Record<number, string> = { 0: "Google Meet", 1: "Zoom", 2: "Présentiel" };
@@ -22,8 +22,8 @@ function toLocalInput(iso: string) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
-type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; publication: string };
-const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", publication: "" };
+type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; publication: string; seance: string };
+const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", publication: "", seance: "" };
 
 const MEETING_TYPE_OPTIONS = [
   { value: "0", label: "Google Meet" },
@@ -38,6 +38,10 @@ export default function AgendaPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
   const [pubs, setPubs] = useState<PublicationItem[]>([]);
+  // Séances proposées : uniquement celles des programmes vendus par la session
+  // choisie — le back refuse toute autre (elle daterait la séance d'une autre
+  // formation).
+  const [seances, setSeances] = useState<SeanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [mPage, setMPage] = useState(1);
@@ -91,6 +95,31 @@ export default function AgendaPage() {
     setMeetings(m);
     setPubs(t);
   }
+  // Les séances dépendent de la session choisie : on les recharge à chaque
+  // changement, en concaténant les programmes vendus par cette session.
+  useEffect(() => {
+    const pubId = draft?.publication;
+    if (!pubId) {
+      setSeances([]);
+      return;
+    }
+    const pub = pubs.find((p) => String(p.id) === String(pubId));
+    const themeIds = (pub?.themes_titles ?? []).map((t) => t.id);
+    if (themeIds.length === 0) {
+      setSeances([]);
+      return;
+    }
+    let annule = false;
+    Promise.all(themeIds.map((id) => listAll<SeanceItem>(`/modules/seances/?theme=${id}`)))
+      .then((listes) => {
+        if (!annule) setSeances(listes.flat());
+      })
+      .catch(() => setSeances([]));
+    return () => {
+      annule = true;
+    };
+  }, [draft?.publication, pubs]);
+
   useEffect(() => {
     load().finally(() => setLoading(false));
   }, []);
@@ -118,6 +147,7 @@ export default function AgendaPage() {
       start_time: toLocalInput(e.start_time),
       end_time: toLocalInput(e.end_time),
       publication: e.publication_id ? String(e.publication_id) : "",
+      seance: e.seance ? String(e.seance) : "",
     });
   }
 
@@ -136,6 +166,7 @@ export default function AgendaPage() {
         start_time: new Date(draft.start_time).toISOString(),
         end_time: new Date(draft.end_time).toISOString(),
         publication: draft.publication ? Number(draft.publication) : null,
+        seance: draft.seance ? Number(draft.seance) : null,
       };
       if (draft.id) await api(`/modules/events/${draft.id}/`, { method: "PATCH", body });
       else await api("/modules/events/", { method: "POST", body });
@@ -362,9 +393,25 @@ export default function AgendaPage() {
             <SelectField
               label="Session concernée (optionnel)"
               value={draft.publication}
-              onChange={(v) => setDraft({ ...draft, publication: v })}
+              onChange={(v) => setDraft({ ...draft, publication: v, seance: "" })}
               options={[{ value: "", label: "— Aucune —" }, ...pubs.map((t) => ({ value: String(t.id), label: t.title }))]}
             />
+            {draft.publication && (
+              <SelectField
+                label="Séance du programme (optionnel)"
+                value={draft.seance}
+                onChange={(v) => setDraft({ ...draft, seance: v })}
+                options={[
+                  { value: "", label: "— Aucune (réunion, examen, rattrapage…) —" },
+                  ...seances.map((s) => ({ value: String(s.id), label: `${s.order}. ${s.title}` })),
+                ]}
+              />
+            )}
+            {draft.publication && seances.length === 0 && (
+              <p className="-mt-2 text-xs text-muted">
+                Le programme de cette session n&apos;a pas encore de séance.
+              </p>
+            )}
             {err && <p className="text-sm text-red-600">{err}</p>}
             {!isAdmin && (
               <p className="text-xs text-muted">

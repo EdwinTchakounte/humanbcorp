@@ -289,6 +289,10 @@ export interface ScheduleEvent {
   start_time: string;
   end_time: string;
   meetings: ScheduleMeeting[];
+  // Séance du programme couverte par ce créneau, si c'en est une.
+  seance_id: number | null;
+  seance_title: string | null;
+  seance_order: number | null;
 }
 export interface LearnerTheme {
   id: number;

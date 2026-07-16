@@ -227,6 +227,7 @@ def build_schedule(publication):
     events = list(
         publication.events.filter(is_deleted=False, is_active=True)
         .exclude(is_test=True)  # is_test est nullable : exclude() couvre NULL et False
+        .select_related("seance")
         .order_by("start_time")
     )
     # Une seule requête pour toutes les visios, au lieu d'une par créneau.
@@ -241,6 +242,12 @@ def build_schedule(publication):
             "start_time": ev.start_time,
             "end_time": ev.end_time,
             "meetings": meetings.get(ev.id, []),
+            # Séance couverte par le créneau : permet à l'apprenant de relier une
+            # date à un chapitre du programme (« Séance 3 — 12 mars »), et de
+            # sauter directement au contenu correspondant.
+            "seance_id": ev.seance_id,
+            "seance_title": ev.seance.title if ev.seance else None,
+            "seance_order": ev.seance.order if ev.seance else None,
         }
         for ev in events
     ]

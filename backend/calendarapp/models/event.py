@@ -38,6 +38,15 @@ class Event(Abstract):
     is_test = models.BooleanField(null=True,default=False)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
+    # Séance du programme couverte par ce créneau. C'est ce qui permet de dire
+    # « la séance 3 a lieu le 12 mars » : la Seance porte le contenu (un chapitre
+    # réutilisable d'une session à l'autre), l'Event porte la date, propre à la
+    # cohorte. Facultatif : un créneau peut être un examen, une réunion, un
+    # rattrapage — tout ce qui n'est pas une séance du programme.
+    seance = models.ForeignKey(
+        "lessonapp.Seance", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="creneaux",
+    )
     
     
      

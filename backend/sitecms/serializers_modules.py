@@ -28,6 +28,9 @@ class EventSerializer(serializers.ModelSerializer):
     publication_id = serializers.SerializerMethodField()
     publication_title = serializers.SerializerMethodField()
     participants_count = serializers.SerializerMethodField()
+    # Séance couverte : le contenu vient du programme, la date de la cohorte.
+    seance_title = serializers.CharField(source="seance.title", read_only=True)
+    seance_order = serializers.IntegerField(source="seance.order", read_only=True)
 
     class Meta:
         model = Event
@@ -35,12 +38,35 @@ class EventSerializer(serializers.ModelSerializer):
             "id", "title", "description", "start_time", "end_time",
             "is_test", "is_active", "user", "user_name", "created_at",
             "publication", "publication_id", "publication_title", "participants_count",
+            "seance", "seance_title", "seance_order",
         ]
         read_only_fields = ["created_at", "user_name"]
         extra_kwargs = {
             "user": {"required": False},
             "description": {"required": False, "allow_blank": True},
         }
+
+    def validate(self, attrs):
+        # Une séance n'a de sens que si la cohorte vend bien le programme qui la
+        # contient : sinon on daterait la séance d'une autre formation.
+        seance = attrs.get("seance", getattr(self.instance, "seance", None))
+        if seance is None:
+            return attrs
+        pub_id = attrs.get("publication")
+        if pub_id is None and self.instance is not None:
+            pub = self.instance.publication_set.first()
+            pub_id = pub.id if pub else None
+        if pub_id is None:
+            raise serializers.ValidationError(
+                {"seance": "Rattachez d'abord ce créneau à une session."}
+            )
+        from contents.models import Publication
+
+        if not Publication.objects.filter(pk=pub_id, themes=seance.theme_id).exists():
+            raise serializers.ValidationError(
+                {"seance": "Cette séance n'appartient pas au programme vendu par la session."}
+            )
+        return attrs
 
     def _publication(self, obj):
         # Reverse du M2M `Publication.events` (sans related_name).

@@ -36,7 +36,15 @@ class Activity(Abstract):
         
     	
     def save(self, *args, **kwargs):
-       
+        # Cf. Seance.save : rang attribué au niveau du modèle pour que tout point
+        # d'entrée (API, admin, script) produise un ordre cohérent.
+        if not self.order and self.seance_id:
+            from django.db.models import Max
+
+            dernier = Activity.objects.filter(
+                seance_id=self.seance_id, is_deleted=False
+            ).aggregate(m=Max("order"))["m"]
+            self.order = (dernier or 0) + 1
         return super(Activity, self).save(*args, **kwargs)
         
         

@@ -137,6 +137,10 @@ export interface EventItem {
   publication_id: number | null;
   publication_title: string | null;
   participants_count: number;
+  // Séance du programme couverte par ce créneau (« la séance 3 a lieu le 12 mars »).
+  seance: number | null;
+  seance_title?: string | null;
+  seance_order?: number | null;
 }
 
 export interface MeetingItem {

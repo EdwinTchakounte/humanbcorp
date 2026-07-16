@@ -30,6 +30,15 @@ class Seance(Abstract):
         return self.title
     
     def save(self, *args, **kwargs):
-        
+        # Rang attribué ici plutôt que dans la vue : sinon une séance créée hors
+        # API (admin Django, script, import) resterait à 0 et, le tri étant
+        # ["order", "id"], passerait DEVANT toutes les autres.
+        if not self.order and self.theme_id:
+            from django.db.models import Max
+
+            dernier = Seance.objects.filter(
+                theme_id=self.theme_id, is_deleted=False
+            ).aggregate(m=Max("order"))["m"]
+            self.order = (dernier or 0) + 1
         return super(Seance, self).save(*args, **kwargs)
 

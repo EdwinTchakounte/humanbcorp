@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api, listAll } from "@/lib/api";
-import { Modal, Pagination, PAGE_SIZE, TextField } from "@/components/ui";
+import { Modal, Pagination, PAGE_SIZE, TextField, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
-import type { InscriptionItem, OrderItem, InscriptionsOverview } from "@/lib/types";
+import type { InscriptionItem, OrderItem, InscriptionsOverview, PublicationItem } from "@/lib/types";
 
 function fmtAmount(v: string | number) {
   const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
@@ -36,7 +36,60 @@ export default function InscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  const { canWrite } = useAuth();
+  const { canWrite, profile } = useAuth();
+  const isAdmin = !!profile?.is_admin;
+
+  // Inscription manuelle : place offerte, cohorte interne, correction d'erreur.
+  // Le parcours normal exige un paiement ; sans cette porte, le seul recours
+  // était le Django admin — qui n'envoie pas le lien d'accès.
+  const [pubs, setPubs] = useState<PublicationItem[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ email: "", first_name: "", last_name: "", publication: "" });
+  const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (!isAdmin) return;
+    listAll<PublicationItem>("/modules/publications/").then(setPubs).catch(() => {});
+  }, [isAdmin]);
+
+  async function inscrire() {
+    if (!addForm.email.trim() || !addForm.publication) {
+      setFlash({ ok: false, msg: "E-mail et session sont requis." });
+      return;
+    }
+    setAdding(true);
+    try {
+      const r = await api<{ detail: string }>("/modules/inscriptions/inscrire/", {
+        method: "POST",
+        body: { ...addForm, publication: Number(addForm.publication) },
+      });
+      setAddOpen(false);
+      setAddForm({ email: "", first_name: "", last_name: "", publication: "" });
+      setFlash({ ok: true, msg: r.detail });
+      await refresh();
+    } catch (e) {
+      // Le back renvoie 409 sur doublon ou session complète : son message est
+      // exploitable tel quel (il dit quoi faire), on ne le réécrit pas.
+      const m = String(e);
+      let detail = m;
+      try {
+        detail = JSON.parse(m.slice(m.indexOf("{"))).detail ?? m;
+      } catch {
+        /* corps non JSON */
+      }
+      setFlash({ ok: false, msg: detail });
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function renvoyerLien(i: InscriptionItem) {
+    try {
+      const r = await api<{ detail: string }>(`/modules/inscriptions/${i.id}/renvoyer-lien/`, { method: "POST" });
+      setFlash({ ok: true, msg: `${i.participant_name} — ${r.detail}` });
+    } catch {
+      setFlash({ ok: false, msg: "Le renvoi du lien a échoué." });
+    }
+  }
   const writable = canWrite("inscriptions");
   const [busy, setBusy] = useState<number | null>(null);
   const [flash, setFlash] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -93,18 +146,21 @@ export default function InscriptionsPage() {
     }
   }
 
-  useEffect(() => {
-    Promise.all([
+  // Extrait de l'effet : rechargé aussi après une inscription manuelle.
+  async function refresh() {
+    const [i, o, ov] = await Promise.all([
       listAll<InscriptionItem>("/modules/inscriptions/"),
       listAll<OrderItem>("/modules/orders/"),
       api<InscriptionsOverview>("/modules/inscriptions/overview/"),
-    ])
-      .then(([i, o, ov]) => {
-        setIns(i);
-        setOrders(o);
-        setOverview(ov);
-      })
-      .finally(() => setLoading(false));
+    ]);
+    setIns(i);
+    setOrders(o);
+    setOverview(ov);
+  }
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pagedIns = ins.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -121,9 +177,16 @@ export default function InscriptionsPage() {
 
   return (
     <div className="p-8">
-      <header className="mb-6">
-        <h1 className="text-2xl">Inscriptions &amp; Paniers</h1>
-        <p className="text-sm text-muted">Inscriptions des participants et commandes.</p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl">Inscriptions &amp; Paniers</h1>
+          <p className="text-sm text-muted">Inscriptions des participants et commandes.</p>
+        </div>
+        {isAdmin && (
+          <button onClick={() => setAddOpen(true)} className="btn-accent">
+            <i className="bx bx-user-plus" /> Inscrire un apprenant
+          </button>
+        )}
       </header>
 
       {flash && (
@@ -189,6 +252,7 @@ export default function InscriptionsPage() {
                   <th className="px-5 py-3">Formation / Publication</th>
                   <th className="px-5 py-3">Date</th>
                   <th className="px-5 py-3">Statut</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -201,6 +265,14 @@ export default function InscriptionsPage() {
                       <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${INS_STYLE[i.status] || ""}`}>
                         {i.status_label}
                       </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {/* Le lien d'accès n'a de sens que sur une inscription confirmée. */}
+                      {isAdmin && i.status === 2 && (
+                        <button onClick={() => renvoyerLien(i)} className="btn-ghost text-xs" title="Renvoyer le lien d'accès par e-mail">
+                          <i className="bx bx-mail-send" /> Renvoyer le lien
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -271,6 +343,53 @@ export default function InscriptionsPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={addOpen}
+        title="Inscrire un apprenant"
+        onClose={() => setAddOpen(false)}
+        footer={
+          <>
+            <button onClick={() => setAddOpen(false)} className="btn-ghost">Annuler</button>
+            <button onClick={inscrire} disabled={adding} className="btn-accent">
+              {adding ? "Inscription…" : "Inscrire et envoyer le lien"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            L&apos;apprenant est inscrit sans passer par un paiement, et reçoit aussitôt
+            le lien de son espace. Utile pour une place offerte, une cohorte interne
+            ou la correction d&apos;une erreur.
+          </p>
+          <TextField
+            label="E-mail"
+            value={addForm.email}
+            onChange={(v) => setAddForm({ ...addForm, email: v })}
+            placeholder="apprenant@exemple.com"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TextField label="Prénom" value={addForm.first_name} onChange={(v) => setAddForm({ ...addForm, first_name: v })} />
+            <TextField label="Nom" value={addForm.last_name} onChange={(v) => setAddForm({ ...addForm, last_name: v })} />
+          </div>
+          <SelectField
+            label="Session"
+            value={addForm.publication}
+            onChange={(v) => setAddForm({ ...addForm, publication: v })}
+            options={[
+              { value: "", label: "— Choisir —" },
+              ...pubs.map((p) => ({
+                value: String(p.id),
+                label: p.places_restantes == null ? p.title : `${p.title} — ${p.places_restantes} place(s)`,
+              })),
+            ]}
+          />
+          <p className="text-xs text-muted">
+            Une place offerte reste une place : si la session est complète, augmentez d&apos;abord sa capacité.
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         open={payOrder !== null}

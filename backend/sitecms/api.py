@@ -1347,6 +1347,125 @@ class InscriptionViewSet(_ModuleViewSet):
             qs = qs.filter(status=status_q)
         return qs.order_by("-created_at", "-id")
 
+    def _envoyer_lien(self, inscription):
+        """Envoie à l'apprenant le lien de son espace (best-effort, ne lève jamais).
+
+        Sans cet envoi, une inscription créée à la main serait inutilisable : le
+        lien magique ne partait jusqu'ici que par l'événement « paiement reçu »,
+        donc uniquement au bout d'un paiement.
+        """
+        try:
+            from apps_coop.notifications.events import emit_event
+
+            from .learner import learner_space_url
+
+            u = inscription.participant
+            emit_event(
+                "inscription.confirmee",
+                member=u,
+                to_email=u.email or None,
+                context={
+                    "nom": u.get_full_name() or u.first_name or u.username,
+                    "formation": inscription.publication.title,
+                    "portal_url": learner_space_url(u),
+                },
+            )
+            return True
+        except Exception:  # noqa: BLE001 — l'inscription prime sur la notification
+            return False
+
+    @action(detail=False, methods=["post"], url_path="inscrire")
+    def inscrire(self, request):
+        """Inscrit un apprenant à la main : place offerte, cohorte interne, correction.
+
+        Le parcours normal passe par une commande et un paiement. Il n'existait
+        aucune porte de sortie pour une inscription hors vente — le back-office
+        était en lecture seule, et le Django admin, lui, n'envoie pas le lien.
+        """
+        if not is_admin(request.user):
+            raise PermissionDenied("Réservé aux administrateurs.")
+
+        d = request.data
+        email = (d.get("email") or "").strip().lower()
+        if not email or "@" not in email:
+            return Response({"detail": "Email valide requis."}, status=status.HTTP_400_BAD_REQUEST)
+        pub = Publication.objects.filter(pk=d.get("publication")).first()
+        if pub is None:
+            return Response({"detail": "Session introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        from django.db import transaction
+
+        from .public_catalog import _guest_user
+
+        with transaction.atomic():
+            # Verrou : deux ajouts simultanés ne doivent pas prendre la même place.
+            pub = Publication.objects.select_for_update().get(pk=pub.pk)
+            user = _guest_user(
+                email=email,
+                first_name=(d.get("first_name") or "").strip(),
+                last_name=(d.get("last_name") or "").strip(),
+            )
+            existante = (
+                Inscription.objects.filter(participant=user, publication=pub, is_deleted=False)
+                .exclude(status=Inscription.CANCEL)
+                .first()
+            )
+            if existante and existante.status == Inscription.CONFIRMED:
+                return Response(
+                    {"detail": "Cet apprenant est déjà inscrit à cette session.",
+                     "inscription_id": existante.pk},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if existante:
+                # Paiement abandonné : on confirme l'inscription en attente plutôt
+                # que d'en créer une seconde. La capacité n'est PAS revérifiée ici —
+                # cette personne occupe déjà une place (places_restantes compte les
+                # inscriptions en attente), la confirmer n'en consomme aucune autre.
+                existante.status = Inscription.CONFIRMED
+                existante.save(update_fields=["status"])
+                inscription = existante
+            else:
+                # Nouvelle place : là, et seulement là, la capacité s'applique.
+                # Plutôt qu'un contournement silencieux, la décision revient à
+                # l'admin — augmenter la capacité est explicite et traçable.
+                if pub.est_complete():
+                    return Response(
+                        {"detail": "Session complète. Augmentez la capacité pour ajouter une place.",
+                         "complete": True},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                inscription = Inscription.objects.create(
+                    participant=user, publication=pub, status=Inscription.CONFIRMED
+                )
+
+        envoye = self._envoyer_lien(inscription)
+        return Response(
+            {
+                "id": inscription.pk,
+                "participant_name": user.get_full_name() or user.username,
+                "publication_title": pub.title,
+                "lien_envoye": envoye,
+                "detail": "Apprenant inscrit. Le lien d'accès lui a été envoyé."
+                if envoye else "Apprenant inscrit, mais l'envoi du lien a échoué.",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="renvoyer-lien")
+    def renvoyer_lien(self, request, pk=None):
+        """Renvoie le lien d'accès (e-mail perdu, adresse corrigée)."""
+        if not is_admin(request.user):
+            raise PermissionDenied("Réservé aux administrateurs.")
+        inscription = self.get_object()
+        if inscription.status != Inscription.CONFIRMED:
+            return Response(
+                {"detail": "Seule une inscription confirmée donne accès à un espace."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        envoye = self._envoyer_lien(inscription)
+        return Response({"lien_envoye": envoye,
+                         "detail": "Lien renvoyé." if envoye else "L'envoi a échoué."})
+
 
 class OrderViewSet(_ModuleViewSet):
     """Module Inscriptions & Paniers — commandes (bucket.Order)."""

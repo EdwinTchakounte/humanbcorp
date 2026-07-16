@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 /** Interrupteur Visible / masqué. */
 export function Toggle({
   checked,
@@ -42,10 +44,13 @@ export function TextField({
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  // Le label doit être rattaché à son champ : sinon cliquer le libellé ne place
+  // pas le curseur, et un lecteur d'écran annonce un champ sans nom.
+  const id = useId();
   return (
     <div>
-      <label className="label">{label}</label>
-      <input className="input" value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      <label className="label" htmlFor={id}>{label}</label>
+      <input id={id} className="input" value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -61,10 +66,11 @@ export function TextArea({
   onChange: (v: string) => void;
   rows?: number;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="label">{label}</label>
-      <textarea className="input" rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+      <label className="label" htmlFor={id}>{label}</label>
+      <textarea id={id} className="input" rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -81,10 +87,11 @@ export function SelectField({
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="label">{label}</label>
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+      <label className="label" htmlFor={id}>{label}</label>
+      <select id={id} className="input" value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

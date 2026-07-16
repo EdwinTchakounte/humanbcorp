@@ -374,7 +374,15 @@ CORS_ALLOWED_ORIGINS = [o.strip() for o in config(
     ),
 ).split(",") if o.strip()]
 CORS_ALLOW_CREDENTIALS = True
-# En dev (DEBUG), autoriser tout localhost:<port> pour ne pas bloquer un front
-# lancé sur un port différent (évite les erreurs CORS lors des tests locaux).
+# En dev (DEBUG), autoriser tout localhost:<port> ET toute IP privée du réseau
+# local : un collaborateur sur le même sous-réseau accède aux front-ends via
+# l'IP LAN de la machine (ex. http://10.158.219.210:3007), et son navigateur
+# appelle l'API depuis cette origine — sans cette règle, CORS la bloquerait.
+# Plages privées : 10.x, 172.16–31.x, 192.168.x (RFC 1918).
 if DEBUG:
-    CORS_ALLOWED_ORIGIN_REGEXES = [r"^http://(localhost|127\.0\.0\.1):\d+$"]
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://(localhost|127\.0\.0\.1):\d+$",
+        r"^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$",
+        r"^http://172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}:\d+$",
+        r"^http://192\.168\.\d{1,3}\.\d{1,3}:\d+$",
+    ]

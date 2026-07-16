@@ -6,7 +6,7 @@ const results = [];
 const ok = (s, c) => { results.push(!!c); console.log(`${c ? "OK" : "KO"}  ${s}`); };
 
 async function login(page, user, pass) {
-  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.locator("input").first().fill(user);
   await page.locator('input[type="password"]').fill(pass);
   await page.getByRole("button", { name: /connexion|se connecter|connecter/i }).first()
@@ -19,6 +19,9 @@ const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome"
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5 });
 const page = await ctx.newPage();
 page.setDefaultTimeout(20000);
+// Compilation à la demande de Next en mode dev : la 1re visite
+// d'une route peut prendre ~40 s. Sans rapport avec la production (pré-compilée).
+page.setDefaultNavigationTimeout(60000);
 
 try {
   // ─── ADMIN ───────────────────────────────────────────────
@@ -26,7 +29,7 @@ try {
   ok("Admin connecté", !page.url().endsWith("/login"));
 
   // Suivi
-  await page.goto(`${BASE}/suivi`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/suivi`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
   ok("Page Suivi accessible (admin)", /\/suivi/.test(page.url()));
   ok("Suivi affiche des formations", await page.getByText(/apprenant\(s\)/i).first().isVisible().catch(() => false));
@@ -34,7 +37,7 @@ try {
   await page.screenshot({ path: `${OUT}/6_suivi_admin.jpeg`, type: "jpeg", quality: 90, fullPage: true });
 
   // Modale formation → affectation formateur
-  await page.goto(`${BASE}/formations`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/formations`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1000);
   await page.getByRole("button", { name: /nouvelle formation/i }).click();
   await page.waitForTimeout(600);
@@ -56,13 +59,13 @@ try {
   ok("Sidebar SANS Paiements ni Inscriptions", !/Paiements/.test(bodyTxt) && !/Inscriptions/.test(bodyTxt));
 
   // Formations : ne voit que la sienne
-  await p2.goto(`${BASE}/formations`, { waitUntil: "networkidle" });
+  await p2.goto(`${BASE}/formations`, { waitUntil: "domcontentloaded" });
   await p2.waitForTimeout(1200);
   await p2.screenshot({ path: `${OUT}/8_formateur_formations.jpeg`, type: "jpeg", quality: 90, fullPage: true });
   ok("Formateur voit sa formation", await p2.getByText(/Formation E2E Formateur/i).first().isVisible().catch(() => false));
 
   // Suivi côté formateur
-  await p2.goto(`${BASE}/suivi`, { waitUntil: "networkidle" });
+  await p2.goto(`${BASE}/suivi`, { waitUntil: "domcontentloaded" });
   await p2.waitForTimeout(1200);
   ok("Formateur accède au Suivi", /\/suivi/.test(p2.url()));
   await p2.screenshot({ path: `${OUT}/9_suivi_formateur.jpeg`, type: "jpeg", quality: 90, fullPage: true });

@@ -13,6 +13,9 @@ const ok = (s, c) => { results.push(!!c); console.log(`${c ? "OK" : "KO"}  ${s}`
 const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
 page.setDefaultTimeout(20000);
+// Compilation à la demande de Next en mode dev : la 1re visite
+// d'une route peut prendre ~40 s. Sans rapport avec la production (pré-compilée).
+page.setDefaultNavigationTimeout(60000);
 
 const jsErrors = [];
 page.on("pageerror", (e) => jsErrors.push(String(e)));
@@ -20,13 +23,13 @@ page.on("pageerror", (e) => jsErrors.push(String(e)));
 const SFX = String(Date.now()).slice(-6);
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.locator("input").first().fill("admin");
   await page.locator('input[type="password"]').fill("Admin@HBC2026");
   await page.getByRole("button", { name: /connexion|connecter/i }).first().click();
   await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 20000 }).catch(() => {});
 
-  await page.goto(`${BASE}/publications`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/publications`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1800);
   ok("Page publications chargée sans erreur JS", jsErrors.length === 0);
   if (jsErrors.length) console.log("   →", jsErrors[0].slice(0, 160));

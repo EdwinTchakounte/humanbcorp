@@ -20,10 +20,13 @@ const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome"
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5, acceptDownloads: true });
 const page = await ctx.newPage();
 page.setDefaultTimeout(20000);
+// Compilation à la demande de Next en mode dev : la 1re visite
+// d'une route peut prendre ~40 s. Sans rapport avec la production (pré-compilée).
+page.setDefaultNavigationTimeout(60000);
 
 try {
   // login admin
-  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.locator("input").first().fill("admin");
   await page.locator('input[type="password"]').fill("Admin@HBC2026");
   await page.getByRole("button", { name: /connexion|connecter/i }).first().click().catch(async () => { await page.locator('button[type="submit"]').click(); });
@@ -31,7 +34,7 @@ try {
   await page.waitForTimeout(1000);
 
   // page d'édition de l'activité quiz
-  await page.goto(`${BASE}/formations/${THEME}/contenu/activite/${AID}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/formations/${THEME}/contenu/activite/${AID}`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
   ok("Page activité quiz chargée", await page.getByText(/Questions du quiz/i).isVisible().catch(() => false));
 

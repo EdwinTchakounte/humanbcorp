@@ -13,6 +13,9 @@ const ok = (s, c) => { results.push(!!c); console.log(`${c ? "OK" : "KO"}  ${s}`
 const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
 page.setDefaultTimeout(20000);
+// Compilation à la demande de Next en mode dev : la 1re visite
+// d'une route peut prendre ~40 s. Sans rapport avec la production (pré-compilée).
+page.setDefaultNavigationTimeout(60000);
 
 const jsErrors = [];
 page.on("pageerror", (e) => jsErrors.push(String(e)));
@@ -21,7 +24,7 @@ const SFX = String(Date.now()).slice(-6);
 const EMAIL = `e2e-offert-${SFX}@hbc.test`;
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.locator("input").first().fill("admin");
   await page.locator('input[type="password"]').fill("Admin@HBC2026");
   await page.getByRole("button", { name: /connexion|connecter/i }).first().click();
@@ -41,7 +44,7 @@ try {
   });
   ok("Une session avec capacité est disponible pour le test", cible !== null);
 
-  await page.goto(`${BASE}/inscriptions`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/inscriptions`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1800);
   ok("Page inscriptions chargée sans erreur JS", jsErrors.length === 0);
   if (jsErrors.length) console.log("   →", jsErrors[0].slice(0, 160));
@@ -76,7 +79,7 @@ try {
     .first().isVisible().catch(() => false);
   ok("Un retour explicite est affiché", confirme);
 
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1800);
   ok("L'apprenant apparaît dans la liste", await page.getByText(EMAIL, { exact: false })
     .first().isVisible().catch(() => false)

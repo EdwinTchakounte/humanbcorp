@@ -13,10 +13,13 @@ const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome"
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5 });
 const page = await ctx.newPage();
 page.setDefaultTimeout(20000);
+// Compilation à la demande de Next en mode dev : la 1re visite
+// d'une route peut prendre ~40 s. Sans rapport avec la production (pré-compilée).
+page.setDefaultNavigationTimeout(60000);
 
 try {
   // 1. LOGIN
-  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.locator("input").first().fill(USER);
   await page.locator('input[type="password"]').fill(PASS);
   await page.screenshot({ path: `${OUT}/1_login.jpeg`, type: "jpeg", quality: 90 });
@@ -28,7 +31,7 @@ try {
   ok("Login réussi (sortie de /login)", !page.url().endsWith("/login"));
 
   // 2. FORMATIONS
-  await page.goto(`${BASE}/formations`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/formations`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1200);
   const hasNew = await page.getByRole("button", { name: /nouvelle formation/i }).isVisible().catch(() => false);
   ok("Bouton « Nouvelle formation » visible", hasNew);

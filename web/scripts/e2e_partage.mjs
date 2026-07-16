@@ -42,36 +42,34 @@ try {
   ok("Toutes les balises d'aperçu sont présentes", manquantes.length === 0, manquantes.join(", "));
   ok("Une image d'aperçu est servie", !!home.tags["og:image"], home.tags["og:image"]);
 
-  // ── 2. Détail d'une formation ──────────────────────────────────────────
-  console.log("\n── 2. Une formation partage SON image, pas le logo ──");
+  // ── 2. Détail d'une formation : une vraie carte de partage ─────────────
+  console.log("\n── 2. Une formation partage une carte, pas une photo brute ──");
   const cat = await (await fetch(`${API}/api/v1/site/formations/`)).json();
-  const avecImage = (cat.results || []).find((f) => f.image_url);
-  if (!avecImage) {
-    ok("IGNORÉ : aucune formation avec image en base", true);
-  } else {
-    const f = await meta(`${WEB}/formations/${avecImage.id}`);
-    const abs = REQUISES.filter((k) => !f.tags[k]);
-    ok("Toutes les balises d'aperçu sont présentes", abs.length === 0, abs.join(", "));
-    ok("L'image est celle de la formation", f.tags["og:image"] === avecImage.image_url,
-      f.tags["og:image"]);
-    ok("…et non le logo générique", !/brand\/logo/.test(f.tags["og:image"] || ""));
-    ok("Le titre n'est pas dupliqué (« … — HBC-RH | HBC-RH »)",
-      !/HBC-RH.*HBC-RH/.test(f.tags["og:title"] || ""), f.tags["og:title"]);
-    ok("L'URL de partage est posée", !!f.tags["og:url"], f.tags["og:url"]);
-    ok("Une alternative textuelle accompagne l'image", !!f.tags["og:image:alt"]);
-  }
+  const form = (cat.results || [])[0];
+  const f = await meta(`${WEB}/formations/${form.id}`);
+  const abs = REQUISES.filter((k) => !f.tags[k]);
+  ok("Toutes les balises d'aperçu sont présentes", abs.length === 0, abs.join(", "));
+  ok("L'aperçu est la vignette générée, pas le logo générique",
+    /opengraph-image/.test(f.tags["og:image"] || ""), f.tags["og:image"]);
+  ok("Le titre n'est pas dupliqué (« … — HBC-RH | HBC-RH »)",
+    !/HBC-RH.*HBC-RH/.test(f.tags["og:title"] || ""), f.tags["og:title"]);
+  ok("L'URL de partage est posée", !!f.tags["og:url"], f.tags["og:url"]);
+  ok("Une alternative textuelle accompagne l'image", !!f.tags["og:image:alt"]);
 
-  // ── 3. Une formation SANS image retombe sur le logo ────────────────────
-  console.log("\n── 3. Sans image propre, le logo prend le relais ──");
-  const sansImage = (cat.results || []).find((f) => !f.image_url);
-  if (!sansImage) {
-    ok("IGNORÉ : toutes les formations ont une image", true);
-  } else {
-    const f = await meta(`${WEB}/formations/${sansImage.id}`);
-    ok("L'aperçu reste complet", REQUISES.every((k) => f.tags[k]));
-    ok("Le logo sert d'image de repli", /brand\/logo/.test(f.tags["og:image"] || ""),
-      f.tags["og:image"]);
-  }
+  // ── 3. La vignette se génère vraiment, au bon format ───────────────────
+  console.log("\n── 3. La vignette est une image valide au format attendu ──");
+  const imgUrl = (f.tags["og:image"] || "").replace("localhost", "127.0.0.1");
+  const r = await fetch(imgUrl);
+  ok("Elle se génère sans erreur", r.status === 200, `HTTP ${r.status}`);
+  ok("C'est bien une image PNG", (r.headers.get("content-type") || "").includes("image/png"));
+  ok("Au format 1200×630 attendu par WhatsApp et LinkedIn",
+    f.tags["og:image:width"] === "1200" && f.tags["og:image:height"] === "630",
+    `${f.tags["og:image:width"]}x${f.tags["og:image:height"]}`);
+  const octets = Buffer.from(await r.arrayBuffer());
+  ok("Le PNG n'est pas vide", octets.length > 10000, `${octets.length} octets`);
+  // Une image trop lourde n'est pas récupérée par WhatsApp (limite ~600 Ko).
+  ok("…ni trop lourde pour être récupérée (< 600 Ko)", octets.length < 600_000,
+    `${Math.round(octets.length / 1024)} Ko`);
 
   // ── 4. Les URLs doivent être absolues ──────────────────────────────────
   console.log("\n── 4. Les URLs sont absolues (une URL relative ne s'affiche pas) ──");
@@ -86,7 +84,7 @@ try {
   ok("La locale annoncée est l'anglais", en.tags["og:locale"] === "en_US", en.tags["og:locale"]);
   // ── 6. Données structurées ─────────────────────────────────────────────
   console.log("\n── 6. Google comprend ce que la page décrit ──");
-  const html = await (await fetch(`${WEB}/formations/${(cat.results || [])[0].id}`)).text();
+  const html = await (await fetch(`${WEB}/formations/${form.id}`)).text();
   const blocs = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => { try { return JSON.parse(m[1]); } catch { return null; } })
     .filter(Boolean);

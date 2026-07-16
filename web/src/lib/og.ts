@@ -18,9 +18,23 @@ export const OG_IMAGE_DEFAUT = "/brand/logo.png";
 
 export function ogBase(lang: Lang): NonNullable<Metadata["openGraph"]> {
   return {
+    ...socleSansImage(lang),
+    images: [OG_IMAGE_DEFAUT],
+  };
+}
+
+/**
+ * Même socle, sans image — à utiliser sur les pages qui ont un
+ * `opengraph-image.tsx`.
+ *
+ * Une image posée dans `generateMetadata` l'emporte sur la convention de
+ * fichier : poser le logo ici neutraliserait la vignette générée, sans que rien
+ * ne le signale.
+ */
+export function socleSansImage(lang: Lang): NonNullable<Metadata["openGraph"]> {
+  return {
     type: "website",
     locale: lang === "en" ? "en_US" : "fr_FR",
     siteName: "Human Brain Corporation-RH",
-    images: [OG_IMAGE_DEFAUT],
   };
 }

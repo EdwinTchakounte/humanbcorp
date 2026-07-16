@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { getFormation, type Lang, type PublicFormation } from "@/lib/api";
-import { ogBase } from "@/lib/og";
+import { socleSansImage } from "@/lib/og";
 
 /** « du 12 mars au 20 mars 2026 » — la période, pour l'aperçu de partage. */
 function periode(f: PublicFormation, lang: Lang): string {
@@ -53,14 +53,15 @@ export async function buildFormationMetadata(id: string, lang: Lang): Promise<Me
     },
     openGraph: {
       // Socle complet : une clé openGraph partielle écraserait celle du layout
-      // racine (og:site_name, og:locale, image par défaut). Cf. lib/og.ts.
-      ...ogBase(lang),
+      // racine (og:site_name, og:locale). Cf. lib/og.ts.
+      ...socleSansImage(lang),
       url: chemin,
       title: f.title,
       description,
-      // Sans image propre, le logo du socle prend le relais plutôt qu'une URL
-      // vide qui casserait l'aperçu.
-      ...(f.image_url ? { images: [{ url: f.image_url, alt: f.title }] } : {}),
+      // Aucune image posée ici, volontairement : `openGraph.images` défini à la
+      // main l'emporte sur la convention de fichier et neutraliserait la
+      // vignette générée par opengraph-image.tsx — laquelle reprend la photo de
+      // la formation et y ajoute titre, dates et places.
     },
   };
 }

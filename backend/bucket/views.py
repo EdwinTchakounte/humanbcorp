@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.template import RequestContext
 from django.http import HttpResponse, JsonResponse
+from sitecms.roles import is_admin as _is_admin
 import json as simplejson
 from django.core import serializers
 from django.contrib.auth.models import User
@@ -148,7 +149,7 @@ def ajax_get_reservations(request):
 		reservations = Reservation.objects.filter(inscription__participant=user)
 	elif user.groups.filter(name='Parent').exists():
 		reservations = Reservation.objects.filter(created_by=user)
-	elif user.is_superuser or user.is_staff or user.groups.filter(name__icontains='admin').exists():
+	elif user.is_staff or _is_admin(user):
 		reservations = Reservation.objects.all()
 		admin = True
 	else:

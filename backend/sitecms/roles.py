@@ -12,11 +12,28 @@ On réutilise scrupuleusement cette logique pour :
 """
 
 
+import re
+
+# Groupes conférant le rôle admin. Le préfixe numérique optionnel est un héritage
+# de l'application historique, qui nommait ses groupes « {user_id}_{groupe} » —
+# d'où « 2_Second_Admin » en base.
+#
+# La règle précédente (« le nom contient admin ») était trop large : elle
+# reconnaissait n'importe quel groupe fabriqué, ce qui rendait exploitable la
+# prise de contrôle par /registration/admin_new_user/ (groupe « None_Admin »).
+# Le vecteur est fermé, mais un privilège ne doit pas tenir à une sous-chaîne.
+_GROUPE_ADMIN = re.compile(r"^(?:\d+_)?(?:admin|second_admin)$", re.IGNORECASE)
+
+
 def is_admin(user):
-    """Vrai si superuser OU membre d'un groupe dont le nom contient « admin »."""
+    """Vrai si superuser OU membre d'un groupe Admin / Second_Admin."""
     if not (user and user.is_authenticated):
         return False
-    return bool(user.is_superuser or user.groups.filter(name__icontains="admin").exists())
+    if user.is_superuser:
+        return True
+    # Filtrage en Python : la comparaison est exacte et identique quel que soit
+    # le moteur de base (les regex SQL diffèrent entre SQLite et PostgreSQL).
+    return any(_GROUPE_ADMIN.match(nom) for nom in user.groups.values_list("name", flat=True))
 
 
 def is_teacher(user):

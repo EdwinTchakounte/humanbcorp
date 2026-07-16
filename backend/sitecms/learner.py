@@ -23,6 +23,17 @@ from bucket.models import Inscription
 _MEMBER_SALT = "sitecms.learner.member"
 _TOKEN_MAX_AGE = 60 * 60 * 24 * 180  # 6 mois d'accès au contenu acheté
 
+# Jeton distinct pour le flux d'agenda. Une URL d'abonnement est stockée
+# durablement chez Google et se transmet facilement : réutiliser le jeton du
+# contenu ferait d'une fuite d'agenda une fuite de la formation entière. Celui-ci
+# ne donne que le planning.
+#
+# Il n'expire pas, volontairement : un abonnement qui meurt le fait en silence,
+# l'apprenant ne voit rien et rate ses séances. L'accès est de toute façon
+# revérifié à chaque requête — inscription confirmée, offre non expirée — donc
+# une URL fuitée ne survit pas aux droits qu'elle représente.
+_CALENDAR_SALT = "sitecms.learner.calendar"
+
 
 def sign_member(user: User) -> str:
     """Jeton opaque et signé identifiant un apprenant (accès à son espace)."""
@@ -35,6 +46,38 @@ def learner_space_url(user: User) -> str:
 
     base = getattr(settings, "SITE_PUBLIC_URL", "http://localhost:3000").rstrip("/")
     return f"{base}/mon-espace/{sign_member(user)}"
+
+
+def sign_member_calendar(user: User) -> str:
+    """Jeton d'abonnement à l'agenda — ne donne accès qu'au planning."""
+    return signing.dumps({"cal": user.pk}, salt=_CALENDAR_SALT)
+
+
+def load_member_calendar(token: str) -> User:
+    """Résout un jeton d'agenda → User. Lève `User.DoesNotExist` si invalide.
+
+    Un jeton de contenu présenté ici ne passe pas : les sels diffèrent.
+    """
+    try:
+        data = signing.loads(token, salt=_CALENDAR_SALT)
+    except signing.BadSignature as exc:
+        raise User.DoesNotExist(str(exc))
+    return User.objects.get(pk=data["cal"])
+
+
+def learner_calendar_url(user: User) -> str:
+    """URL d'abonnement au flux d'agenda (à coller dans Google Agenda).
+
+    On réutilise `PUBLIC_BASE_URL`, l'URL publique de l'API : c'est déjà elle
+    qu'on transmet à Tara pour ses webhooks, donc elle est nécessairement juste
+    en production — sinon les paiements ne rentreraient pas. Un réglage de plus
+    serait un réglage de plus à oublier, et l'apprenant s'abonnerait alors à une
+    adresse locale, injoignable depuis Google.
+    """
+    from django.conf import settings
+
+    base = getattr(settings, "PUBLIC_BASE_URL", "http://localhost:8011").rstrip("/")
+    return f"{base}/api/v1/site/mon-espace/{sign_member_calendar(user)}/agenda.ics"
 
 
 def load_member(token: str) -> User:
@@ -295,6 +338,9 @@ def my_space(request, token):
     return Response({
         "learner": {"name": user.get_full_name() or user.first_name or user.username, "email": user.email},
         "formations": formations,
+        # URL d'abonnement : l'apprenant la colle dans son agenda et ses séances
+        # s'y synchronisent, y compris quand on les déplace.
+        "agenda_url": learner_calendar_url(user),
     })
 
 
@@ -490,3 +536,101 @@ def mark_activity(request, token, activity_id):
     done = request.data.get("done", True)
     _mark_activity(user, activity, bool(done))
     return Response({"activity_id": activity.id, "completed": bool(done)})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def agenda_ics(request, token):
+    """GET /api/v1/site/mon-espace/<token>/agenda.ics → flux d'abonnement.
+
+    Ce flux est relu périodiquement par l'agenda de l'apprenant (Google, Apple,
+    Outlook) : déplacer une séance ou en ajouter une se propage sans qu'il ait
+    quoi que ce soit à faire. Google rafraîchit à son rythme, souvent 12 à 24 h —
+    on ne peut que le suggérer.
+
+    Les droits sont revérifiés à CHAQUE requête : une inscription annulée ou une
+    offre expirée vide le flux, donc une URL fuitée ne survit pas aux droits
+    qu'elle représente.
+    """
+    from calendarapp.models import Meeting
+
+    from .ics import Calendrier
+
+    try:
+        user = load_member_calendar(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'agenda invalide."}, status=status.HTTP_404_NOT_FOUND)
+
+    inscriptions = (
+        Inscription.objects.filter(participant=user, status=Inscription.CONFIRMED, is_deleted=False)
+        .select_related("publication")
+    )
+
+    cal = Calendrier(
+        nom="Mes formations — HBC-RH",
+        description="Séances des formations auxquelles vous êtes inscrit(e).",
+    )
+
+    vus = set()
+    for ins in inscriptions:
+        pub = ins.publication
+        if not pub or acces_expire(ins):
+            continue
+        events = (
+            pub.events.filter(is_deleted=False, is_active=True)
+            .exclude(is_test=True)
+            .select_related("seance")
+            .order_by("start_time")
+        )
+        # Une requête pour toutes les visios, plutôt qu'une par créneau.
+        meetings = {}
+        for m in Meeting.objects.filter(event__in=events, is_deleted=False):
+            meetings.setdefault(m.event_id, []).append(m)
+
+        for ev in events:
+            if ev.id in vus or not ev.start_time or not ev.end_time:
+                continue
+            vus.add(ev.id)
+
+            ms = meetings.get(ev.id, [])
+            # Le lien qu'on propose de rejoindre, pas un autre rendez-vous du
+            # même créneau (cf. l'espace apprenant).
+            lien = next((m.link_url for m in ms if m.link_url), "")
+            presentiel = any(m.m_type == 2 for m in ms)
+
+            titre = ev.seance.title if ev.seance else ev.title
+            if ev.seance and ev.seance.order:
+                titre = f"Séance {ev.seance.order} — {titre}"
+
+            # Surtout PAS le lien magique de l'espace : il ouvre tout le contenu.
+            # Le jeton d'agenda est distinct précisément pour qu'une fuite du flux
+            # n'expose qu'un planning — l'y recopier annulerait ce cloisonnement.
+            # L'apprenant a déjà son lien par e-mail.
+            corps = [pub.title]
+            if lien:
+                corps.append(f"Rejoindre : {lien}")
+
+            cal.ajouter(
+                # UID stable : c'est lui qui permet à l'agenda de METTRE À JOUR
+                # l'événement au lieu d'en créer un second à chaque relecture.
+                uid=f"hbc-event-{ev.id}@humanbcorp.com",
+                debut=ev.start_time,
+                fin=ev.end_time,
+                titre=titre,
+                description="\n".join(corps),
+                lieu=lien or ("Présentiel" if presentiel else ""),
+                url=lien,
+                modifie_le=getattr(ev, "updated_at", None) or ev.start_time,
+                # Toute modification du créneau doit se propager : on dérive la
+                # séquence de la date de dernière modification.
+                sequence=int(getattr(ev, "updated_at", None).timestamp()) if getattr(ev, "updated_at", None) else 0,
+            )
+
+    from django.http import HttpResponse
+
+    resp = HttpResponse(cal.rendu(), content_type="text/calendar; charset=utf-8")
+    resp["Content-Disposition"] = 'inline; filename="hbc-formations.ics"'
+    # Un flux d'agenda ne doit pas être servi depuis un cache : l'apprenant
+    # verrait un planning périmé sans le savoir.
+    resp["Cache-Control"] = "no-cache, must-revalidate"
+    return resp

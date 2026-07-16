@@ -382,6 +382,76 @@ function SeanceBlock({ s, token, onComplete }: { s: LearnerSeance; token: string
   );
 }
 
+/**
+ * Abonnement agenda. On ne propose pas un téléchargement : un fichier est une
+ * copie, et une séance déplacée ne bougerait pas dans l'agenda de l'apprenant.
+ * Un abonnement, lui, se resynchronise tout seul.
+ */
+function AbonnementAgenda({ url }: { url: string }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [copie, setCopie] = useState(false);
+  // webcal:// fait proposer l'abonnement directement par le système, là où
+  // https:// ferait télécharger un fichier figé.
+  const webcal = url.replace(/^https?:\/\//, "webcal://");
+  const google = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`;
+
+  async function copier() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopie(true);
+      setTimeout(() => setCopie(false), 2500);
+    } catch {
+      // Presse-papiers refusé (contexte non sécurisé) : l'URL reste
+      // sélectionnable à la main juste au-dessus.
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-brand/20 bg-brand-soft/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-sm font-semibold text-brand-deep">
+          <i className="bx bx-calendar-plus text-lg" />
+          Ajoutez vos séances à votre agenda
+        </p>
+        <button onClick={() => setOuvert((o) => !o)} className="text-sm font-semibold text-accent">
+          {ouvert ? "Masquer" : "Comment faire ?"}
+        </button>
+      </div>
+      <p className="mt-1 text-sm text-muted">
+        Vos séances apparaissent dans votre agenda et se mettent à jour toutes seules si une date change.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a href={google} target="_blank" rel="noopener noreferrer" className="btn-accent text-sm">
+          <i className="bx bxl-google" /> Google Agenda
+        </a>
+        <a href={webcal} className="btn-ghost text-sm">
+          <i className="bx bx-mobile-alt" /> Apple / Outlook
+        </a>
+        <button onClick={copier} className="btn-ghost text-sm">
+          <i className={`bx ${copie ? "bx-check" : "bx-copy"}`} /> {copie ? "Lien copié" : "Copier le lien"}
+        </button>
+      </div>
+
+      {ouvert && (
+        <div className="mt-4 border-t border-brand/15 pt-3 text-sm text-muted">
+          <p className="font-medium text-ink">Si le bouton ne fonctionne pas :</p>
+          <ol className="mt-2 list-inside list-decimal space-y-1">
+            <li>Copiez le lien ci-dessous.</li>
+            <li>Dans Google Agenda : <strong>Autres agendas</strong> → <strong>À partir de l&apos;URL</strong>.</li>
+            <li>Collez le lien, puis validez.</li>
+          </ol>
+          <p className="mt-3 break-all rounded-lg bg-white px-3 py-2 font-mono text-xs text-ink">{url}</p>
+          <p className="mt-2 text-xs">
+            Gardez ce lien pour vous : il donne accès à votre planning. Google actualise
+            généralement les agendas abonnés une à deux fois par jour.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LearnerSpace({ token }: { token: string }) {
   const [space, setSpace] = useState<MySpace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -479,6 +549,11 @@ export default function LearnerSpace({ token }: { token: string }) {
         <h1 className="mt-2 text-3xl md:text-4xl">Bonjour {space.learner.name} 👋</h1>
         <p className="mt-3 text-muted">Retrouvez ici le contenu de vos formations.</p>
       </header>
+
+      {/* Abonnement agenda : proposé seulement s'il y a des séances à suivre. */}
+      {space.agenda_url && space.formations.length > 0 && (
+        <AbonnementAgenda url={space.agenda_url} />
+      )}
 
       {space.formations.length === 0 ? (
         <p className="text-muted">Aucune formation confirmée pour le moment.</p>

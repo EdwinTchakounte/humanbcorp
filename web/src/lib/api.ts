@@ -211,6 +211,9 @@ export interface LearnerFormation {
 export interface MySpace {
   learner: { name: string; email: string };
   formations: LearnerFormation[];
+  // URL d'abonnement iCalendar : collée dans Google Agenda, elle synchronise
+  // les séances et suit leurs déplacements.
+  agenda_url: string;
 }
 export interface QuizOption {
   id: number;

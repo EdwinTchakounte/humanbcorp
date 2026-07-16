@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getFormation } from "@/lib/api";
+import { buildFormationMetadata } from "@/lib/formation-meta";
 import FormationDetail from "@/components/formations/FormationDetail";
 
 interface Props {
@@ -7,9 +7,7 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const f = await getFormation(params.id);
-  if (!f) return { title: "Formation introuvable — HBC-RH" };
-  return { title: `${f.title} — HBC-RH`, description: f.description?.slice(0, 160) };
+  return buildFormationMetadata(params.id, "fr");
 }
 
 export default function FormationDetailPage({ params }: Props) {

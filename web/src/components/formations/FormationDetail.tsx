@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getFormation } from "@/lib/api";
 import type { Lang } from "@/lib/api";
 import InscriptionWidget from "@/components/formations/InscriptionWidget";
+import JsonLd from "@/components/JsonLd";
 
 const L = {
   fr: { back: "Toutes les formations" },
@@ -15,8 +16,44 @@ export default async function FormationDetail({ id, lang }: { id: string; lang: 
   const formation = await getFormation(id);
   if (!formation) notFound();
 
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://humanbcorp.com";
+  // Balisage schema.org : indispensable pour que Google comprenne qu'il s'agit
+  // d'une formation, avec son prix et ses dates, plutôt que d'une page quelconque.
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    name: formation.title,
+    description: (formation.description || "").slice(0, 500),
+    url: `${site}${base}/formations/${formation.id}`,
+    provider: {
+      "@type": "Organization",
+      name: "Human Brain Corporation-RH",
+      url: site,
+    },
+    ...(formation.image_url ? { image: formation.image_url } : {}),
+    offers: {
+      "@type": "Offer",
+      price: Number(formation.price) || 0,
+      priceCurrency: "XAF",
+      // Une session complète doit être annoncée comme telle : sinon Google
+      // continue de l'afficher comme disponible.
+      availability: formation.complete
+        ? "https://schema.org/SoldOut"
+        : "https://schema.org/InStock",
+      url: `${site}${base}/formations/${formation.id}`,
+    },
+    hasCourseInstance: {
+      "@type": "CourseInstance",
+      // mode 1 = session à dates fixes, 2 = accès libre.
+      courseMode: formation.mode === 2 ? "online" : "blended",
+      ...(formation.date_debut ? { startDate: formation.date_debut } : {}),
+      ...(formation.date_fin ? { endDate: formation.date_fin } : {}),
+    },
+  };
+
   return (
     <section className="py-14 md:py-20">
+      <JsonLd data={jsonLd} />
       <div className="container-hbc">
         <Link
           href={`${base}/formations`}

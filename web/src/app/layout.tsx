@@ -4,6 +4,19 @@ import ChatWidget from "@/components/ChatWidget";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://humanbcorp.com";
 
+// Les variables NEXT_PUBLIC_* sont figées AU BUILD. Buildée avec une URL locale,
+// la vitrine émettrait des og:image en http://localhost — WhatsApp et LinkedIn
+// n'afficheraient alors aucun aperçu, sans que rien ne le signale dans
+// l'application. On échoue au build : une erreur se corrige, un aperçu vide ne
+// se voit pas.
+if (process.env.NODE_ENV === "production" && /localhost|127\.0\.0\.1/.test(SITE_URL)) {
+  throw new Error(
+    `NEXT_PUBLIC_SITE_URL vaut « ${SITE_URL} » au build de production. ` +
+      "Renseignez l'URL publique du site (ex. https://humanbcorp.com), " +
+      "sinon les aperçus de partage pointeront vers localhost."
+  );
+}
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {

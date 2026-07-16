@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getArticle, getArticles } from "@/lib/api";
+import { ogBase } from "@/lib/og";
 import ArticleView from "@/components/blog/ArticleView";
 
 interface Props {
@@ -14,11 +15,23 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const a = await getArticle(params.slug, "en");
   if (!a) return {};
+  const description = a.excerpt || undefined;
   return {
     title: a.title,
-    description: a.excerpt || undefined,
+    description,
     alternates: { canonical: `/en/blog/${params.slug}` },
-    openGraph: a.cover?.url ? { images: [a.cover.url] } : undefined,
+    // Bloc reconstruit en entier (cf. lib/og.ts) : `openGraph: undefined`
+    // effaçait celui du layout racine, et un article sans couverture se
+    // partageait alors sans le moindre aperçu.
+    openGraph: {
+      ...ogBase("en"),
+      type: "article",
+      url: `/en/blog/${params.slug}`,
+      title: a.title,
+      description,
+      ...(a.published_at ? { publishedTime: a.published_at } : {}),
+      ...(a.cover?.url ? { images: [{ url: a.cover.url, alt: a.title }] } : {}),
+    },
   };
 }
 

@@ -3,29 +3,14 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import CommandPalette from "@/components/CommandPalette";
 import { useAuth } from "@/lib/auth";
 
 // Routes appartenant au module CMS (réservé aux profils admin).
 const CMS_PREFIXES = ["/", "/articles", "/media", "/settings", "/pages"];
 const isCmsRoute = (path: string) =>
   CMS_PREFIXES.some((p) => (p === "/" ? path === "/" : path.startsWith(p)));
-
-// Titre affiché dans le header selon la route.
-const TITLES: { prefix: string; label: string }[] = [
-  { prefix: "/articles", label: "Articles" },
-  { prefix: "/media", label: "Médiathèque" },
-  { prefix: "/settings", label: "Réglages" },
-  { prefix: "/pages", label: "Pages" },
-  { prefix: "/agenda", label: "Agenda & Événements" },
-  { prefix: "/formations", label: "Formations" },
-  { prefix: "/suivi", label: "Suivi apprenants" },
-  { prefix: "/publications", label: "Publications" },
-  { prefix: "/inscriptions", label: "Inscriptions & Paniers" },
-  { prefix: "/paiements", label: "Paiements" },
-  { prefix: "/messagerie", label: "Messagerie" },
-];
-const titleFor = (path: string) =>
-  path === "/" ? "Pages" : (TITLES.find((t) => path.startsWith(t.prefix))?.label ?? "Dashboard");
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { ready, authed, profile } = useAuth();
@@ -61,9 +46,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Colonne principale */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header fixe */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-line bg-white px-8">
-          <h1 className="font-heading text-lg font-semibold text-brand-deep">{titleFor(pathname)}</h1>
+        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-line bg-white px-8">
+          <Breadcrumbs />
           <div className="flex items-center gap-3 text-sm">
+            <CommandPalette />
             <span className="hidden text-muted sm:inline">{profile?.full_name}</span>
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${

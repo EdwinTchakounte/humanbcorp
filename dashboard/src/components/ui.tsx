@@ -102,8 +102,10 @@ export function SelectField({
   );
 }
 
-/** Pagination simple (précédent / pages / suivant). PAGE_SIZE = 5. */
-export const PAGE_SIZE = 5;
+/** Pagination simple (précédent / pages / suivant).
+ *  15 plutôt que 5 : à 5 par page, retrouver une ressource obligeait à cliquer
+ *  « suivant » plusieurs fois avant même de commencer à naviguer. */
+export const PAGE_SIZE = 15;
 
 export function Pagination({
   page,

@@ -37,14 +37,23 @@ export default function CardEditor({
       };
       await api(`/cms/cards/${c.id}/`, { method: "PATCH", body: payload });
       setDirty(false);
+    } catch (e) {
+      alert("Échec de l'enregistrement de l'élément : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }
   }
 
+  // Visibilité : optimiste puis rétablissement en cas d'échec (sans marquer « dirty »).
   async function toggleActive(v: boolean) {
-    set("is_active", v);
-    await api(`/cms/cards/${c.id}/`, { method: "PATCH", body: { is_active: v } });
+    const prev = c.is_active;
+    setC((p) => ({ ...p, is_active: v }));
+    try {
+      await api(`/cms/cards/${c.id}/`, { method: "PATCH", body: { is_active: v } });
+    } catch {
+      setC((p) => ({ ...p, is_active: prev }));
+      alert("Impossible de changer la visibilité de l'élément.");
+    }
   }
 
   async function del() {

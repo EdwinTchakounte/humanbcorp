@@ -46,6 +46,8 @@ export default function SettingsPage() {
       await api("/cms/settings/1/", { method: "PATCH", body: s });
       setDirty(false);
       setSaved(true);
+    } catch (e) {
+      alert("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }

@@ -20,7 +20,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
     setLoading(true);
     const [p, secs] = await Promise.all([
       api<Page>(`/cms/pages/${id}/`),
-      listAll<Section>(`/cms/sections/?page=${id}`),
+      listAll<Section>(`/cms/sections/?page_id=${id}`),
     ]);
     setPage(p);
     setSections(secs.sort((a, b) => a.order - b.order));
@@ -49,8 +49,24 @@ export default function PageEditor({ params }: { params: { id: string } }) {
         },
       });
       setMetaDirty(false);
+    } catch (e) {
+      alert("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSavingMeta(false);
+    }
+  }
+
+  // Publication : optimiste puis rétablissement si le serveur refuse ; ne marque
+  // pas le bloc SEO « dirty » (is_active n'en fait pas partie).
+  async function togglePublish(v: boolean) {
+    if (!page) return;
+    const prev = page.is_active;
+    setPage((p) => (p ? { ...p, is_active: v } : p));
+    try {
+      await api(`/cms/pages/${page.id}/`, { method: "PATCH", body: { is_active: v } });
+    } catch {
+      setPage((p) => (p ? { ...p, is_active: prev } : p));
+      alert("Impossible de changer la publication de la page.");
     }
   }
 
@@ -67,17 +83,22 @@ export default function PageEditor({ params }: { params: { id: string } }) {
     const idx = sections.findIndex((s) => s.id === sid);
     const j = idx + dir;
     if (idx < 0 || j < 0 || j >= sections.length) return;
-    const a = sections[idx];
-    const b = sections[j];
-    // échange des positions
-    await Promise.all([
-      api(`/cms/sections/${a.id}/`, { method: "PATCH", body: { order: b.order } }),
-      api(`/cms/sections/${b.id}/`, { method: "PATCH", body: { order: a.order } }),
-    ]);
+    // On échange dans le tableau puis on renumérote 0..n-1. L'ancienne version
+    // échangeait les valeurs `order` : dès que deux sections partageaient un même
+    // `order` (possible après suppression), le bouton ne faisait rien. Renuméroter
+    // par index garantit un ordre strict et persiste un état cohérent.
     const next = [...sections];
-    next[idx] = { ...b, order: a.order };
-    next[j] = { ...a, order: b.order };
-    setSections(next.sort((x, y) => x.order - y.order));
+    [next[idx], next[j]] = [next[j], next[idx]];
+    const renum = next.map((s, i) => ({ ...s, order: i }));
+    setSections(renum);
+    try {
+      await Promise.all(
+        renum.map((s) => api(`/cms/sections/${s.id}/`, { method: "PATCH", body: { order: s.order } }))
+      );
+    } catch {
+      alert("Impossible de réordonner les sections.");
+      load();
+    }
   }
 
   if (loading) return <div className="p-8 text-muted">Chargement…</div>;
@@ -95,10 +116,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
         </div>
         <Toggle
           checked={page.is_active}
-          onChange={async (v) => {
-            setP("is_active", v);
-            await api(`/cms/pages/${page.id}/`, { method: "PATCH", body: { is_active: v } });
-          }}
+          onChange={togglePublish}
           label={page.is_active ? "Publiée" : "Brouillon"}
         />
       </div>

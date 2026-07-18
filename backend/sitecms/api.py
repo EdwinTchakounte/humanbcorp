@@ -307,7 +307,10 @@ class SectionViewSet(_BaseCmsViewSet):
 
     def get_queryset(self):
         qs = Section.objects.filter(is_deleted=False)
-        page = self.request.query_params.get("page")
+        # NB : filtrer par « page_id » et non « page » — « page » est le paramètre
+        # réservé de la pagination DRF ; le réutiliser comme filtre provoquait une
+        # 404 « Invalid page » dès que l'id de page dépassait le nb de pages paginées.
+        page = self.request.query_params.get("page_id")
         if page:
             qs = qs.filter(page_id=page)
         if not is_admin(self.request.user):

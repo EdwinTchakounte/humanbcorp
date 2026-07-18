@@ -33,6 +33,7 @@ export default function CommandPalette() {
   const [themes, setThemes] = useState<ThemeItem[]>([]);
   const [pubs, setPubs] = useState<PublicationItem[]>([]);
   const [charge, setCharge] = useState(false);
+  const [pret, setPret] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const peutFormations = !!profile?.modules.find((m) => m.key === "formations");
@@ -62,6 +63,7 @@ export default function CommandPalette() {
     ]).then(([t, p]) => {
       setThemes(t);
       setPubs(p);
+      setPret(true); // chargement terminé — permet de distinguer « vide » de « en cours »
     });
   }, [ouvert, charge, authed, peutFormations, peutPublications]);
 
@@ -91,9 +93,9 @@ export default function CommandPalette() {
       ...pubs.map((p) => ({
         id: `p-${p.id}`,
         label: p.title,
-        sous: "Session vendue",
+        sous: "Session — ouvrir la fiche",
         icone: "bx-news",
-        href: `/publications`,
+        href: `/publications?edit=${p.id}`,
         cat: "Sessions",
       })),
     ];
@@ -167,9 +169,7 @@ export default function CommandPalette() {
             <div className="max-h-[52vh] overflow-y-auto p-2">
               {resultats.length === 0 ? (
                 <p className="px-3 py-8 text-center text-sm text-muted">
-                  {charge && (themes.length || pubs.length)
-                    ? "Aucun résultat."
-                    : "Chargement…"}
+                  {pret ? "Aucun résultat." : "Chargement…"}
                 </p>
               ) : (
                 resultats.map((c, i) => (

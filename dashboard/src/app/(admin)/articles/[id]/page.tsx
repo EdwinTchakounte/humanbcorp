@@ -39,8 +39,25 @@ export default function ArticleEditor({ params }: { params: { id: string } }) {
       });
       setDirty(false);
       setSaved(true);
+    } catch (e) {
+      alert("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Publication : mise à jour optimiste MAIS on rétablit l'état réel si le serveur
+  // refuse — sinon la bascule « ment » (affiche « Publié » alors que rien n'a changé).
+  // On ne marque pas le formulaire « dirty » : la publication est indépendante.
+  async function togglePublish(v: boolean) {
+    if (!a) return;
+    const prev = a.is_active;
+    setA((p) => (p ? { ...p, is_active: v } : p));
+    try {
+      await api(`/cms/articles/${a.id}/`, { method: "PATCH", body: { is_active: v } });
+    } catch {
+      setA((p) => (p ? { ...p, is_active: prev } : p));
+      alert("Impossible de changer la publication de l'article.");
     }
   }
 
@@ -61,10 +78,7 @@ export default function ArticleEditor({ params }: { params: { id: string } }) {
         <h1 className="flex-1 truncate text-2xl">{a.title}</h1>
         <Toggle
           checked={a.is_active}
-          onChange={(v) => {
-            set("is_active", v);
-            api(`/cms/articles/${a.id}/`, { method: "PATCH", body: { is_active: v } });
-          }}
+          onChange={togglePublish}
           label={a.is_active ? "Publié" : "Brouillon"}
         />
         <button onClick={del} className="btn-danger">

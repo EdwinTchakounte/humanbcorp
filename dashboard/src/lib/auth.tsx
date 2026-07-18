@@ -37,6 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (hasToken) {
       // Rechargement de page : on récupère le profil depuis le token stocké.
       apiMe().then((p) => {
+        // Token expiré/invalide (le refresh a déjà été tenté par api()) : on purge
+        // la session pour que le layout redirige vers /login, au lieu de laisser
+        // un shell vide bloqué sur « Chargement… ».
+        if (!p) {
+          tokens.clear();
+          setAuthed(false);
+        }
         setProfile(p);
         setReady(true);
       });

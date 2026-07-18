@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, listAll } from "@/lib/api";
 import { Toggle, Pagination, PAGE_SIZE, Modal, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
@@ -77,6 +77,20 @@ export default function PublicationsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Lien profond depuis la recherche rapide (⌘K) : /publications?edit=<id>
+  // ouvre directement la fiche de la session concernée.
+  const deepLinkFait = useRef(false);
+  useEffect(() => {
+    if (deepLinkFait.current || items.length === 0) return;
+    const id = Number(new URLSearchParams(window.location.search).get("edit"));
+    if (!id) return;
+    const cible = items.find((x) => x.id === id);
+    if (cible) {
+      deepLinkFait.current = true;
+      openEdit(cible);
+    }
+  }, [items]);
 
   async function onFilter(cat: string) {
     setCategorie(cat);

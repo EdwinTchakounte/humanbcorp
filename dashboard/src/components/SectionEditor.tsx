@@ -44,14 +44,24 @@ export default function SectionEditor({
         },
       });
       setDirty(false);
+    } catch (e) {
+      alert("Échec de l'enregistrement de la section : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }
   }
 
+  // Visibilité : optimiste puis rétablissement si le serveur refuse. On met à jour
+  // is_active directement (sans set() qui marquerait la section « dirty » à tort).
   async function toggleActive(v: boolean) {
-    set("is_active", v);
-    await api(`/cms/sections/${s.id}/`, { method: "PATCH", body: { is_active: v } });
+    const prev = s.is_active;
+    setS((p) => ({ ...p, is_active: v }));
+    try {
+      await api(`/cms/sections/${s.id}/`, { method: "PATCH", body: { is_active: v } });
+    } catch {
+      setS((p) => ({ ...p, is_active: prev }));
+      alert("Impossible de changer la visibilité de la section.");
+    }
   }
 
   async function del() {

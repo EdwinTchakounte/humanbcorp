@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { Card, Section } from "@/lib/types";
+import CmsLink from "@/components/ui/CmsLink";
 import Icon from "@/components/ui/Icon";
 import Reveal from "@/components/ui/Reveal";
 import Blobs from "@/components/ui/Blobs";
@@ -25,9 +25,9 @@ function ImageCard({ c }: { c: Card }) {
         {c.title && <h3 className="text-lg text-brand-deep">{c.title}</h3>}
         {c.text && <p className="mt-2 flex-1 text-sm text-muted">{c.text}</p>}
         {c.link && (
-          <Link href={c.link} className="mt-4 inline-flex items-center gap-1 font-heading text-sm font-semibold text-accent">
+          <CmsLink href={c.link} className="mt-4 inline-flex items-center gap-1 font-heading text-sm font-semibold text-accent">
             {c.link_label || "En savoir plus"} <i className="bx bx-right-arrow-alt" />
-          </Link>
+          </CmsLink>
         )}
       </div>
     </div>
@@ -50,9 +50,10 @@ function IconCard({ c }: { c: Card }) {
 /** Grille de cartes — icônes (services) ou images (blog / équipe / offres). */
 export default function Services({ section }: { section: Section }) {
   const soft = section.bg_color === "soft";
-  const hasImages = section.cards.some((c) => c.image?.url);
+  const cards = section.cards ?? [];
+  const hasImages = cards.some((c) => c.image?.url);
   const cols =
-    section.cards.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3";
+    cards.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3";
 
   return (
     <section
@@ -67,7 +68,7 @@ export default function Services({ section }: { section: Section }) {
       <div className="container-hbc">
         <SectionIntro section={section} />
         <div className={`grid gap-x-6 ${hasImages ? "mt-14 gap-y-8" : "mt-20 gap-y-16"} ${cols}`}>
-          {section.cards.map((c, i) => (
+          {cards.map((c, i) => (
             <Reveal key={c.id} delay={0.06 * (i % 4)}>
               {c.image?.url ? <ImageCard c={c} /> : <IconCard c={c} />}
             </Reveal>

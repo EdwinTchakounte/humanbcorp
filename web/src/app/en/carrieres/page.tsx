@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import OffersList from "@/components/recruitment/OffersList";
 
 export const metadata: Metadata = {
-  title: "Careers — HBC-RH",
+  title: "Careers",
   description: "Join HBC-RH: browse our job openings and apply online.",
 };
 

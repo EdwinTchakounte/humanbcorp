@@ -23,7 +23,7 @@ export default function About({ section }: { section: Section }) {
   if (slides.length === 0 && section.bg_image?.url) {
     slides.push({ url: section.bg_image.url, alt: section.bg_image.alt || section.title });
   }
-  const steps = section.cards.filter((c) => !c.image?.url && c.icon);
+  const steps = (section.cards ?? []).filter((c) => !c.image?.url && c.icon);
 
   return (
     <section id={section.anchor || undefined} className="relative overflow-hidden py-14 md:py-20">

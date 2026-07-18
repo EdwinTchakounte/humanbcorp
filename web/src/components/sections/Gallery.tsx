@@ -1,4 +1,4 @@
-import Link from "next/link";
+import CmsLink from "@/components/ui/CmsLink";
 import type { Section } from "@/lib/types";
 import Reveal from "@/components/ui/Reveal";
 import Pattern from "@/components/ui/Pattern";
@@ -6,7 +6,7 @@ import SectionIntro from "@/components/ui/SectionIntro";
 
 /** Galerie alignée (grille uniforme) + bouton « Voir plus » optionnel. */
 export default function Gallery({ section }: { section: Section }) {
-  const all = section.cards.filter((c) => c.image?.url);
+  const all = (section.cards ?? []).filter((c) => c.image?.url);
   const limit = Number(section.options?.limit) || 0;
   const cards = limit > 0 ? all.slice(0, limit) : all;
   const more = section.options?.more as string | undefined;
@@ -44,9 +44,9 @@ export default function Gallery({ section }: { section: Section }) {
 
         {more && (
           <div className="mt-12 text-center">
-            <Link href={more} className="btn-outline-brand">
+            <CmsLink href={more} className="btn-outline-brand">
               Voir plus <i className="bx bx-right-arrow-alt text-lg" />
-            </Link>
+            </CmsLink>
           </div>
         )}
       </div>

@@ -60,6 +60,9 @@ export default function Header({
 
   const bySlug = (slug: string) => nav.find((n) => n.slug === slug);
   const href = (slug: string) => (slug === "accueil" ? prefix || "/" : `${prefix}/${slug}`);
+  // Liens statiques (catalogue, carrières…) : préfixés par la langue, sinon le
+  // site anglais renverrait vers les routes françaises.
+  const extraHref = (h: string) => `${prefix}${h}`;
   const isActive = (slug: string) =>
     slug === "accueil" ? pathname === (prefix || "/") : pathname === `${prefix}/${slug}`;
   const label = (g: (typeof GROUPS)[number]) => (lang === "en" ? g.en : g.fr);
@@ -124,9 +127,9 @@ export default function Header({
                   {(g.extra || []).map((x) => (
                     <Link
                       key={x.href}
-                      href={x.href}
+                      href={extraHref(x.href)}
                       className={`block rounded-lg px-3 py-2 text-sm ${
-                        pathname === x.href ? "bg-brand-soft text-accent" : "text-brand-deep hover:bg-brand-soft"
+                        pathname === extraHref(x.href) ? "bg-brand-soft text-accent" : "text-brand-deep hover:bg-brand-soft"
                       }`}
                     >
                       {lang === "en" ? x.en : x.fr}
@@ -202,9 +205,9 @@ export default function Header({
                 {(g.extra || []).map((x) => (
                   <Link
                     key={x.href}
-                    href={x.href}
+                    href={extraHref(x.href)}
                     className={`block rounded-lg px-5 py-2.5 font-heading text-sm ${
-                      pathname === x.href ? "text-accent" : "text-brand-deep hover:bg-brand-soft"
+                      pathname === extraHref(x.href) ? "text-accent" : "text-brand-deep hover:bg-brand-soft"
                     }`}
                   >
                     {lang === "en" ? x.en : x.fr}

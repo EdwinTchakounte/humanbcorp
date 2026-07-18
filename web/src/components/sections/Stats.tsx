@@ -8,7 +8,7 @@ export default function Stats({ section }: { section: Section }) {
       <div className="container-hbc">
         <Reveal>
           <div className="grid grid-cols-2 gap-6 rounded-2xl border border-line/70 bg-white px-6 py-9 shadow-hbc-lg md:grid-cols-4 md:px-10">
-            {section.cards.map((c) => (
+            {(section.cards ?? []).map((c) => (
               <div key={c.id} className="text-center">
                 <div className="font-heading text-3xl font-extrabold text-brand md:text-4xl">
                   {String((c.extra?.value as string) ?? "")}

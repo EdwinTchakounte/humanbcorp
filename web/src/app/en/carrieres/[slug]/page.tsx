@@ -8,8 +8,8 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const o = await getOffer(params.slug);
-  if (!o) return { title: "Position not found — HBC-RH" };
-  return { title: `${o.title} — HBC-RH Careers`, description: o.description?.slice(0, 160) };
+  if (!o) return { title: "Position not found" };
+  return { title: `${o.title} — Careers`, description: o.description?.slice(0, 160) };
 }
 
 export default function EnOffreDetailPage({ params }: Props) {

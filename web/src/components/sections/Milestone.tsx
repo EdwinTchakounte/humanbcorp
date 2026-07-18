@@ -10,7 +10,7 @@ export default function Milestone({ section }: { section: Section }) {
       <Pattern variant="grid" opacity={0.09} />
       <Blobs variant="mix" />
       <div className="container-hbc grid grid-cols-2 gap-8 md:grid-cols-4">
-        {section.cards.map((c, i) => (
+        {(section.cards ?? []).map((c, i) => (
           <Reveal key={c.id} delay={0.06 * i}>
             <div className="rounded-2xl bg-white/70 px-4 py-8 text-center shadow-hbc-sm backdrop-blur">
               <div className="font-heading text-4xl font-extrabold text-brand md:text-5xl">

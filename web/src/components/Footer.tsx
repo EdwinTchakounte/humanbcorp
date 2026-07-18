@@ -2,8 +2,19 @@ import Link from "next/link";
 import type { NavItem, SiteSettings } from "@/lib/types";
 import Pattern from "@/components/ui/Pattern";
 
-export default function Footer({ nav, settings }: { nav: NavItem[]; settings: SiteSettings | null }) {
+export default function Footer({
+  nav,
+  settings,
+  lang = "fr",
+}: {
+  nav: NavItem[];
+  settings: SiteSettings | null;
+  lang?: "fr" | "en";
+}) {
   const year = 2026;
+  // Sur le site anglais, tous les liens internes doivent être préfixés par /en.
+  const prefix = lang === "en" ? "/en" : "";
+  const to = (slug: string) => (slug === "accueil" ? prefix || "/" : `${prefix}/${slug}`);
   const phones = settings?.phones_list ?? [];
   const socials: Array<[string, string]> = [
     ["bxl-facebook", settings?.facebook || ""],
@@ -65,7 +76,7 @@ export default function Footer({ nav, settings }: { nav: NavItem[]; settings: Si
             {nav.map((n) => (
               <li key={n.slug}>
                 <Link
-                  href={n.slug === "accueil" ? "/" : `/${n.slug}`}
+                  href={to(n.slug)}
                   className="inline-flex items-center gap-1.5 text-white/70 transition-all hover:text-accent"
                 >
                   <i className="bx bx-chevron-right text-accent/70" aria-hidden /> {n.nav_label}
@@ -112,7 +123,7 @@ export default function Footer({ nav, settings }: { nav: NavItem[]; settings: Si
             )}
           </ul>
           <Link
-            href="/contact"
+            href={to("contact")}
             className="btn-accent mt-6 inline-flex !px-5 !py-2.5 text-sm"
           >
             <i className="bx bx-calendar-check" aria-hidden /> Demander un rendez-vous

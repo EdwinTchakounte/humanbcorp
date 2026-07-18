@@ -41,7 +41,7 @@ export default function Contact({ section }: { section: Section }) {
           <h2 className="mt-3 text-3xl md:text-4xl">{section.title}</h2>
           {section.subtitle && <p className="mt-4 text-lg text-muted">{section.subtitle}</p>}
           <ul className="mt-8 space-y-4">
-            {section.cards.map((c) => (
+            {(section.cards ?? []).map((c) => (
               <li key={c.id} className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl text-accent shadow-hbc-sm">
                   <Icon name={c.icon || "bxs-chevron-right"} />

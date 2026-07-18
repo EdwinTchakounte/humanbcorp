@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { sendChat, type ChatMessage } from "@/lib/api";
 
-const WELCOME = "Bonjour 👋 Je suis l'assistant HBC-RH. Comment puis-je vous aider sur vos besoins RH ?";
+const WELCOME_FR = "Bonjour 👋 Je suis l'assistant HBC-RH. Comment puis-je vous aider sur vos besoins RH ?";
+const WELCOME_EN = "Hello 👋 I'm the HBC-RH assistant. How can I help with your HR needs?";
 
 export default function ChatWidget() {
+  const pathname = usePathname();
+  // Le widget est monté dans le layout racine (commun FR/EN) : on déduit la
+  // langue de l'URL pour ne pas afficher du français sur le site anglais.
+  const WELCOME = pathname?.startsWith("/en") ? WELCOME_EN : WELCOME_FR;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: WELCOME }]);
   const [input, setInput] = useState("");

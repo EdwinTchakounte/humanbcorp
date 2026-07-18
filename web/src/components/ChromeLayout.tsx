@@ -15,7 +15,7 @@ export default async function ChromeLayout({
     <>
       <Header nav={nav} settings={settings} lang={lang} />
       <main>{children}</main>
-      <Footer nav={nav} settings={settings} />
+      <Footer nav={nav} settings={settings} lang={lang} />
     </>
   );
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import DocumentsList from "@/components/documents/DocumentsList";
 
 export const metadata: Metadata = {
-  title: "Resources — HBC-RH",
+  title: "Resources",
   description: "Download our brochures, catalogues and fact sheets.",
 };
 

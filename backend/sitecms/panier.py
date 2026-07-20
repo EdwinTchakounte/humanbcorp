@@ -152,6 +152,67 @@ def _panier_lire_body(request, user):
     return Response(_panier_payload(user))
 
 
+def _memes_noms(u, first: str, last: str) -> bool:
+    """Le compte existant est-il la même personne (ou encore sans nom) ?"""
+    ef = (u.first_name or "").strip().lower()
+    el = (u.last_name or "").strip().lower()
+    if not ef and not el:
+        return True  # compte invité encore vierge → on le complètera
+    return ef == first.strip().lower() and el == last.strip().lower()
+
+
+def _participant_user(email: str, first_name: str, last_name: str):
+    """Résout le compte apprenant d'un participant, en gérant l'e-mail PARTAGÉ.
+
+    Un parent peut inscrire plusieurs enfants sous **une seule adresse e-mail**.
+    Or `_guest_user` déduplique par e-mail (username = e-mail) : deux enfants
+    partageant l'adresse fusionneraient en un seul compte. On distingue donc :
+
+    - e-mail libre, ou déjà celui de CETTE personne → compte « normal »
+      (username = e-mail, login par mot de passe possible), via `_guest_user` ;
+    - e-mail déjà détenu par une AUTRE personne (le parent ou un frère/sœur) →
+      compte **distinct** au username dérivé. Ces comptes s'utilisent par lien
+      magique (un lien par enfant, tous dans la boîte du parent), pas par mot de
+      passe — l'adresse partagée ne les distinguerait pas au login.
+    """
+    email = email.strip().lower()
+    first = first_name.strip()
+    last = last_name.strip()
+
+    holder = User.objects.filter(username=email[:150]).first()
+    if holder is None or _memes_noms(holder, first, last):
+        return _guest_user(email=email, first_name=first, last_name=last)
+
+    from django.contrib.auth.models import Group
+    from django.utils.text import slugify
+
+    from .roles import LEARNER_GROUP
+
+    # Réutilise un compte enfant déjà créé pour ce (e-mail, nom) — un parent qui
+    # re-sélectionne le même enfant ne doit pas en dupliquer le compte.
+    frere = (
+        User.objects.filter(
+            email__iexact=email, first_name__iexact=first, last_name__iexact=last,
+            groups__name__iexact=LEARNER_GROUP,
+        ).exclude(pk=holder.pk).first()
+    )
+    if frere:
+        return frere
+
+    base = (slugify(f"{first}-{last}") or "enfant")[:80]
+    username = f"{base}.{email}"[:150]
+    n = 2
+    while User.objects.filter(username=username).exists():
+        username = f"{base}-{n}.{email}"[:150]
+        n += 1
+    child = User.objects.create(username=username, email=email, first_name=first, last_name=last)
+    child.set_unusable_password()
+    child.save(update_fields=["password"])
+    learner_group, _ = Group.objects.get_or_create(name=LEARNER_GROUP)
+    child.groups.add(learner_group)
+    return child
+
+
 def _ajouter_body(request, user):
     """Ajoute une formation au panier pour un ou plusieurs apprenants.
 
@@ -186,8 +247,9 @@ def _ajouter_body(request, user):
     with transaction.atomic():
         pub = Publication.objects.select_for_update().get(pk=pub.pk)
 
-        # Résolution des apprenants visés. `_guest_user` déduplique par e-mail :
-        # réinscrire un enfant déjà connu réutilise son compte et son historique.
+        # Résolution des apprenants visés. `_participant_user` réutilise le compte
+        # d'un enfant déjà connu (même e-mail + même nom) mais crée un compte
+        # DISTINCT quand plusieurs enfants partagent une adresse — pas de fusion.
         pour_moi = request.data.get("pour_moi")
         if pour_moi is None:
             pour_moi = not participants
@@ -212,8 +274,8 @@ def _ajouter_body(request, user):
                     {"detail": f"L'adresse {email} appartient à un compte du personnel."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            cibles.append(_guest_user(email=email, first_name=prenom,
-                                      last_name=(p.get("last_name") or "").strip()))
+            cibles.append(_participant_user(email=email, first_name=prenom,
+                                            last_name=(p.get("last_name") or "").strip()))
 
         # Dédoublonnage intra-requête : deux lignes identiques prendraient deux
         # places pour une seule personne.

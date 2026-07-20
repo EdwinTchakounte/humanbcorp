@@ -125,10 +125,14 @@ function ChoixParticipants({
         <i className="bx bx-plus" /> Ajouter une autre personne
       </button>
 
-      {/* L'e-mail sert d'identité : c'est là que part l'accès de chacun. */}
+      {/* L'e-mail sert d'identité : c'est là que part l'accès de chacun.
+          Une même adresse peut servir à plusieurs enfants — le back crée un
+          compte distinct par personne et envoie un lien d'accès par enfant. */}
       {autres.length > 0 && (
         <p className="mt-2 text-xs text-muted">
-          Chaque personne recevra son propre lien d’accès à cette adresse.
+          Chaque personne reçoit son propre lien d’accès. Vous pouvez indiquer la
+          <strong> même adresse e-mail pour plusieurs enfants</strong> — ils recevront
+          chacun leur lien à cette adresse.
         </p>
       )}
 

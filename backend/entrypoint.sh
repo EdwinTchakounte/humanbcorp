@@ -23,6 +23,11 @@ fi
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 
+echo "Ensuring payment schedules (django-q2)..."
+# Idempotent : crée les planifications réconciliation/alerte si absentes. Non
+# bloquant — un souci ici ne doit pas empêcher le démarrage du serveur.
+python manage.py setup_payment_crons || echo "setup_payment_crons a échoué (non bloquant)."
+
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 

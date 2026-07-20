@@ -40,6 +40,32 @@ services:
         condition: service_healthy
     expose:
       - "8000"
+    healthcheck:
+      # Sonde de vivacité applicative (DB + app). Nécessite `localhost` dans
+      # ALLOWED_HOSTS pour ne pas être rejetée par Django (DisallowedHost).
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/').status==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Ordonnanceur django-q2 : exécute les tâches planifiées (réconciliation des
+  # paiements EN_ATTENTE toutes les 10 min, alerte des paiements bloqués toutes
+  # les heures). SANS ce service, un webhook Tara perdu = paiement bloqué
+  # indéfiniment. Bypass de l'entrypoint (migrations/collectstatic gérés par
+  # `web`) : il ne fait qu'exécuter le cluster.
+  qcluster:
+    image: ${WEB_IMAGE:-ghcr.io/edwintchakounte/humanbcorp:latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    entrypoint: ["python", "manage.py", "qcluster"]
+    depends_on:
+      db:
+        condition: service_healthy
 
   nginx:
     image: nginx:1.27-alpine

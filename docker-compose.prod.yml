@@ -56,6 +56,25 @@ services:
     expose:
       - "8000"
 
+  # Ordonnanceur django-q2 : réconciliation des paiements EN_ATTENTE (10 min) et
+  # alerte des paiements bloqués (horaire). Indispensable — sans lui, un webhook
+  # Tara perdu laisse un paiement bloqué indéfiniment. Bypass de l'entrypoint
+  # (migrations gérées par humanbcorp_web) ; ne fait qu'exécuter le cluster.
+  humanbcorp_qcluster:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: humanbcorp_db
+      POSTGRES_PORT: 5432
+    entrypoint: ["python", "manage.py", "qcluster"]
+    networks:
+      - internal
+    depends_on:
+      humanbcorp_db:
+        condition: service_healthy
+
 networks:
   internal:
   proxy:

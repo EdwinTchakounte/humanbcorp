@@ -33,3 +33,18 @@ next-env.d.ts
 .idea/
 .vscode/
 .DS_Store
+
+# Accès de développement (contient des identifiants) — ne pas versionner
+ACCES-DEV.md
+
+# Fichiers locaux / personnels — hors périmètre du dépôt
+partager.sh
+presentation/
+mail+paiement/
+backend/logs/
+
+# Scripts visant le VRAI prestataire de paiement — à ne jamais versionner ni lancer par erreur
+backend/real_pay_start.py
+backend/real_pay_reconcile.py
+# Seed local d'algorithmique (jeu de données perso)
+backend/seed_algorithmique.py

@@ -3,11 +3,22 @@ import { notFound } from "next/navigation";
 import { getFormation } from "@/lib/api";
 import type { Lang } from "@/lib/api";
 import InscriptionWidget from "@/components/formations/InscriptionWidget";
+import ShareLinks from "@/components/ShareLinks";
 import JsonLd from "@/components/JsonLd";
 
 const L = {
-  fr: { back: "Toutes les formations" },
-  en: { back: "All trainings" },
+  fr: {
+    back: "Toutes les formations",
+    forme: "forme",
+    partage: "Partager cette formation",
+    partageMsg: "une formation proposée par HBC-RH",
+  },
+  en: {
+    back: "All trainings",
+    forme: "trains",
+    partage: "Share this training",
+    partageMsg: "a training offered by HBC-RH",
+  },
 } as const;
 
 export default async function FormationDetail({ id, lang }: { id: string; lang: Lang }) {
@@ -70,11 +81,23 @@ export default async function FormationDetail({ id, lang }: { id: string; lang: 
                 <img src={formation.image_url} alt={formation.title} className="w-full object-cover" />
               </div>
             )}
-            {formation.categorie_name && <p className="eyebrow">{formation.categorie_name}</p>}
+            {/* École organisatrice si tierce, sinon la catégorie. */}
+            {(formation.ecole || formation.categorie_name) && (
+              <p className="eyebrow">
+                {formation.ecole ? `${formation.ecole} ${t.forme}` : formation.categorie_name}
+              </p>
+            )}
             <h1 className="mt-3 text-3xl md:text-4xl">{formation.title}</h1>
             <div className="prose-hbc mt-6 whitespace-pre-line text-lg leading-relaxed text-muted">
               {formation.description}
             </div>
+
+            <ShareLinks
+              url={`${site}${base}/formations/${formation.id}`}
+              message={`${formation.title} — ${t.partageMsg}`}
+              lang={lang}
+              titre={t.partage}
+            />
           </div>
 
           <aside className="lg:sticky lg:top-28 lg:self-start">

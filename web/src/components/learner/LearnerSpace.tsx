@@ -13,6 +13,7 @@ import {
   type LearnerDoc,
   type SubmitQuizResponse,
 } from "@/lib/api";
+import Souscrire from "./Souscrire";
 
 const SEANCE_TYPE: Record<number, string> = { 0: "Théorie", 1: "Pratique", 2: "Exercice" };
 const DOC_TYPE: Record<number, string> = { 1: "Cours", 2: "Exercice", 3: "Réponse", 4: "Correction" };
@@ -459,6 +460,13 @@ export default function LearnerSpace({ token }: { token: string }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const [content, setContent] = useState<MyFormation | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  const [onglet, setOnglet] = useState<"formations" | "souscrire">("formations");
+
+  /** Après un achat, la liste des formations a changé : on la relit. */
+  async function rechargerEspace() {
+    const s = await getMySpace(token);
+    if (s) setSpace(s);
+  }
 
   useEffect(() => {
     getMySpace(token)
@@ -544,12 +552,44 @@ export default function LearnerSpace({ token }: { token: string }) {
 
   return (
     <div>
-      <header className="mb-8">
+      <header className="mb-6">
         <p className="eyebrow">Mon espace</p>
         <h1 className="mt-2 text-3xl md:text-4xl">Bonjour {space.learner.name} 👋</h1>
-        <p className="mt-3 text-muted">Retrouvez ici le contenu de vos formations.</p>
+        <p className="mt-3 text-muted">
+          Retrouvez ici le contenu de vos formations, et inscrivez-vous à de nouvelles.
+        </p>
       </header>
 
+      {/* Deux usages distincts — apprendre / s'inscrire — donc deux onglets.
+          Les mêler noierait le catalogue commercial sous le contenu pédagogique. */}
+      <div className="mb-8 flex gap-1 border-b border-line" role="tablist">
+        {(
+          [
+            ["formations", "Mes formations", "bx-book-open"],
+            ["souscrire", "S’inscrire à une formation", "bx-cart-add"],
+          ] as const
+        ).map(([id, label, icon]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={onglet === id}
+            onClick={() => setOnglet(id)}
+            className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-3 font-heading text-sm font-semibold transition ${
+              onglet === id
+                ? "border-accent text-brand-deep"
+                : "border-transparent text-muted hover:text-brand"
+            }`}
+          >
+            <i className={`bx ${icon} text-lg`} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {onglet === "souscrire" ? (
+        <Souscrire token={token} onChangement={rechargerEspace} />
+      ) : (
+        <>
       {/* Abonnement agenda : proposé seulement s'il y a des séances à suivre. */}
       {space.agenda_url && space.formations.length > 0 && (
         <AbonnementAgenda url={space.agenda_url} />
@@ -587,7 +627,7 @@ export default function LearnerSpace({ token }: { token: string }) {
                   )}
                   {!f.acces_expire && f.acces_fin && (
                     <p className="mt-1 text-xs text-muted">
-                      <i className="bx bx-time-five" /> Accès jusqu'au {fmtDate(f.acces_fin)}
+                      <i className="bx bx-time-five" /> Accès jusqu&apos;au {fmtDate(f.acces_fin)}
                     </p>
                   )}
                 </div>
@@ -679,6 +719,8 @@ export default function LearnerSpace({ token }: { token: string }) {
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

@@ -74,7 +74,8 @@ export interface PublicFormation {
   id: number;
   title: string;
   description: string;
-  price: string;
+  /** `null` si le responsable a masqué le prix (≠ gratuit). */
+  price: string | null;
   categorie_name: string | null;
   image_url: string | null;
   date: string;
@@ -85,6 +86,8 @@ export interface PublicFormation {
   capacite: number | null;
   places_restantes: number | null;
   complete: boolean;
+  /** École organisatrice — `null` tant que tout relève de HBC-RH. */
+  ecole: string | null;
 }
 
 export async function getFormations(): Promise<PublicFormation[]> {
@@ -146,17 +149,32 @@ export async function getInscriptionStatus(
 // ---------------------------------------------------------------------------
 // Recrutement — offres d'emploi + candidature publique
 // ---------------------------------------------------------------------------
+/** Entreprise révélée (offre premium non anonymisée) ; `null` sinon. */
+export interface OfferCompany {
+  name: string;
+  logo: string | null;
+  website: string | null;
+}
+
 export interface JobOffer {
   id: number;
   title: string;
   slug: string;
-  department: string;
-  location: string;
-  contract_type: string;
-  contract_label: string;
+  /** « UCB recrute » ou « Une entreprise recrute » — calculé côté serveur. */
+  headline: string;
+  company: OfferCompany | null;
+  // Ces champs valent `null` quand le recruteur les a désactivés ou laissés
+  // vides : le rendu doit donc les traiter comme optionnels.
+  department: string | null;
+  location: string | null;
+  contract_label: string | null;
+  salary: string | null;
   description: string;
   profile: string;
   closing_date: string | null;
+  is_featured: boolean;
+  /** `platform` = formulaire HBC-RH ; `direct` = candidature chez le client. */
+  apply: { mode: "platform" | "direct"; target: string | null };
   created_at: string;
 }
 
@@ -365,6 +383,126 @@ export async function markActivity(token: string, activityId: number, done: bool
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Panier — souscrire à d'autres formations depuis son espace, pour soi ou pour
+// des proches (typiquement un parent qui inscrit ses enfants).
+// ---------------------------------------------------------------------------
+export interface CatalogueItem extends PublicFormation {
+  deja_inscrit: boolean;
+  au_panier: boolean;
+}
+export interface PanierLigne {
+  inscription_id: number;
+  publication_id: number;
+  formation: string;
+  prix: string;
+  participant: { id: number; nom: string; email: string };
+}
+export interface Panier {
+  lignes: PanierLigne[];
+  total: string;
+  nb_lignes: number;
+  nb_participants: number;
+  /** Renseignés seulement en réponse à un ajout. */
+  ignores?: { email: string; raison: string }[];
+}
+export interface Participant {
+  first_name: string;
+  last_name?: string;
+  email: string;
+}
+export interface ApprenantSuivi {
+  nom: string;
+  email: string;
+  compte_actif: boolean;
+  formations: {
+    publication_id: number;
+    titre: string;
+    confirmee: boolean;
+    commande_id: number;
+    payee: boolean;
+  }[];
+}
+
+/** Base des routes panier pour l'apprenant identifié par son lien magique. */
+const espace = (token: string) => `${API}/api/v1/site/mon-espace/${token}`;
+
+async function panierPost<T>(url: string, body: unknown): Promise<{ ok: boolean; data: T | null; detail: string }> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    return {
+      ok: res.ok,
+      data: res.ok ? (data as T) : null,
+      detail: (data && (data as { detail?: string }).detail) || (res.ok ? "" : "Une erreur est survenue."),
+    };
+  } catch {
+    return { ok: false, data: null, detail: "Connexion impossible." };
+  }
+}
+
+export async function getCatalogueApprenant(token: string): Promise<CatalogueItem[]> {
+  try {
+    const res = await fetch(`${espace(token)}/catalogue/`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).formations ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getPanier(token: string): Promise<Panier | null> {
+  try {
+    const res = await fetch(`${espace(token)}/panier/`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** `pourMoi` est explicite : on peut s'inscrire soi-même ET inscrire des proches. */
+export async function ajouterAuPanier(
+  token: string,
+  publicationId: number,
+  participants: Participant[],
+  pourMoi: boolean
+) {
+  return panierPost<Panier>(`${espace(token)}/panier/ajouter/`, {
+    publication_id: publicationId,
+    pour_moi: pourMoi,
+    participants,
+  });
+}
+
+export async function retirerDuPanier(token: string, inscriptionId: number) {
+  return panierPost<Panier>(`${espace(token)}/panier/retirer/`, { inscription_id: inscriptionId });
+}
+
+export interface CommandeCreee {
+  order_id: number;
+  order_token?: string;
+  amount: string;
+  paid: boolean;
+}
+export async function commanderPanier(token: string) {
+  return panierPost<CommandeCreee>(`${espace(token)}/panier/commander/`, {});
+}
+
+export async function getMesApprenants(token: string): Promise<ApprenantSuivi[]> {
+  try {
+    const res = await fetch(`${espace(token)}/mes-apprenants/`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).apprenants ?? [];
+  } catch {
+    return [];
   }
 }
 

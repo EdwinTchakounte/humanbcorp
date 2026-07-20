@@ -24,21 +24,34 @@ const config: Config = {
           soft: "#FCECDD",
         },
         ink: "#1F2733",
-        muted: "#5C6675",
-        line: "#E7EBF2",
+        muted: "#586274",
+        line: "#DCE2EC",
+        // Fond « papier » pour alterner discrètement les sections (institutionnel).
+        paper: "#F6F8FC",
       },
       fontFamily: {
         heading: ["var(--font-poppins)", "system-ui", "sans-serif"],
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
+      // Échelle de rayons resserrée : rendu plus institutionnel, net et
+      // structuré (on garde une légère douceur, sans angles vifs bruts).
       borderRadius: {
-        xl: "16px",
-        "2xl": "26px",
+        none: "0",
+        sm: "2px",
+        DEFAULT: "3px",
+        md: "4px",
+        lg: "6px",
+        xl: "8px",
+        "2xl": "10px",
+        "3xl": "14px",
+        full: "9999px",
       },
+      // Ombres resserrées : on privilégie les filets (bordures 1px) à la
+      // profondeur floue. Rendu architectural, net, institutionnel.
       boxShadow: {
-        "hbc-sm": "0 6px 18px rgba(28,50,94,.07)",
-        hbc: "0 14px 38px rgba(28,50,94,.10)",
-        "hbc-lg": "0 26px 60px rgba(28,50,94,.16)",
+        "hbc-sm": "0 1px 2px rgba(28,50,94,.05)",
+        hbc: "0 6px 20px rgba(28,50,94,.07)",
+        "hbc-lg": "0 18px 44px rgba(28,50,94,.12)",
       },
       transitionTimingFunction: {
         hbc: "cubic-bezier(.22,.61,.36,1)",

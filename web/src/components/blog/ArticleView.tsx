@@ -27,7 +27,7 @@ export default async function ArticleView({ slug, lang }: { slug: string; lang: 
         <div className="absolute inset-0 flex items-end">
           <div className="container-hbc pb-10">
             {article.category && (
-              <span className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white">{article.category}</span>
+              <span className="rounded-sm bg-accent px-2.5 py-1 text-xs font-semibold text-white">{article.category}</span>
             )}
             <h1 className="mt-4 max-w-3xl text-3xl text-white md:text-5xl">{article.title}</h1>
             <p className="mt-3 text-sm text-white/80">

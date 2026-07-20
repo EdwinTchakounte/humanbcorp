@@ -45,7 +45,7 @@ export default async function BlogList({ lang }: { lang: Lang }) {
                         />
                       )}
                       {a.category && (
-                        <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white shadow">
+                        <span className="absolute left-3 top-3 rounded-sm bg-accent px-2.5 py-1 text-xs font-semibold text-white shadow">
                           {a.category}
                         </span>
                       )}

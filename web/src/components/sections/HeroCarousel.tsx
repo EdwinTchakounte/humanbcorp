@@ -108,7 +108,7 @@ export default function HeroCarousel({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm"
+                className="inline-flex items-center gap-2 rounded-sm bg-white/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                 {eyebrow}

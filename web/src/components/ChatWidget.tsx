@@ -108,7 +108,7 @@ export default function ChatWidget() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send()}
                 placeholder="Votre message…"
-                className="flex-1 rounded-full border border-line bg-white px-4 py-2 text-sm outline-none focus:border-brand"
+                className="flex-1 rounded-md border border-line bg-white px-4 py-2 text-sm outline-none focus:border-brand"
               />
               <button
                 onClick={send}

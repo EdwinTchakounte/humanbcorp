@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getOffer } from "@/lib/api";
+import { buildOfferMetadata } from "@/lib/offer-meta";
 import OfferDetail from "@/components/recruitment/OfferDetail";
 
 interface Props {
@@ -7,9 +7,7 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const o = await getOffer(params.slug);
-  if (!o) return { title: "Position not found" };
-  return { title: `${o.title} — Careers`, description: o.description?.slice(0, 160) };
+  return buildOfferMetadata(params.slug, "en");
 }
 
 export default function EnOffreDetailPage({ params }: Props) {

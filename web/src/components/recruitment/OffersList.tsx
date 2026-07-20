@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getOffers, type Lang } from "@/lib/api";
 import CandidatureForm from "@/components/recruitment/CandidatureForm";
+import { accrocheOffre } from "@/lib/offer-meta";
 
 const L = {
   fr: {
@@ -11,6 +12,7 @@ const L = {
     see: "Voir l’offre",
     closing: (d: string) => `Clôture le ${d}`,
     spontaneous: "Candidature spontanée",
+    featured: "À la une",
     locale: "fr-FR",
   },
   en: {
@@ -21,6 +23,7 @@ const L = {
     see: "View position",
     closing: (d: string) => `Closes on ${d}`,
     spontaneous: "Open application",
+    featured: "Featured",
     locale: "en-GB",
   },
 } as const;
@@ -49,20 +52,51 @@ export default async function OffersList({ lang }: { lang: Lang }) {
               <Link
                 key={o.id}
                 href={`${base}/carrieres/${o.slug}`}
-                className="group flex items-center justify-between gap-4 rounded-2xl border border-line/70 bg-white p-5 shadow-hbc-sm transition hover:-translate-y-0.5 hover:shadow-hbc md:p-6"
+                className="group flex items-center justify-between gap-4 rounded-lg border border-l-2 border-line border-l-transparent bg-white p-5 shadow-hbc-sm transition-all duration-300 ease-hbc hover:-translate-y-0.5 hover:border-line hover:border-l-accent hover:shadow-hbc md:p-6"
               >
-                <div>
+                <div className="min-w-0">
+                  {/* Qui recrute : nom de l'entreprise si révélé, sinon anonyme. */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
-                      {o.contract_label}
+                    {o.company?.logo && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={o.company.logo}
+                        alt={o.company.name}
+                        className="h-6 w-6 shrink-0 rounded-sm border border-line bg-white object-contain"
+                      />
+                    )}
+                    <span className="text-xs font-semibold uppercase tracking-wide text-accent">
+                      {accrocheOffre(o.company, lang)}
                     </span>
-                    {o.department && <span className="text-xs text-muted">{o.department}</span>}
+                    {o.is_featured && (
+                      <span className="rounded-sm bg-accent px-2 py-0.5 text-[11px] font-semibold text-white">
+                        {t.featured}
+                      </span>
+                    )}
                   </div>
-                  <h3 className="mt-2 text-lg leading-snug">{o.title}</h3>
-                  <p className="mt-1 text-sm text-muted">
-                    <i className="bx bx-map-pin" /> {o.location}
-                    {fmtDate(o.closing_date) && <> · {t.closing(fmtDate(o.closing_date)!)}</>}
-                  </p>
+
+                  <h3 className="mt-1.5 text-lg leading-snug">{o.title}</h3>
+
+                  {/* Seules les informations disponibles sont listées. */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                    {o.contract_label && (
+                      <span className="rounded-sm bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand">
+                        {o.contract_label}
+                      </span>
+                    )}
+                    {o.location && (
+                      <span>
+                        <i className="bx bx-map-pin" /> {o.location}
+                      </span>
+                    )}
+                    {o.salary && (
+                      <span>
+                        <i className="bx bx-wallet" /> {o.salary}
+                      </span>
+                    )}
+                    {o.department && <span>{o.department}</span>}
+                    {fmtDate(o.closing_date) && <span>{t.closing(fmtDate(o.closing_date)!)}</span>}
+                  </div>
                 </div>
                 <span className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-accent sm:inline-flex">
                   {t.see} <i className="bx bx-right-arrow-alt transition group-hover:translate-x-1" />

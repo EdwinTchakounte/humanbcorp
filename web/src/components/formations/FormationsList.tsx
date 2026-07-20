@@ -9,6 +9,7 @@ const L = {
     lead: "Choisissez une formation, inscrivez-vous en quelques clics et réglez en ligne par Mobile Money.",
     empty: "Aucune formation disponible pour le moment.",
     free: "Gratuit",
+    onRequest: "Prix sur demande",
     cta: "S’inscrire",
   },
   en: {
@@ -17,11 +18,14 @@ const L = {
     lead: "Pick a training, register in a few clicks and pay online via Mobile Money.",
     empty: "No training available at the moment.",
     free: "Free",
+    onRequest: "Price on request",
     cta: "Register",
   },
 } as const;
 
-function fmtPrice(v: string, freeLabel: string) {
+function fmtPrice(v: string | null, freeLabel: string, onRequest: string) {
+  // Prix MASQUÉ (null) ≠ prix nul : annoncer « Gratuit » serait un contresens.
+  if (v == null) return onRequest;
   const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
   if (!n) return freeLabel;
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -49,7 +53,7 @@ export default async function FormationsList({ lang }: { lang: Lang }) {
               <Link
                 key={f.id}
                 href={`${base}/formations/${f.id}`}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-line/70 bg-white shadow-hbc-sm transition hover:-translate-y-1 hover:shadow-hbc"
+                className="group flex flex-col overflow-hidden rounded-lg border border-line bg-white shadow-hbc-sm transition-all duration-300 ease-hbc hover:-translate-y-1 hover:border-brand/40 hover:shadow-hbc"
               >
                 <div className="relative aspect-[16/10] overflow-hidden bg-brand-soft">
                   {f.image_url ? (
@@ -60,8 +64,12 @@ export default async function FormationsList({ lang }: { lang: Lang }) {
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-4xl text-brand/30">
-                      <i className="bx bxs-graduation" />
+                    /* Repli sans image : dégradé de marque + marque en filigrane
+                       et liseré d'accent, plutôt qu'un aplat vide. Une carte
+                       sans visuel reste ainsi intentionnelle et soignée. */
+                    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-brand-soft via-white to-brand-soft">
+                      <i className="bx bxs-graduation text-6xl text-brand/20" />
+                      <span className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-accent to-brand opacity-70" />
                     </div>
                   )}
                 </div>
@@ -70,7 +78,7 @@ export default async function FormationsList({ lang }: { lang: Lang }) {
                   <h3 className="mt-2 text-lg leading-snug">{f.title}</h3>
                   <p className="mt-2 line-clamp-3 flex-1 text-sm text-muted">{f.description}</p>
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="font-bold text-brand">{fmtPrice(f.price, t.free)}</span>
+                    <span className="font-bold text-brand">{fmtPrice(f.price, t.free, t.onRequest)}</span>
                     <span className="inline-flex items-center gap-1 text-sm font-semibold text-accent">
                       {t.cta} <i className="bx bx-right-arrow-alt transition group-hover:translate-x-1" />
                     </span>

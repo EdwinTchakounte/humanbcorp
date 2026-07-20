@@ -33,7 +33,7 @@ export default function Gallery({ section }: { section: Section }) {
               <div className="absolute inset-0 bg-gradient-to-t from-brand-deep/60 via-brand-deep/0 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
               {c.title && (
                 <div className="absolute inset-x-3 bottom-3 translate-y-2 opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-                  <span className="inline-block rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-brand-deep shadow-hbc-sm backdrop-blur">
+                  <span className="inline-block rounded-sm bg-white/90 px-3 py-1 text-xs font-medium text-brand-deep shadow-hbc-sm backdrop-blur">
                     {c.title}
                   </span>
                 </div>

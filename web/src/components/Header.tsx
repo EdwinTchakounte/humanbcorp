@@ -141,7 +141,7 @@ export default function Header({
           })}
           <Link
             href={toggleLangHref}
-            className="ml-1 rounded-full border border-line px-3 py-1 font-heading text-xs font-semibold text-brand-deep transition-colors hover:border-brand hover:text-brand"
+            className="ml-1 rounded-md border border-line px-3 py-1 font-heading text-xs font-semibold text-brand-deep transition-colors hover:border-brand hover:text-brand"
           >
             {t.other}
           </Link>
@@ -154,7 +154,7 @@ export default function Header({
         <div className="flex items-center gap-2 lg:hidden">
           <Link
             href={toggleLangHref}
-            className="rounded-full border border-line px-2.5 py-1 font-heading text-xs font-semibold text-brand-deep"
+            className="rounded-md border border-line px-2.5 py-1 font-heading text-xs font-semibold text-brand-deep"
           >
             {t.other}
           </Link>

@@ -12,6 +12,7 @@ import {
 const L = {
   fr: {
     free: "Gratuit",
+    onRequest: "Prix sur demande",
     register: "S’inscrire",
     firstName: "Prénom",
     lastName: "Nom",
@@ -36,6 +37,7 @@ const L = {
   },
   en: {
     free: "Free",
+    onRequest: "Price on request",
     register: "Register",
     firstName: "First name",
     lastName: "Last name",
@@ -60,7 +62,9 @@ const L = {
   },
 } as const;
 
-function fmtPrice(v: string, freeLabel: string) {
+function fmtPrice(v: string | null, freeLabel: string, onRequest: string) {
+  // Prix MASQUÉ (null) ≠ prix nul : annoncer « Gratuit » serait un contresens.
+  if (v == null) return onRequest;
   const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
   if (!n) return freeLabel;
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -157,7 +161,7 @@ export default function InscriptionWidget({
     <div className="rounded-2xl border border-line/70 bg-white p-6 shadow-hbc md:p-8">
       <div className="mb-5 flex items-baseline justify-between gap-3">
         <h3 className="text-lg">{t.register}</h3>
-        <span className="text-xl font-bold text-brand">{fmtPrice(formation.price, t.free)}</span>
+        <span className="text-xl font-bold text-brand">{fmtPrice(formation.price, t.free, t.onRequest)}</span>
       </div>
 
       {/* Session à dates fixes : l'acheteur voit les dates et les places avant
@@ -241,7 +245,7 @@ export default function InscriptionWidget({
             </select>
           </div>
           <button type="submit" disabled={busy} className="btn-accent">
-            {busy ? t.initiating : `${t.pay} ${fmtPrice(formation.price, t.free)}`}
+            {busy ? t.initiating : `${t.pay} ${fmtPrice(formation.price, t.free, t.onRequest)}`}
           </button>
         </form>
       )}

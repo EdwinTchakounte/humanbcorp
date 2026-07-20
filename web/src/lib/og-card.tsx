@@ -68,10 +68,14 @@ export async function formationOgCard(id: string, lang: Lang) {
       f.date_fin ? t.entre(d, new Date(f.date_fin).toLocaleDateString(t.locale, o)) : t.depuis(d)
     );
   }
+  // Prix MASQUÉ (null) ≠ prix nul : sans cette distinction, une formation dont
+  // on cache le tarif s'afficherait « Gratuit » — contresens commercial.
   const prix =
-    f && Number(f.price) > 0
-      ? sansEspacesFines(`${new Intl.NumberFormat(t.locale).format(Number(f.price))} FCFA`)
-      : t.gratuit;
+    !f || f.price == null
+      ? ""
+      : Number(f.price) > 0
+        ? sansEspacesFines(`${new Intl.NumberFormat(t.locale).format(Number(f.price))} FCFA`)
+        : t.gratuit;
   const places = f?.complete
     ? t.complet
     : f?.places_restantes != null
@@ -114,18 +118,23 @@ export async function formationOgCard(id: string, lang: Lang) {
         <div style={{ display: "flex", height: "12px", background: ORANGE, width: "100%" }} />
 
         <div style={{ display: "flex", flexDirection: "column", padding: "0 64px", gap: "18px" }}>
-          {f?.categorie_name ? (
-            <div
-              style={{
-                display: "flex",
-                fontSize: 24,
-                letterSpacing: "3px",
-                textTransform: "uppercase",
-                color: ORANGE,
-                fontWeight: 600,
-              }}
-            >
-              {f.categorie_name}
+          {/* Accroche : école organisatrice si tierce, sinon la catégorie.
+              Même motif signature que le flyer des offres (filet d'accent). */}
+          {f?.ecole || f?.categorie_name ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <div style={{ display: "flex", width: "5px", height: "28px", background: ORANGE }} />
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 26,
+                  letterSpacing: "2px",
+                  textTransform: "uppercase",
+                  color: ORANGE,
+                  fontWeight: 700,
+                }}
+              >
+                {f?.ecole ? `${f.ecole} forme` : f?.categorie_name}
+              </div>
             </div>
           ) : null}
 
@@ -155,19 +164,21 @@ export async function formationOgCard(id: string, lang: Lang) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-            <div
-              style={{
-                display: "flex",
-                background: ORANGE,
-                color: "#ffffff",
-                fontSize: 30,
-                fontWeight: 700,
-                padding: "12px 28px",
-                borderRadius: "999px",
-              }}
-            >
-              {prix}
-            </div>
+            {prix ? (
+              <div
+                style={{
+                  display: "flex",
+                  background: ORANGE,
+                  color: "#ffffff",
+                  fontSize: 30,
+                  fontWeight: 700,
+                  padding: "12px 28px",
+                  borderRadius: "6px",
+                }}
+              >
+                {prix}
+              </div>
+            ) : null}
             {places ? <div style={{ display: "flex", fontSize: 26, color: "#c9d6ee" }}>{places}</div> : null}
           </div>
 

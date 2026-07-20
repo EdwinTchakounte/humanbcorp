@@ -337,6 +337,8 @@ class PublicationSerializer(serializers.ModelSerializer):
             "children_count", "events_count", "image", "image_url",
             "mode", "date_debut", "date_fin", "capacite", "acces_duree_mois",
             "places_restantes", "instructors", "instructors_detail",
+            # Bascules d'affichage de la fiche publique et du flyer de partage.
+            "show_price", "show_dates", "show_places", "show_categorie",
         ]
         read_only_fields = ["date"]
         extra_kwargs = {"categorie": {"required": False}, "description": {"required": False}}

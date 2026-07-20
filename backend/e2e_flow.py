@@ -162,7 +162,11 @@ print("\n── 8. Recrutement ──")
 r = client.get("/api/v1/site/offres/")
 offers = r.data if isinstance(r.data, list) else r.data.get("results", [])
 line("GET liste des offres", r.status_code == 200, f"{len(offers)} offre(s)")
-slug = offers[0]["slug"] if offers else ""
+# Les offres premium se postulent DIRECTEMENT auprès de l'entreprise : le dépôt
+# via la plateforme y est refusé, à dessein. Ce scénario teste le parcours
+# plateforme, on cible donc une offre qui l'accepte.
+plateforme = [o for o in offers if (o.get("apply") or {}).get("mode") != "direct"]
+slug = plateforme[0]["slug"] if plateforme else ""
 if slug:
     r = client.get(f"/api/v1/site/offres/{slug}/")
     line("GET détail offre", r.status_code == 200, r.data.get("title", "")[:30])

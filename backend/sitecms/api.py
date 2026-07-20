@@ -28,6 +28,7 @@ from paiement.models import Paiement
 from bucket.models import Inscription, Order
 from chat.models import Project, ChatMessage
 from .roles import is_admin, is_teacher, module_is_accessible, module_can_write, profile_payload, MODULES
+from espaces.access import espaces_for, is_responsable, current_espace
 from .serializers_modules import (
     EventSerializer,
     MeetingSerializer,
@@ -103,14 +104,55 @@ class HasModuleAccess(permissions.BasePermission):
 # Périmètre « formateur » (auteur limité) : un Teacher ne voit / n'édite que les
 # formations (Theme) où il est affecté ; un admin voit tout.
 # ---------------------------------------------------------------------------
+def _espaces_filter(qs, user):
+    """Restreint un queryset aux espaces de l'utilisateur (admin plateforme = tout).
+
+    Pour la taxonomie partagée (sessions/séquences/catégories/classes) : chaque
+    espace a la sienne, sans distinction responsable/formateur.
+    """
+    if is_admin(user):
+        return qs
+    espaces = espaces_for(user)
+    if not espaces.exists():
+        return qs.none()
+    return qs.filter(espace__in=espaces)
+
+
+def _scope_by_espace_role(qs, user):
+    """Isolation multi-tenant + distinction responsable / formateur rattaché.
+
+    S'applique à un queryset portant un champ `espace` et un M2M `instructors` :
+    - un **responsable** d'espace voit tout le contenu de ses espaces ;
+    - un **formateur** voit le contenu où il est instructeur — l'affectation
+      comme instructeur vaut périmètre à elle seule (arête strictement plus
+      étroite qu'un espace : il ne voit jamais le reste de l'espace), donc on ne
+      le conditionne pas à un rattachement d'espace explicite ni à l'estampille
+      `espace` du contenu. On ne prive jamais un formateur de ce qu'il anime.
+    Le super-admin plateforme est traité en amont (il voit tout, hors espace).
+    """
+    espaces = espaces_for(user)
+    resp_ids = [e.id for e in espaces if is_responsable(user, e)]
+    conds = Q()
+    if resp_ids:
+        conds |= Q(espace_id__in=resp_ids)
+    if is_teacher(user):
+        conds |= Q(instructors=user)
+    if not conds:
+        return qs.none()
+    return qs.filter(conds).distinct()
+
+
 def themes_for(user):
-    """Queryset des thèmes accessibles à ce profil (tout pour admin, affectés pour teacher)."""
+    """Queryset des thèmes accessibles à ce profil.
+
+    Admin plateforme → tout ; sinon isolation par espace, puis périmètre
+    responsable (tout l'espace) ou formateur (ses formations) — cf.
+    `_scope_by_espace_role`.
+    """
     qs = Theme.objects.filter(is_deleted=False)
     if is_admin(user):
         return qs
-    if is_teacher(user):
-        return qs.filter(instructors=user)
-    return qs.none()
+    return _scope_by_espace_role(qs, user)
 
 
 def can_edit_theme(user, theme):
@@ -139,9 +181,7 @@ def publications_for(user):
     qs = Publication.objects.all()
     if is_admin(user):
         return qs
-    if is_teacher(user):
-        return qs.filter(instructors=user)
-    return qs.none()
+    return _scope_by_espace_role(qs, user)
 
 
 def _assert_publication_access(user, publication):
@@ -283,6 +323,18 @@ class ArticleDetailView(_LangContextMixin, RetrieveAPIView):
 # ---------------------------------------------------------------------------
 # CRUD dashboard
 # ---------------------------------------------------------------------------
+def _audit_action(request, action, obj, details=None):
+    """Trace une action sur le contenu/le back-office (défensif — ne casse rien)."""
+    from apps_coop.audit.services import client_ip, record
+
+    record(
+        action=action, entite_type=type(obj).__name__, entite_id=getattr(obj, "pk", None),
+        user=getattr(request, "user", None),
+        details=details or {"repr": str(obj)[:120]},
+        ip=client_ip(request), user_agent=request.META.get("HTTP_USER_AGENT", ""),
+    )
+
+
 class _BaseCmsViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffOrReadOnly]
 
@@ -290,6 +342,19 @@ class _BaseCmsViewSet(viewsets.ModelViewSet):
         ctx = super().get_serializer_context()
         ctx["request"] = self.request
         return ctx
+
+    # Traçabilité du contenu du site : création / modification / suppression.
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        _audit_action(self.request, "cms.created", obj)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        _audit_action(self.request, "cms.updated", obj)
+
+    def perform_destroy(self, instance):
+        _audit_action(self.request, "cms.deleted", instance)
+        instance.delete()
 
 
 class PageViewSet(_BaseCmsViewSet):
@@ -361,6 +426,8 @@ class SiteSettingsViewSet(viewsets.ViewSet):
         ser = SiteSettingsWriteSerializer(obj, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
+        _audit_action(request, "settings.updated", obj,
+                      details={"champs": sorted(request.data.keys())})
         return Response(SiteSettingsWriteSerializer(obj).data)
 
     partial_update = update
@@ -601,7 +668,8 @@ class ThemeViewSet(_ModuleViewSet):
         # L'affectation des formateurs (instructors) est réservée aux admins.
         if not is_admin(self.request.user):
             serializer.validated_data.pop("instructors", None)
-        theme = serializer.save()
+        # Estampille l'espace (tenant) propriétaire de la formation.
+        theme = serializer.save(espace=current_espace(self.request.user))
         # Un formateur qui crée une formation s'y affecte pour la retrouver dans son périmètre.
         if is_teacher(self.request.user) and not is_admin(self.request.user):
             theme.instructors.add(self.request.user)
@@ -611,6 +679,26 @@ class ThemeViewSet(_ModuleViewSet):
         if not is_admin(self.request.user):
             serializer.validated_data.pop("instructors", None)
         serializer.save()
+
+    @action(detail=True, methods=["get"], url_path="apercu")
+    def apercu(self, request, pk=None):
+        """GET /modules/themes/<id>/apercu/ → le contenu tel que l'apprenant le verra.
+
+        On appelle **le même constructeur** que l'espace apprenant
+        (`build_theme_content`) : un aperçu qui reconstruirait l'arbre de son
+        côté finirait par diverger du rendu réel, et ne servirait plus à rien.
+
+        Différence unique : les bonnes réponses du quiz sont marquées, pour que
+        l'auteur puisse vérifier son corrigé. L'accès est déjà restreint à son
+        périmètre (`get_queryset` → `themes_for`).
+        """
+        from .learner import build_theme_content
+
+        theme = self.get_object()
+        return Response({
+            "theme": build_theme_content(theme, request, user=None, reveal_answers=True),
+            "titre": theme.title,
+        })
 
 
 # --- Hiérarchie des formations : axes de classement (CRUD léger) ----------
@@ -626,7 +714,10 @@ class _HierarchyViewSet(_ModuleViewSet):
     module_key = "formations"
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(
+            created_by=self.request.user,
+            espace=current_espace(self.request.user),
+        )
 
     def _admin_only(self):
         if not is_admin(self.request.user):
@@ -649,14 +740,18 @@ class SessionViewSet(_HierarchyViewSet):
     serializer_class = SessionMiniSerializer
 
     def get_queryset(self):
-        return Session.objects.filter(is_deleted=False).order_by("-year", "-id")
+        qs = _espaces_filter(Session.objects.filter(is_deleted=False), self.request.user)
+        return qs.order_by("-year", "-id")
 
 
 class SequenceViewSet(_HierarchyViewSet):
     serializer_class = SequenceMiniSerializer
 
     def get_queryset(self):
-        qs = Sequence.objects.filter(is_deleted=False).select_related("session")
+        qs = _espaces_filter(
+            Sequence.objects.filter(is_deleted=False).select_related("session"),
+            self.request.user,
+        )
         session = self.request.query_params.get("session")
         if session:
             qs = qs.filter(session_id=session)
@@ -669,14 +764,16 @@ class FormationCategorieViewSet(_HierarchyViewSet):
     serializer_class = CategorieMiniSerializer
 
     def get_queryset(self):
-        return Categorie.objects.filter(is_deleted=False).order_by("name")
+        qs = _espaces_filter(Categorie.objects.filter(is_deleted=False), self.request.user)
+        return qs.order_by("name")
 
 
 class ClasseViewSet(_HierarchyViewSet):
     serializer_class = ClasseMiniSerializer
 
     def get_queryset(self):
-        return Classe.objects.filter(is_deleted=False).order_by("name")
+        qs = _espaces_filter(Classe.objects.filter(is_deleted=False), self.request.user)
+        return qs.order_by("name")
 
 
 class SeanceViewSet(_ModuleViewSet):
@@ -1103,19 +1200,25 @@ class FormationsOverviewView(APIView):
     def get(self, request):
         ctx = {"request": request}
         # Le compteur de formations respecte le périmètre (un formateur ne voit
-        # que les siennes) — cohérent avec la liste filtrée en dessous.
+        # que les siennes) — cohérent avec la liste filtrée en dessous. La
+        # taxonomie (sessions/séquences/catégories/classes) est cloisonnée par
+        # espace comme le reste du contenu.
+        sessions = _espaces_filter(Session.objects.filter(is_deleted=False), request.user)
+        sequences = _espaces_filter(Sequence.objects.filter(is_deleted=False), request.user)
+        categories = _espaces_filter(Categorie.objects.filter(is_deleted=False), request.user)
+        classes = _espaces_filter(Classe.objects.filter(is_deleted=False), request.user)
         return Response({
             "counts": {
                 "themes": themes_for(request.user).count(),
-                "sessions": Session.objects.filter(is_deleted=False).count(),
-                "sequences": Sequence.objects.filter(is_deleted=False).count(),
-                "classes": Classe.objects.filter(is_deleted=False).count(),
-                "categories": Categorie.objects.filter(is_deleted=False).count(),
+                "sessions": sessions.count(),
+                "sequences": sequences.count(),
+                "classes": classes.count(),
+                "categories": categories.count(),
             },
-            "sessions": SessionMiniSerializer(Session.objects.filter(is_deleted=False).order_by("-year"), many=True, context=ctx).data,
-            "sequences": SequenceMiniSerializer(Sequence.objects.filter(is_deleted=False), many=True, context=ctx).data,
-            "categories": CategorieMiniSerializer(Categorie.objects.filter(is_deleted=False), many=True, context=ctx).data,
-            "classes": ClasseMiniSerializer(Classe.objects.filter(is_deleted=False), many=True, context=ctx).data,
+            "sessions": SessionMiniSerializer(sessions.order_by("-year"), many=True, context=ctx).data,
+            "sequences": SequenceMiniSerializer(sequences, many=True, context=ctx).data,
+            "categories": CategorieMiniSerializer(categories, many=True, context=ctx).data,
+            "classes": ClasseMiniSerializer(classes, many=True, context=ctx).data,
         })
 
 
@@ -1257,7 +1360,10 @@ class PublicationViewSet(_ModuleViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        qs = Publication.objects.select_related("categorie").prefetch_related("liste_tags", "themes")
+        qs = _espaces_filter(
+            Publication.objects.select_related("categorie").prefetch_related("liste_tags", "themes"),
+            self.request.user,
+        )
         categorie = self.request.query_params.get("categorie")
         if categorie:
             qs = qs.filter(categorie_id=categorie)
@@ -1267,6 +1373,9 @@ class PublicationViewSet(_ModuleViewSet):
         elif visibility == "private":
             qs = qs.filter(is_private=True)
         return qs.order_by("-date", "-id")
+
+    def perform_create(self, serializer):
+        serializer.save(espace=current_espace(self.request.user))
 
 
 class PublicationsOverviewView(APIView):
@@ -1357,25 +1466,9 @@ class InscriptionViewSet(_ModuleViewSet):
         lien magique ne partait jusqu'ici que par l'événement « paiement reçu »,
         donc uniquement au bout d'un paiement.
         """
-        try:
-            from apps_coop.notifications.events import emit_event
+        from .learner import notifier_acces_apprenant
 
-            from .learner import learner_space_url
-
-            u = inscription.participant
-            emit_event(
-                "inscription.confirmee",
-                member=u,
-                to_email=u.email or None,
-                context={
-                    "nom": u.get_full_name() or u.first_name or u.username,
-                    "formation": inscription.publication.title,
-                    "portal_url": learner_space_url(u),
-                },
-            )
-            return True
-        except Exception:  # noqa: BLE001 — l'inscription prime sur la notification
-            return False
+        return notifier_acces_apprenant(inscription)
 
     @action(detail=False, methods=["post"], url_path="inscrire")
     def inscrire(self, request):
@@ -1604,6 +1697,106 @@ class InscriptionsOverviewView(APIView):
             "total_orders_paid": round(total_orders, 2),
             "inscription_statuses": [{"value": k, "label": v} for k, v in INSCRIPTION_STATUS.items()],
             "order_statuses": [{"value": k, "label": v} for k, v in ORDER_STATUS.items()],
+        })
+
+
+class EspacesCAView(APIView):
+    """GET /modules/espaces/ca/ → suivi des souscriptions + chiffre d'affaires par espace.
+
+    L'encaissement reste centralisé (portefeuille super-admin, un seul compte
+    Tara), mais chaque école a son propre suivi : nombre de souscriptions par
+    statut, apprenants distincts, et CA encaissé. L'attribution se fait au grain
+    de la souscription (`Inscription.espace`), figé à la souscription — un panier
+    mixte est ainsi ventilé correctement entre écoles.
+
+    Périmètre : super-admin plateforme → tous les espaces ; sinon uniquement les
+    espaces dont l'utilisateur est **responsable** (un formateur rattaché ne pilote
+    pas le CA de l'école). Le CA encaissé = somme des prix des publications des
+    souscriptions **confirmées** (order réglé) rattachées à l'espace.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count, Sum
+
+        user = request.user
+        espaces = espaces_for(user)
+        if not is_admin(user):
+            # Un responsable pilote le CA ; les autres rôles n'y ont pas accès.
+            espaces = [e for e in espaces if is_responsable(user, e)]
+        espaces = list(espaces)
+        by_id = {e.id: e for e in espaces}
+
+        rows = (
+            Inscription.objects.filter(is_deleted=False, espace_id__in=by_id.keys())
+            .values("espace")
+            .annotate(
+                total=Count("id"),
+                confirmed=Count("id", filter=Q(status=Inscription.CONFIRMED)),
+                waiting=Count("id", filter=Q(status=Inscription.WAITING)),
+                cancel=Count("id", filter=Q(status=Inscription.CANCEL)),
+                apprenants=Count("participant", distinct=True),
+            )
+        )
+        agg = {r["espace"]: r for r in rows}
+
+        # CA « réellement encaissé » : montant FIGÉ de la souscription (immunise
+        # contre un changement de prix ultérieur), et UNIQUEMENT les inscriptions
+        # confirmées rattachées à une commande RÉGLÉE (TOTAL_PAID). Les places
+        # offertes (confirmées sans paiement) sont donc naturellement exclues.
+        from bucket.models import Order, OrderInscription
+
+        ca_rows = (
+            OrderInscription.objects.filter(
+                order__status=Order.TOTAL_PAID,
+                inscription__status=Inscription.CONFIRMED,
+                inscription__is_deleted=False,
+                inscription__espace_id__in=by_id.keys(),
+            )
+            .values("inscription__espace")
+            .annotate(ca=Sum("inscription__montant"))
+        )
+        ca_by_espace = {r["inscription__espace"]: r["ca"] for r in ca_rows}
+
+        def _f(v):
+            try:
+                return round(float(v), 2)
+            except (TypeError, ValueError):
+                return 0.0
+
+        items = []
+        total_ca = 0.0
+        total_souscriptions = 0
+        for e in espaces:
+            r = agg.get(e.id, {})
+            ca = _f(ca_by_espace.get(e.id, 0))
+            total_ca += ca
+            total_souscriptions += r.get("total", 0)
+            items.append({
+                "id": e.id,
+                "nom": e.nom,
+                "slug": e.slug,
+                "est_actif": e.est_actif(),
+                "est_expire": e.est_expire,
+                "date_fin": e.date_fin,
+                "souscriptions": {
+                    "total": r.get("total", 0),
+                    "confirmed": r.get("confirmed", 0),
+                    "waiting": r.get("waiting", 0),
+                    "cancel": r.get("cancel", 0),
+                },
+                "apprenants": r.get("apprenants", 0),
+                "ca_encaisse": ca,
+            })
+
+        return Response({
+            "espaces": items,
+            "totaux": {
+                "ca_encaisse": round(total_ca, 2),
+                "souscriptions": total_souscriptions,
+                "espaces": len(items),
+            },
         })
 
 

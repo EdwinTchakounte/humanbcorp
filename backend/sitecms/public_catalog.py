@@ -53,23 +53,53 @@ def load_order(token: str) -> Order:
 # Sérialisation du catalogue public
 # ---------------------------------------------------------------------------
 class PublicFormationSerializer(serializers.ModelSerializer):
-    """Vue publique et minimale d'une formation (Publication non privée)."""
+    """Vue publique d'une formation (Publication non privée).
 
-    categorie_name = serializers.CharField(source="categorie.name", read_only=True)
+    Comme pour les offres d'emploi, on ne sérialise QUE ce qui est montrable :
+    un champ désactivé par le responsable vaut `null` et disparaît donc de la
+    fiche comme du flyer, sans laisser de trou dans la mise en page.
+    """
+
+    categorie_name = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     # Cohorte : ce que l'acheteur doit voir avant de s'inscrire.
     places_restantes = serializers.SerializerMethodField()
     complete = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
+    date_debut = serializers.SerializerMethodField()
+    date_fin = serializers.SerializerMethodField()
+    # École organisatrice — `null` tant que tout relève de HBC-RH (cf. modèle).
+    ecole = serializers.CharField(source="ecole_display", read_only=True)
 
     class Meta:
         model = Publication
         fields = [
             "id", "title", "description", "price", "categorie_name", "image_url", "date",
             "mode", "date_debut", "date_fin", "capacite", "places_restantes", "complete",
+            "ecole",
         ]
 
+    def _vis(self, obj):
+        if not hasattr(obj, "_vis_cache"):
+            obj._vis_cache = obj.visible_fields()
+        return obj._vis_cache
+
+    def get_price(self, obj):
+        p = self._vis(obj)["price"]
+        return None if p is None else str(p)
+
+    def get_date_debut(self, obj):
+        return self._vis(obj)["date_debut"]
+
+    def get_date_fin(self, obj):
+        return self._vis(obj)["date_fin"]
+
+    def get_categorie_name(self, obj):
+        return self._vis(obj)["categorie"]
+
     def get_places_restantes(self, obj):
-        return obj.places_restantes()
+        # Masquées si le responsable a désactivé l'affichage des places.
+        return self._vis(obj)["places"]
 
     def get_complete(self, obj):
         return obj.est_complete()
@@ -185,6 +215,13 @@ def _guest_user(*, email: str, first_name: str, last_name: str) -> User:
             changed.append("email")
         if changed:
             user.save(update_fields=changed)
+    # Étiquette « apprenant » : distingue ce compte du staff au login et lui
+    # ouvre l'espace apprenant (mais aucun accès dashboard). Idempotent.
+    from django.contrib.auth.models import Group
+    from .roles import LEARNER_GROUP
+
+    learner_group, _ = Group.objects.get_or_create(name=LEARNER_GROUP)
+    user.groups.add(learner_group)
     return user
 
 

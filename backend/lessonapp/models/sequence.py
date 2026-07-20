@@ -11,8 +11,12 @@ from .session import Session
 class Sequence(Abstract):
   
 	numero =  models.PositiveIntegerField()
-	created_by = models.ForeignKey(User, on_delete=models.CASCADE, default=None)   
+	created_by = models.ForeignKey(User, on_delete=models.CASCADE, default=None)
 	session = models.ForeignKey(Session, on_delete=models.CASCADE, default=None)
+	espace = models.ForeignKey(
+		"espaces.Espace", on_delete=models.CASCADE, null=True, blank=True,
+		related_name="sequences",
+	)
 	
 	def __str__(self):
 		return str(self.numero)

@@ -10,15 +10,18 @@ quiz, ni de notation, ni de progression (itération suivante).
 """
 from __future__ import annotations
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.core import signing
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from bucket.models import Inscription
+from .roles import LEARNER_GROUP, is_learner
 
 _MEMBER_SALT = "sitecms.learner.member"
 _TOKEN_MAX_AGE = 60 * 60 * 24 * 180  # 6 mois d'accès au contenu acheté
@@ -46,6 +49,55 @@ def learner_space_url(user: User) -> str:
 
     base = getattr(settings, "SITE_PUBLIC_URL", "http://localhost:3000").rstrip("/")
     return f"{base}/mon-espace/{sign_member(user)}"
+
+
+def learner_password_url(user: User) -> str:
+    """Lien de définition du mot de passe (activation du compte).
+
+    Même jeton signé que l'espace : le lien reçu par e-mail prouve la possession
+    de l'adresse, ce qui suffit à autoriser la pose d'un mot de passe. Une fois
+    activé, l'apprenant se connecte sans dépendre du lien magique — lequel
+    expire au bout de 6 mois.
+    """
+    return f"{learner_space_url(user)}/compte"
+
+
+def notifier_acces_apprenant(inscription) -> bool:
+    """Envoie à **l'apprenant** son e-mail d'accès (espace + définition du mot de passe).
+
+    Point d'envoi unique, appelé partout où une inscription devient CONFIRMED :
+    encaissement manuel, webhook Tara, inscription posée à la main. Le destinataire
+    est `inscription.participant`, **pas l'acheteur** : quand un parent règle pour
+    ses enfants, c'est chaque enfant qui doit recevoir son accès. Le reçu de
+    paiement (`paiement.recu`), lui, reste adressé à l'acheteur — ce sont deux
+    messages distincts pour deux personnes distinctes.
+
+    Best-effort : ne lève jamais, une notification ratée ne doit pas annuler un
+    paiement encaissé. Renvoie True si l'envoi a été émis.
+    """
+    try:
+        from apps_coop.notifications.events import emit_event
+
+        u = inscription.participant
+        if not u or not u.email:
+            return False
+        emit_event(
+            "inscription.confirmee",
+            member=u,
+            to_email=u.email,
+            context={
+                "nom": u.get_full_name() or u.first_name or u.username,
+                "formation": inscription.publication.title,
+                "portal_url": learner_space_url(u),
+                # L'apprenant n'a pas choisi de mot de passe (compte invité créé
+                # au passage en caisse, ou inscrit par un tiers) : ce lien est sa
+                # seule porte vers un accès durable, sans dépendre du lien magique.
+                "password_url": learner_password_url(u),
+            },
+        )
+        return True
+    except Exception:  # noqa: BLE001 — l'inscription prime sur la notification
+        return False
 
 
 def sign_member_calendar(user: User) -> str:
@@ -112,11 +164,15 @@ def _doc_payload(request, doc, index):
     }
 
 
-def build_theme_content(theme, request, user=None):
+def build_theme_content(theme, request, user=None, reveal_answers=False):
     """Construit l'arbre de contenu d'un Theme (adapté de lessonapp.read_theme).
 
     Si ``user`` est fourni, chaque activité quiz porte ``last_attempt`` (dernier
     score de l'apprenant sur ce quiz) — sinon ``None``.
+
+    ``reveal_answers`` marque les bonnes options (`is_answer`). Réservé à
+    l'**aperçu auteur** : l'auteur doit pouvoir vérifier que son corrigé est
+    juste. Il reste à False pour l'apprenant, sinon le quiz se donnerait.
     """
     # Imports locaux (évite de charger lessonapp/material au démarrage de sitecms).
     from lessonapp.models import Objectif, Seance, Activity, Activityquestion, Question
@@ -165,7 +221,13 @@ def build_theme_content(theme, request, user=None):
                 for qi, aq in enumerate(aqs, start=1):
                     q = aq.question
                     options = [
-                        {"id": o.pk, "title": o.title, "input_type": o.input_type}
+                        {
+                            "id": o.pk,
+                            "title": o.title,
+                            "input_type": o.input_type,
+                            # Corrigé visible uniquement en aperçu auteur.
+                            **({"is_answer": o.is_answer} if reveal_answers else {}),
+                        }
                         for o in InputQuestionBox.objects.filter(question=q)
                     ]
                     questions.append({
@@ -299,18 +361,21 @@ def build_schedule(publication):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def my_space(request, token):
-    """GET /api/v1/site/mon-espace/<token>/ → formations confirmées de l'apprenant."""
-    try:
-        user = load_member(token)
-    except User.DoesNotExist:
-        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
-
+# ---------------------------------------------------------------------------
+# Résolution de l'apprenant : deux voies vers le MÊME contenu.
+#
+# 1. Lien magique signé (historique, sans compte) — `load_member(token)`.
+# 2. Compte apprenant authentifié (mot de passe → JWT) — `request.user`.
+#
+# Les corps métier ci-dessous prennent un `user` déjà résolu : l'autorisation
+# reste identique (inscription confirmée + offre non expirée), seule change la
+# façon d'identifier l'apprenant. On ne duplique donc jamais la logique d'accès.
+# ---------------------------------------------------------------------------
+def _space_payload(request, user):
+    """Corps de l'espace apprenant : ses formations confirmées + agenda."""
     inscriptions = (
         Inscription.objects.filter(participant=user, status=Inscription.CONFIRMED, is_deleted=False)
-        .select_related("publication")
+        .select_related("publication", "publication__espace")
     )
     seen = set()
     formations = []
@@ -327,6 +392,10 @@ def my_space(request, token):
             "title": pub.title,
             "description": pub.description,
             "image": _abs(request, pub.image.url) if pub.image else None,
+            # École (espace) qui a vendu cette formation : contextualise l'offre
+            # pour l'apprenant, sans jamais exposer d'autre espace (on ne liste
+            # que SES propres inscriptions).
+            "ecole": pub.espace.nom if pub.espace_id else None,
             "has_content": pub.themes.exists(),
             "progress": _publication_progress(user, pub),
             "mode": pub.mode,
@@ -335,28 +404,23 @@ def my_space(request, token):
             "acces_fin": fin,
             "acces_expire": acces_expire(ins),
         })
-    return Response({
-        "learner": {"name": user.get_full_name() or user.first_name or user.username, "email": user.email},
+    return {
+        "learner": {
+            "name": user.get_full_name() or user.first_name or user.username,
+            "email": user.email,
+            # L'apprenant a-t-il déjà activé un mot de passe ? La vitrine s'en
+            # sert pour proposer « créer mon compte » depuis le lien magique.
+            "has_account": user.has_usable_password(),
+        },
         "formations": formations,
         # URL d'abonnement : l'apprenant la colle dans son agenda et ses séances
         # s'y synchronisent, y compris quand on les déplace.
         "agenda_url": learner_calendar_url(user),
-    })
+    }
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def my_formation(request, token, publication_id):
-    """GET /api/v1/site/mon-espace/<token>/formation/<id>/ → contenu d'une formation.
-
-    Autorisation : l'apprenant doit avoir une inscription **confirmée** sur cette
-    publication. Renvoie le contenu de chaque Theme rattaché.
-    """
-    try:
-        user = load_member(token)
-    except User.DoesNotExist:
-        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
-
+def _formation_payload(request, user, publication_id):
+    """Corps du contenu d'une formation. Renvoie (payload, http_status)."""
     ins = (
         Inscription.objects.filter(
             participant=user, publication_id=publication_id,
@@ -366,19 +430,13 @@ def my_formation(request, token, publication_id):
         .first()
     )
     if not ins:
-        return Response(
-            {"detail": "Vous n'avez pas accès à cette formation."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+        return {"detail": "Vous n'avez pas accès à cette formation."}, status.HTTP_403_FORBIDDEN
     if acces_expire(ins):
-        return Response(
-            {
-                "detail": "Votre accès à cette formation a expiré.",
-                "acces_expire": True,
-                "acces_fin": ins.publication.fin_acces(depuis=ins.created_at),
-            },
-            status=status.HTTP_403_FORBIDDEN,
-        )
+        return {
+            "detail": "Votre accès à cette formation a expiré.",
+            "acces_expire": True,
+            "acces_fin": ins.publication.fin_acces(depuis=ins.created_at),
+        }, status.HTTP_403_FORBIDDEN
 
     pub = ins.publication
     # `is_deleted` est un soft-delete : sans ce filtre, une formation supprimée
@@ -388,13 +446,51 @@ def my_formation(request, token, publication_id):
         build_theme_content(t, request, user=user)
         for t in pub.themes.filter(is_deleted=False)
     ]
-    return Response({
+    return {
         "publication_id": pub.id,
         "title": pub.title,
         "description": pub.description,
         "schedule": build_schedule(pub),
         "themes": themes,
-    })
+    }, status.HTTP_200_OK
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def my_space(request, token):
+    """GET /api/v1/site/mon-espace/<token>/ → formations confirmées (voie lien magique)."""
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(_space_payload(request, user))
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_space_auth(request):
+    """GET /api/v1/site/apprenant/mon-espace/ → même espace, via compte authentifié."""
+    return Response(_space_payload(request, request.user))
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def my_formation(request, token, publication_id):
+    """GET /api/v1/site/mon-espace/<token>/formation/<id>/ → contenu (voie lien magique)."""
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+    payload, code = _formation_payload(request, user, publication_id)
+    return Response(payload, status=code)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_formation_auth(request, publication_id):
+    """GET /api/v1/site/apprenant/formation/<id>/ → contenu, via compte authentifié."""
+    payload, code = _formation_payload(request, request.user, publication_id)
+    return Response(payload, status=code)
 
 
 def _learner_can_access_activity(user, activity) -> bool:
@@ -449,6 +545,29 @@ def _score_quiz(activity, answers: dict):
     return total, max_total, results
 
 
+def _submit_quiz_payload(request, user, activity_id):
+    """Corrige un quiz pour `user`. Renvoie (payload, http_status)."""
+    from lessonapp.models import Activity
+    from material.models import QuizAttempt
+
+    activity = Activity.objects.filter(pk=activity_id, a_type=Activity.QUIZZ).first()
+    if activity is None:
+        return {"detail": "Quiz introuvable."}, status.HTTP_404_NOT_FOUND
+    if not _learner_can_access_activity(user, activity):
+        return {"detail": "Vous n'avez pas accès à ce quiz."}, status.HTTP_403_FORBIDDEN
+
+    answers = request.data.get("answers") or {}
+    if not isinstance(answers, dict):
+        return {"detail": "Format de réponses invalide."}, status.HTTP_400_BAD_REQUEST
+
+    score, max_score, results = _score_quiz(activity, answers)
+    QuizAttempt.objects.create(
+        learner=user, activity=activity, score=score, max_score=max_score, answers=answers
+    )
+    _mark_activity(user, activity, True)  # un quiz soumis marque l'activité terminée
+    return {"score": score, "max_score": max_score, "results": results}, status.HTTP_200_OK
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def submit_quiz(request, token, activity_id):
@@ -461,26 +580,16 @@ def submit_quiz(request, token, activity_id):
         user = load_member(token)
     except User.DoesNotExist:
         return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+    payload, code = _submit_quiz_payload(request, user, activity_id)
+    return Response(payload, status=code)
 
-    from lessonapp.models import Activity
-    from material.models import QuizAttempt
 
-    activity = Activity.objects.filter(pk=activity_id, a_type=Activity.QUIZZ).first()
-    if activity is None:
-        return Response({"detail": "Quiz introuvable."}, status=status.HTTP_404_NOT_FOUND)
-    if not _learner_can_access_activity(user, activity):
-        return Response({"detail": "Vous n'avez pas accès à ce quiz."}, status=status.HTTP_403_FORBIDDEN)
-
-    answers = request.data.get("answers") or {}
-    if not isinstance(answers, dict):
-        return Response({"detail": "Format de réponses invalide."}, status=status.HTTP_400_BAD_REQUEST)
-
-    score, max_score, results = _score_quiz(activity, answers)
-    QuizAttempt.objects.create(
-        learner=user, activity=activity, score=score, max_score=max_score, answers=answers
-    )
-    _mark_activity(user, activity, True)  # un quiz soumis marque l'activité terminée
-    return Response({"score": score, "max_score": max_score, "results": results})
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def submit_quiz_auth(request, activity_id):
+    """POST /api/v1/site/apprenant/quiz/<activity_id>/ → corrige et note (compte authentifié)."""
+    payload, code = _submit_quiz_payload(request, request.user, activity_id)
+    return Response(payload, status=code)
 
 
 def _mark_activity(user, activity, completed: bool) -> None:
@@ -512,6 +621,21 @@ def _publication_progress(user, pub) -> dict:
     return {"done": done, "total": total, "percent": round(100 * done / total) if total else 0}
 
 
+def _mark_activity_payload(request, user, activity_id):
+    """Marque une activité terminée/non pour `user`. Renvoie (payload, http_status)."""
+    from lessonapp.models import Activity
+
+    activity = Activity.objects.filter(pk=activity_id).first()
+    if activity is None:
+        return {"detail": "Activité introuvable."}, status.HTTP_404_NOT_FOUND
+    if not _learner_can_access_activity(user, activity):
+        return {"detail": "Vous n'avez pas accès à cette activité."}, status.HTTP_403_FORBIDDEN
+
+    done = request.data.get("done", True)
+    _mark_activity(user, activity, bool(done))
+    return {"activity_id": activity.id, "completed": bool(done)}, status.HTTP_200_OK
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def mark_activity(request, token, activity_id):
@@ -524,18 +648,16 @@ def mark_activity(request, token, activity_id):
         user = load_member(token)
     except User.DoesNotExist:
         return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+    payload, code = _mark_activity_payload(request, user, activity_id)
+    return Response(payload, status=code)
 
-    from lessonapp.models import Activity
 
-    activity = Activity.objects.filter(pk=activity_id).first()
-    if activity is None:
-        return Response({"detail": "Activité introuvable."}, status=status.HTTP_404_NOT_FOUND)
-    if not _learner_can_access_activity(user, activity):
-        return Response({"detail": "Vous n'avez pas accès à cette activité."}, status=status.HTTP_403_FORBIDDEN)
-
-    done = request.data.get("done", True)
-    _mark_activity(user, activity, bool(done))
-    return Response({"activity_id": activity.id, "completed": bool(done)})
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mark_activity_auth(request, activity_id):
+    """POST /api/v1/site/apprenant/activite/<activity_id>/terminer/ (compte authentifié)."""
+    payload, code = _mark_activity_payload(request, request.user, activity_id)
+    return Response(payload, status=code)
 
 
 @api_view(["GET"])
@@ -634,3 +756,72 @@ def agenda_ics(request, token):
     # verrait un planning périmé sans le savoir.
     resp["Cache-Control"] = "no-cache, must-revalidate"
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Comptes apprenants : activation d'un mot de passe + connexion (JWT).
+#
+# On garde le lien magique (accès sans friction) et on ajoute, par-dessus, un
+# vrai compte : l'apprenant définit un mot de passe DEPUIS son lien magique (qui
+# prouve la possession de l'adresse e-mail), puis se connecte ensuite par
+# e-mail + mot de passe pour retrouver ses ressources sans dépendre du lien.
+# ---------------------------------------------------------------------------
+MIN_PASSWORD_LEN = 8
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def set_password(request, token):
+    """POST /api/v1/site/mon-espace/<token>/compte/ → définit le mot de passe.
+
+    Le lien magique signé sert de preuve d'identité pour l'activation. Un compte
+    invité (mot de passe inutilisable) ne peut pas se connecter tant qu'il n'est
+    pas passé par ici.
+    """
+    try:
+        user = load_member(token)
+    except User.DoesNotExist:
+        return Response({"detail": "Lien d'accès invalide ou expiré."}, status=status.HTTP_404_NOT_FOUND)
+
+    password = (request.data.get("password") or "").strip()
+    if len(password) < MIN_PASSWORD_LEN:
+        return Response(
+            {"detail": f"Mot de passe trop court (min. {MIN_PASSWORD_LEN} caractères)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user.set_password(password)
+    user.save(update_fields=["password"])
+    # Garantit l'étiquette apprenant (comptes historiques sans groupe).
+    learner_group, _ = Group.objects.get_or_create(name=LEARNER_GROUP)
+    user.groups.add(learner_group)
+    return Response({"ok": True, "email": user.email, "username": user.username})
+
+
+class ApprenantTokenSerializer(TokenObtainPairSerializer):
+    """JWT apprenant : ajoute un claim `is_learner` et un profil léger.
+
+    Connexion avec `username` = e-mail (convention `_guest_user`) + mot de passe.
+    Un invité sans mot de passe utilisable est refusé par SimpleJWT en amont.
+    """
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["is_learner"] = is_learner(user)
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        u = self.user
+        data["learner"] = {
+            "name": u.get_full_name() or u.first_name or u.username,
+            "email": u.email,
+        }
+        data["is_learner"] = is_learner(u)
+        return data
+
+
+class ApprenantTokenView(TokenObtainPairView):
+    """POST /api/v1/site/apprenant/login/ → JWT apprenant (e-mail + mot de passe)."""
+
+    serializer_class = ApprenantTokenSerializer

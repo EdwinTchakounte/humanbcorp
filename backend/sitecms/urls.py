@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import public_catalog
 from . import learner
+from . import panier
 from .api import (
     ArticleDetailView,
     ArticleListView,
@@ -15,6 +16,7 @@ from .api import (
     ChatProjectViewSet,
     ChatView,
     ContactView,
+    EspacesCAView,
     EventViewSet,
     FormationsOverviewView,
     InscriptionViewSet,
@@ -88,6 +90,7 @@ urlpatterns = [
     path("modules/publications/overview/", PublicationsOverviewView.as_view(), name="mod-publications-overview"),
     path("modules/paiements/overview/", PaiementsOverviewView.as_view(), name="mod-paiements-overview"),
     path("modules/inscriptions/overview/", InscriptionsOverviewView.as_view(), name="mod-inscriptions-overview"),
+    path("modules/espaces/ca/", EspacesCAView.as_view(), name="mod-espaces-ca"),
     path("modules/messagerie/overview/", MessagerieOverviewView.as_view(), name="mod-messagerie-overview"),
 
     # Public (vitrine)
@@ -110,6 +113,28 @@ urlpatterns = [
     path("site/mon-espace/<str:token>/formation/<int:publication_id>/", learner.my_formation, name="site-mon-espace-formation"),
     path("site/mon-espace/<str:token>/quiz/<int:activity_id>/", learner.submit_quiz, name="site-mon-espace-quiz"),
     path("site/mon-espace/<str:token>/activite/<int:activity_id>/terminer/", learner.mark_activity, name="site-mon-espace-activite"),
+    # Activation d'un vrai compte apprenant (mot de passe) depuis le lien magique.
+    path("site/mon-espace/<str:token>/compte/", learner.set_password, name="site-mon-espace-compte"),
+    # Espace apprenant par COMPTE authentifié (mot de passe → JWT), même contenu.
+    path("site/apprenant/login/", learner.ApprenantTokenView.as_view(), name="site-apprenant-login"),
+    path("site/apprenant/mon-espace/", learner.my_space_auth, name="site-apprenant-mon-espace"),
+    path("site/apprenant/formation/<int:publication_id>/", learner.my_formation_auth, name="site-apprenant-formation"),
+    path("site/apprenant/quiz/<int:activity_id>/", learner.submit_quiz_auth, name="site-apprenant-quiz"),
+    path("site/apprenant/activite/<int:activity_id>/terminer/", learner.mark_activity_auth, name="site-apprenant-activite"),
+    # Souscrire à d'autres formations depuis son espace, pour soi ou pour des tiers.
+    path("site/apprenant/catalogue/", panier.catalogue, name="site-apprenant-catalogue"),
+    path("site/apprenant/panier/", panier.panier_lire, name="site-apprenant-panier"),
+    path("site/apprenant/panier/ajouter/", panier.panier_ajouter, name="site-apprenant-panier-ajouter"),
+    path("site/apprenant/panier/retirer/", panier.panier_retirer, name="site-apprenant-panier-retirer"),
+    path("site/apprenant/panier/commander/", panier.panier_commander, name="site-apprenant-panier-commander"),
+    path("site/apprenant/mes-apprenants/", panier.mes_apprenants, name="site-apprenant-mes-apprenants"),
+    # Mêmes fonctions, accessibles depuis le lien magique (apprenant sans mot de passe).
+    path("site/mon-espace/<str:token>/catalogue/", panier.catalogue_token, name="site-mon-espace-catalogue"),
+    path("site/mon-espace/<str:token>/panier/", panier.panier_lire_token, name="site-mon-espace-panier"),
+    path("site/mon-espace/<str:token>/panier/ajouter/", panier.panier_ajouter_token, name="site-mon-espace-panier-ajouter"),
+    path("site/mon-espace/<str:token>/panier/retirer/", panier.panier_retirer_token, name="site-mon-espace-panier-retirer"),
+    path("site/mon-espace/<str:token>/panier/commander/", panier.panier_commander_token, name="site-mon-espace-panier-commander"),
+    path("site/mon-espace/<str:token>/mes-apprenants/", panier.mes_apprenants_token, name="site-mon-espace-mes-apprenants"),
     path("contact/", ContactView.as_view(), name="contact"),
     path("chat/", ChatView.as_view(), name="chat"),
 

@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "paiement",
     "sitecms",
     "recruitment",
+    "espaces",
     #"accounts.apps.AccountsConfig",
 
     # Refonte 2026 — modules greffés (mail Brevo + paiement mobile money Tara)
@@ -81,6 +82,7 @@ INSTALLED_APPS = [
     "django_q",
     "apps_coop.notifications",
     "apps_coop.payments",
+    "apps_coop.audit",
 ]
 
 MIDDLEWARE = [
@@ -333,6 +335,66 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
+
+# ---------------------------------------------------------------------------
+# Journalisation — sans config explicite, seuls les WARNING+ remontaient et les
+# logs INFO (résumés de réconciliation, traces webhook, record_audit best-effort)
+# étaient perdus. On formate la console (récupérée par docker/gunicorn) + un
+# fichier rotatif optionnel, et on route les ERROR vers `mail_admins` si ADMINS.
+# ---------------------------------------------------------------------------
+ADMINS = [("Admin HBC", e.strip()) for e in config("ADMINS", default="").split(",") if e.strip()]
+
+LOG_LEVEL = config("LOG_LEVEL", default="INFO")
+LOG_DIR = BASE_DIR / "logs"
+_log_handlers = ["console"]
+try:
+    LOG_DIR.mkdir(exist_ok=True)
+    _log_handlers.append("file")
+except OSError:
+    pass  # système de fichiers en lecture seule → on reste sur la console
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {"format": "{asctime} {levelname} {name} — {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+        **({"file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOG_DIR / "hbc.log"),
+            "maxBytes": 5 * 1024 * 1024, "backupCount": 5, "formatter": "verbose",
+        }} if "file" in _log_handlers else {}),
+        "mail_admins": {"class": "django.utils.log.AdminEmailHandler", "level": "ERROR"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "django": {"handlers": _log_handlers, "level": "INFO", "propagate": False},
+        "django.request": {"handlers": _log_handlers + ["mail_admins"], "level": "ERROR", "propagate": False},
+        "apps_coop": {"handlers": _log_handlers, "level": LOG_LEVEL, "propagate": False},
+        "recruitment": {"handlers": _log_handlers, "level": LOG_LEVEL, "propagate": False},
+        "sitecms": {"handlers": _log_handlers, "level": LOG_LEVEL, "propagate": False},
+    },
+}
+
+# Tracker d'erreurs Sentry — actif uniquement si SENTRY_DSN est fourni.
+SENTRY_DSN = config("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=config("SENTRY_TRACES_RATE", default=0.0, cast=float),
+            send_default_pii=False,
+            environment=config("SENTRY_ENV", default="production"),
+        )
+    except ImportError:
+        pass  # sentry-sdk non installé → on ignore proprement
 
 
 # ---------------------------------------------------------------------------

@@ -465,6 +465,7 @@ def webhook_tara(request):
             event.status,
             provider_reference=event.provider_reference,
             raw_payload=event.raw,
+            verify_with_provider=True,
         )
     except Payment.DoesNotExist:
         record_audit(

@@ -21,6 +21,13 @@ class Theme(Abstract):
         Categorie, on_delete=models.SET_NULL, null=True, blank=True, default=None
     )
     classes = models.ManyToManyField(Classe)
+    # Espace (tenant) propriétaire de cette formation. Cloisonne le contenu par
+    # école : un membre ne voit que les formations de ses espaces. Nullable le
+    # temps de la bascule ; le contenu historique est rattaché à « Maison mère ».
+    espace = models.ForeignKey(
+        "espaces.Espace", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="themes",
+    )
     # Formateurs affectés à cette formation (rôle Teacher). Un formateur ne voit /
     # n'édite que les formations où il figure ici (les admins voient tout).
     instructors = models.ManyToManyField('auth.User', blank=True, related_name='formations_animees')

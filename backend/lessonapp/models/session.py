@@ -12,6 +12,10 @@ class Session(Abstract):
 
     year =  models.CharField(max_length=400)
     created_by = models.ForeignKey(User,  on_delete=models.CASCADE, default=None)
+    espace = models.ForeignKey(
+        "espaces.Espace", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="sessions",
+    )
    
    	
     def __str__(self):

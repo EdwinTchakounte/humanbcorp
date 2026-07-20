@@ -85,9 +85,31 @@ class Inscription(Abstract):
 	CANCEL = 3
 	TYPES_CHOICES = ( (TESTING, 'Testing'), (WAITING, 'Waiting'),(CONFIRMED, 'Confirmed'),(CANCEL, 'Cancel') )
 	status = models.IntegerField(TYPES_CHOICES, default=0)
-	
-	
-	
+	# Espace (tenant) qui « possède » cette souscription. Clé d'attribution du
+	# suivi des souscriptions et du chiffre d'affaires par école (étape 3).
+	# Dénormalisé depuis `publication.espace` : on fige l'attribution au moment
+	# de la souscription, pour que le CA historique reste juste même si la
+	# publication est déplacée d'espace plus tard (même logique que le snapshot
+	# `Order.total_amount`). Rempli automatiquement par `save()`.
+	espace = models.ForeignKey(
+		"espaces.Espace", on_delete=models.SET_NULL, null=True, blank=True,
+		related_name="inscriptions",
+	)
+	# Prix figé de la souscription (prix de la publication au moment de la
+	# souscription). Base du CA « réellement encaissé » : une variation de prix
+	# ultérieure ne réécrit pas l'historique. `null` = pas encore figé (legacy).
+	# Rempli automatiquement par `save()`, même logique que `espace`.
+	montant = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+	def save(self, *args, **kwargs):
+		# Auto-attribution du tenant : couvre tous les points de création
+		# (catalogue public, panier, inscription manuelle) sans en oublier un.
+		if self.espace_id is None and self.publication_id:
+			self.espace_id = self.publication.espace_id
+		if self.montant is None and self.publication_id:
+			self.montant = self.publication.price or 0
+		return super().save(*args, **kwargs)
+
 	def check_publication_exist( self, publication_id ):
 		publication = Publication.objects.filter(pk=publication_id)[0]
 		if self.publication.id == publication.id:

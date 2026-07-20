@@ -41,6 +41,8 @@ urlpatterns = [
     path('api/v1/', include('recruitment.urls')),
     path('api/v1/payments/', include('apps_coop.payments.urls')),
     path('api/v1/notifications/', include('apps_coop.notifications.urls')),
+    path('api/v1/', include('apps_coop.audit.urls')),
+    path('api/v1/', include('apps_coop.monitoring.urls')),
     # --- Application historique (débranchée) --------------------------------
     # path('administration/', views.administration),
     # path('', views.homepage),

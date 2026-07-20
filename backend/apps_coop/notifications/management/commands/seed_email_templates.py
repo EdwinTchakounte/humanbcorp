@@ -18,6 +18,7 @@ from apps_coop.notifications.email_blocks import (
     callout,
     closing,
     cta,
+    cta_secondary,
     hi,
     info_card,
     lead,
@@ -82,10 +83,15 @@ TEMPLATES = [
                 "Votre inscription à <strong>{formation}</strong> est confirmée. "
                 "Nous avons hâte de vous accueillir."
             ),
-            cta("Voir mes inscriptions", "{portal_url}"),
+            cta("Accéder à mon espace", "{portal_url}"),
+            p(
+                "Astuce : définissez un mot de passe pour retrouver votre espace à tout "
+                "moment, sans dépendre de ce lien (qui expire au bout de 6 mois)."
+            ),
+            cta_secondary("Définir mon mot de passe", "{password_url}"),
             closing(),
         ),
-        "variables": ["nom", "formation", "portal_url"],
+        "variables": ["nom", "formation", "portal_url", "password_url"],
     },
     # ────────────────────────────────────────────────────────────────────
     # Paiement
@@ -106,10 +112,17 @@ TEMPLATES = [
                 tone="success",
             ),
             p("Un reçu détaillé est disponible dans votre espace."),
-            cta("Voir ma commande", "{portal_url}"),
+            cta("Accéder à mon espace", "{portal_url}"),
+            p(
+                "Astuce : définissez un mot de passe pour retrouver votre espace à tout "
+                "moment, sans dépendre de ce lien."
+            ),
+            cta_secondary("Définir mon mot de passe", "{password_url}"),
             closing(),
         ),
-        "variables": ["nom", "montant", "commande_id", "statut", "reste", "portal_url"],
+        "variables": [
+            "nom", "montant", "commande_id", "statut", "reste", "portal_url", "password_url",
+        ],
     },
     # ────────────────────────────────────────────────────────────────────
     # Contact (notification interne à l'équipe HBC-RH)

@@ -31,15 +31,71 @@ CV_MAX_BYTES = 5 * 1024 * 1024  # 5 Mo
 # Serializers
 # ---------------------------------------------------------------------------
 class JobOfferSerializer(serializers.ModelSerializer):
-    contract_label = serializers.CharField(source="get_contract_type_display", read_only=True)
+    """Vue publique d'une offre — filtrée par les règles d'affichage.
+
+    On ne sérialise QUE ce qui est montrable : un champ désactivé, vide, ou
+    réservé au premium (identité de l'entreprise) n'apparaît pas du tout dans
+    la réponse. L'anonymat est ainsi garanti côté serveur, pas seulement
+    masqué à l'affichage.
+    """
+
+    headline = serializers.CharField(read_only=True)
+    company = serializers.SerializerMethodField()
+    contract_label = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    location = serializers.SerializerMethodField()
+    salary = serializers.SerializerMethodField()
+    closing_date = serializers.SerializerMethodField()
+    apply = serializers.SerializerMethodField()
 
     class Meta:
         model = JobOffer
         fields = [
-            "id", "title", "slug", "department", "location",
-            "contract_type", "contract_label", "description", "profile",
-            "closing_date", "created_at",
+            "id", "title", "slug", "headline", "company",
+            "department", "location", "contract_label", "salary",
+            "description", "profile", "closing_date",
+            "is_featured", "apply", "created_at",
         ]
+
+    def _vis(self, obj):
+        # Calculé une fois par objet plutôt qu'à chaque champ.
+        if not hasattr(obj, "_vis_cache"):
+            obj._vis_cache = obj.visible_fields()
+        return obj._vis_cache
+
+    def get_company(self, obj):
+        nom = obj.company_display
+        if not nom:
+            return None  # offre anonyme : rien ne filtre, pas même le logo
+        request = self.context.get("request")
+        logo = None
+        if obj.company_logo:
+            try:
+                logo = obj.company_logo.url
+                if request:
+                    logo = request.build_absolute_uri(logo)
+            except ValueError:
+                logo = None
+        return {"name": nom, "logo": logo, "website": obj.company_website or None}
+
+    def get_contract_label(self, obj):
+        return self._vis(obj)["contract"]
+
+    def get_department(self, obj):
+        return self._vis(obj)["department"]
+
+    def get_location(self, obj):
+        return self._vis(obj)["location"]
+
+    def get_salary(self, obj):
+        return self._vis(obj)["salary"]
+
+    def get_closing_date(self, obj):
+        return self._vis(obj)["closing_date"]
+
+    def get_apply(self, obj):
+        """Où postuler : formulaire plateforme, ou directement chez le client."""
+        return {"mode": obj.apply_mode, "target": obj.apply_target}
 
 
 class ApplicationCreateSerializer(serializers.ModelSerializer):
@@ -70,6 +126,13 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             offer = JobOffer.objects.filter(slug=slug, is_published=True).first()
             if not offer:
                 raise serializers.ValidationError({"offer_slug": "Offre introuvable ou clôturée."})
+            # Une offre en candidature directe ne passe pas par la plateforme :
+            # sans ce garde-fou, un POST forgé déposerait chez nous un dossier
+            # que le client attend dans sa propre boîte.
+            if offer.apply_mode == "direct":
+                raise serializers.ValidationError(
+                    {"offer_slug": "Cette offre se postule directement auprès de l'entreprise."}
+                )
             attrs["offer"] = offer
         return attrs
 
@@ -83,7 +146,8 @@ class CandidatureThrottle(AnonRateThrottle):
 
 
 def _published_qs():
-    return JobOffer.objects.filter(is_published=True)
+    # Les offres « mises en avant » (premium) remontent en tête de liste.
+    return JobOffer.objects.filter(is_published=True).order_by("-is_featured", "-created_at")
 
 
 # ---------------------------------------------------------------------------

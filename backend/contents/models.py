@@ -38,6 +38,17 @@ class Publication(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     date = models.DateTimeField(auto_now_add=True)
+    # Espace (tenant) propriétaire de cette cohorte. Clé d'attribution du suivi
+    # et — à l'étape 3 — du chiffre d'affaires par école. Nullable le temps de la
+    # bascule ; l'historique est rattaché à « Maison mère ».
+    # SET_NULL (et non CASCADE) : supprimer un espace ne doit PAS détruire ses
+    # publications ni, en cascade, les inscriptions/commandes qui portent
+    # l'historique du CA — sinon le SET_NULL défensif de `Inscription.espace`
+    # serait neutralisé. La publication est simplement détachée (à réaffecter).
+    espace = models.ForeignKey(
+        "espaces.Espace", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="publications",
+    )
     price = models.DecimalField(max_digits=8, decimal_places=2, default='00000.00')
     events = models.ManyToManyField(Event, blank=True)
     categorie = models.ForeignKey(Category, on_delete=models.CASCADE, default=None)
@@ -75,6 +86,48 @@ class Publication(models.Model):
     instructors = models.ManyToManyField(
         "auth.User", blank=True, related_name="sessions_animees"
     )
+
+    # --- Champs affichés sur la fiche publique et le flyer de partage ------
+    # Le responsable choisit ce qu'il montre : un champ désactivé disparaît de
+    # la page ET du flyer, dont la composition se resserre.
+    show_price = models.BooleanField("Afficher le prix", default=True)
+    show_dates = models.BooleanField("Afficher les dates", default=True)
+    show_places = models.BooleanField("Afficher les places restantes", default=True)
+    show_categorie = models.BooleanField("Afficher la catégorie", default=True)
+    show_ecole = models.BooleanField("Afficher l'école", default=True)
+
+    def visible_fields(self) -> dict:
+        """Ce qui est réellement montrable : activé ET renseigné.
+
+        Même principe que côté offres d'emploi : la page et le flyer se
+        composent à partir d'ici, pour ne jamais laisser de trou.
+        """
+        return {
+            "price": self.price if self.show_price else None,
+            "date_debut": self.date_debut if self.show_dates else None,
+            "date_fin": self.date_fin if self.show_dates else None,
+            "places": self.places_restantes() if self.show_places else None,
+            "categorie": (
+                self.categorie.name if (self.show_categorie and self.categorie_id) else None
+            ),
+        }
+
+    @property
+    def ecole_display(self):
+        """Nom de l'école à afficher, ou None.
+
+        Aujourd'hui tout est rattaché à HBC-RH : afficher « HBC-RH » ferait
+        doublon avec la marque déjà présente partout. On ne renvoie donc un nom
+        que pour une école TIERCE — l'affichage est ainsi déjà prêt le jour où
+        le catalogue s'ouvrira à d'autres organismes (cf. app `espaces`).
+        """
+        from espaces.access import DEFAULT_ESPACE_SLUG
+
+        if not (self.show_ecole and self.espace_id):
+            return None
+        if self.espace.slug == DEFAULT_ESPACE_SLUG:
+            return None
+        return self.espace.nom
 
     def places_restantes(self):
         """Places encore disponibles, ou None si la capacité est illimitée."""

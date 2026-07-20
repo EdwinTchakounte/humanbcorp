@@ -66,7 +66,6 @@ def init_payin_for_payment(
     return result.payment_url, result.provider_reference, result.raw or {}
 
 
-@transaction.atomic
 def _webhook_amount(raw_payload: dict) -> int | None:
     """Montant (XAF entier) présent dans le webhook Tara, si disponible.
 
@@ -83,12 +82,14 @@ def _webhook_amount(raw_payload: dict) -> int | None:
     return None
 
 
+@transaction.atomic
 def handle_webhook_event(
     payment_idempotency_key: str | uuid.UUID,
     new_status: str,
     *,
     provider_reference: str = "",
     raw_payload: dict | None = None,
+    verify_with_provider: bool = False,
 ) -> Payment:
     """Apply a verified webhook event to the matching Payment row.
 
@@ -207,6 +208,22 @@ def handle_webhook_event(
         return payment
 
     if new_status == "valide":
+        # Tara ne signe pas ses webhooks : un POST "SUCCESS" forgé ne doit JAMAIS
+        # suffire à confirmer un paiement. On reconfirme l'état DIRECTEMENT auprès
+        # de Tara (server-to-server) avant d'accorder l'accès. Le cron, lui, a
+        # déjà vérifié via check_status → il appelle avec verify_with_provider=False.
+        if verify_with_provider and not settings.DEBUG:
+            from apps_coop.payments.providers import get_provider
+            try:
+                confirme = get_provider(payment.provider_code or "tara").check_status(payment) == "valide"
+            except Exception:  # noqa: BLE001 — en cas de doute, on ne confirme pas
+                confirme = False
+            if not confirme:
+                logger.warning(
+                    "[TARA] webhook 'valide' NON confirmé par check_status (Payment #%s) — ignoré.",
+                    payment.id,
+                )
+                return payment
         return _confirm(payment, provider_reference=provider_reference, raw=raw_payload or {})
     if new_status == "rejete":
         return _reject(payment, raw=raw_payload or {})
@@ -391,13 +408,16 @@ def _emit_paiement_recu(payment, order, *, fully_paid, total_paid) -> None:
 
         to_email = getattr(payment.member, "email", "") or ""
 
-        # Lien magique vers l'espace apprenant (accès au contenu de la formation).
+        # Lien magique vers l'espace apprenant (accès au contenu de la formation),
+        # et lien d'activation d'un mot de passe (accès durable, sans le lien).
         try:
-            from sitecms.learner import learner_space_url
+            from sitecms.learner import learner_password_url, learner_space_url
 
             portal_url = learner_space_url(payment.member)
+            password_url = learner_password_url(payment.member)
         except Exception:  # noqa: BLE001 — dégrade sur l'URL dashboard si indispo
             portal_url = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3007")
+            password_url = portal_url
 
         emit_event(
             "paiement.recu",
@@ -410,6 +430,7 @@ def _emit_paiement_recu(payment, order, *, fully_paid, total_paid) -> None:
                 "reste": _fmt_xaf(max(order.total_amount - total_paid, 0)),
                 "statut": "payée intégralement" if fully_paid else "partiellement payée",
                 "portal_url": portal_url,
+                "password_url": password_url,
             },
         )
     except Exception:  # noqa: BLE001
@@ -457,13 +478,17 @@ def _hook_inscription_order(payment: Payment, _raw: dict) -> None:
         # commande est intégralement payée. Sur paiement partiel (SEMI_PAID), les
         # inscriptions restent WAITING : pas d'accès tant que le solde n'est pas réglé.
         confirmed = 0
+        nouvelles = []
         if fully_paid:
-            for oi in OrderInscription.objects.select_related("inscription").filter(order=order):
+            for oi in OrderInscription.objects.select_related(
+                "inscription", "inscription__participant", "inscription__publication"
+            ).filter(order=order):
                 insc = oi.inscription
                 if insc.status != Inscription.CONFIRMED:
                     insc.status = Inscription.CONFIRMED
                     insc.save(update_fields=["status"])
                     confirmed += 1
+                    nouvelles.append(insc)
             _remove_order_inscriptions_from_bucket(order)
 
         record_audit(
@@ -482,6 +507,17 @@ def _hook_inscription_order(payment: Payment, _raw: dict) -> None:
 
         if not already_final:
             _emit_paiement_recu(payment, order, fully_paid=fully_paid, total_paid=total_paid)
+
+        # Reçu ≠ accès. Le reçu ci-dessus part à l'acheteur ; ici chaque apprenant
+        # nouvellement confirmé reçoit SON e-mail de bienvenue avec le lien de
+        # définition de mot de passe. Piloté par la liste des transitions, donc
+        # idempotent : un second encaissement sur la même commande n'en renvoie
+        # aucun. Sans cela, un apprenant payé en agence — ou un enfant inscrit
+        # par son parent — n'aurait jamais reçu ses identifiants.
+        from sitecms.learner import notifier_acces_apprenant
+
+        for insc in nouvelles:
+            notifier_acces_apprenant(insc)
     except Exception:  # noqa: BLE001 — un hook ne doit jamais casser le webhook.
         logger.warning("_hook_inscription_order a échoué pour Payment #%s", payment.id, exc_info=True)
 

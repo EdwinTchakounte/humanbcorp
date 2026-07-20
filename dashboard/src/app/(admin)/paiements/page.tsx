@@ -2,24 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { api, listAll } from "@/lib/api";
-import { Pagination, PAGE_SIZE } from "@/components/ui";
+import { Pagination, PAGE_SIZE, Badge } from "@/components/ui";
+import { formatMoney, formatDate } from "@/lib/format";
 import type { PaiementItem, PaiementsOverview } from "@/lib/types";
 
-function fmtAmount(v: string | number) {
-  const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
-  if (!n) return "—";
-  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-}
-function fmtDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("fr-FR", { dateStyle: "medium" });
-}
-
-const STATUS_STYLE: Record<number, string> = {
-  1: "bg-green-50 text-green-700",
-  2: "bg-red-50 text-red-600",
-  3: "bg-amber-50 text-amber-600",
-};
+type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
+const STATUS_TONE: Record<number, BadgeTone> = { 1: "success", 2: "danger", 3: "warning" };
 const METHOD_ICON: Record<number, string> = { 1: "bx-money", 2: "bx-mobile", 3: "bxl-paypal" };
 
 export default function PaiementsPage() {
@@ -27,6 +15,8 @@ export default function PaiementsPage() {
   const [overview, setOverview] = useState<PaiementsOverview | null>(null);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  // Rechargement léger au changement de filtre : le tableau reste affiché.
+  const [refetching, setRefetching] = useState(false);
   const [page, setPage] = useState(1);
 
   async function load(st: string) {
@@ -49,16 +39,19 @@ export default function PaiementsPage() {
   async function onFilter(st: string) {
     setStatus(st);
     setPage(1);
-    setLoading(true);
-    await load(st);
-    setLoading(false);
+    setRefetching(true);
+    try {
+      await load(st);
+    } finally {
+      setRefetching(false);
+    }
   }
 
   const pagedItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const tiles = overview
     ? [
-        { label: "Total encaissé", value: fmtAmount(overview.total_encaisse), icon: "bx-wallet", accent: true },
+        { label: "Total encaissé", value: formatMoney(overview.total_encaisse), icon: "bx-wallet", accent: true },
         { label: "Paiements", value: overview.counts.total, icon: "bx-receipt" },
         { label: "Réussis", value: overview.counts.success, icon: "bx-check-circle" },
         { label: "En attente", value: overview.counts.pending, icon: "bx-time-five" },
@@ -114,7 +107,7 @@ export default function PaiementsPage() {
       ) : items.length === 0 ? (
         <p className="text-muted">Aucun paiement.</p>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className={`card overflow-x-auto ${refetching ? "pointer-events-none opacity-50 transition" : "transition"}`}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs uppercase text-muted">
@@ -130,16 +123,14 @@ export default function PaiementsPage() {
               {pagedItems.map((p) => (
                 <tr key={p.id} className="border-b border-line/60 last:border-0">
                   <td className="px-5 py-3 font-medium text-brand-deep">{p.owner_name}</td>
-                  <td className="px-5 py-3 font-semibold">{fmtAmount(p.montant)}</td>
+                  <td className="px-5 py-3 font-semibold">{formatMoney(p.montant)}</td>
                   <td className="px-5 py-3">
                     <i className={`bx ${METHOD_ICON[p.method] || "bx-money"} mr-1`} /> {p.method_label}
                   </td>
                   <td className="px-5 py-3 text-muted">{p.tranche === 4 ? "Intégral" : `Tranche ${p.tranche}`}</td>
-                  <td className="px-5 py-3 text-muted">{fmtDate(p.created_at)}</td>
+                  <td className="px-5 py-3 text-muted">{formatDate(p.created_at)}</td>
                   <td className="px-5 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[p.status] || ""}`}>
-                      {p.status_label}
-                    </span>
+                    <Badge tone={STATUS_TONE[p.status] ?? "neutral"}>{p.status_label}</Badge>
                   </td>
                 </tr>
               ))}

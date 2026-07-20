@@ -33,7 +33,7 @@ export default function Sidebar() {
         <span className="font-heading text-sm font-semibold text-brand-deep">Dashboard</span>
       </div>
 
-      <nav className="flex-1 space-y-3 p-3">
+      <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {/* Module CMS (admin) */}
         {hasCms && (
           <div className="space-y-1">
@@ -90,7 +90,7 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="space-y-1 border-t border-line p-3">
+      <div className="shrink-0 space-y-1 border-t border-line p-3">
         {profile && (
           <div className="mb-1 px-3 py-1.5 text-xs text-muted">
             <span className="block font-semibold text-brand-deep">{profile.full_name}</span>

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, listAll } from "@/lib/api";
-import { Toggle } from "@/components/ui";
+import { Toggle, Loading, ErrorState, EmptyState, PageHeader, Modal, TextField } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import type { Page } from "@/lib/types";
 
 const slugify = (s: string) =>
@@ -12,54 +13,100 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 
 export default function PagesList() {
+  const toast = useToast();
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [creating, setCreating] = useState(false);
   const router = useRouter();
 
   async function load() {
     setLoading(true);
-    setPages(await listAll<Page>("/cms/pages/"));
-    setLoading(false);
+    setErr(false);
+    try {
+      setPages(await listAll<Page>("/cms/pages/"));
+    } catch {
+      setErr(true);
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => {
     load();
   }, []);
 
   async function toggle(p: Page) {
-    await api(`/cms/pages/${p.id}/`, { method: "PATCH", body: { is_active: !p.is_active } });
-    setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, is_active: !x.is_active } : x)));
+    // Optimiste : on bascule tout de suite, puis on rétablit si le serveur refuse.
+    const next = !p.is_active;
+    setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, is_active: next } : x)));
+    try {
+      await api(`/cms/pages/${p.id}/`, { method: "PATCH", body: { is_active: next } });
+    } catch {
+      setPages((ps) => ps.map((x) => (x.id === p.id ? { ...x, is_active: !next } : x)));
+      toast.error("Impossible de changer la visibilité de la page.");
+    }
   }
 
-  async function create() {
-    const title = prompt("Titre de la nouvelle page ?");
+  async function submitNew() {
+    const title = newTitle.trim();
     if (!title) return;
-    const p = await api<Page>("/cms/pages/", {
-      method: "POST",
-      body: { title, slug: slugify(title) || `page-${pages.length + 1}`, order: pages.length, is_active: false },
-    });
-    router.push(`/pages/${p.id}`);
+    setCreating(true);
+    try {
+      const p = await api<Page>("/cms/pages/", {
+        method: "POST",
+        body: { title, slug: slugify(title) || `page-${pages.length + 1}`, order: pages.length, is_active: false },
+      });
+      router.push(`/pages/${p.id}`);
+    } catch {
+      toast.error("Impossible de créer la page.");
+      setCreating(false);
+    }
+  }
+
+  function openCreate() {
+    setNewTitle("");
+    setNewOpen(true);
   }
 
   async function del(p: Page) {
     if (!confirm(`Supprimer la page « ${p.title} » et tout son contenu ?`)) return;
-    await api(`/cms/pages/${p.id}/`, { method: "DELETE" });
-    setPages((ps) => ps.filter((x) => x.id !== p.id));
+    try {
+      await api(`/cms/pages/${p.id}/`, { method: "DELETE" });
+      setPages((ps) => ps.filter((x) => x.id !== p.id));
+    } catch {
+      toast.error("Impossible de supprimer la page.");
+    }
   }
 
   return (
     <div className="p-8">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl">Pages du site</h1>
-          <p className="text-sm text-muted">Gère le contenu, l&apos;ordre et la visibilité de chaque page.</p>
-        </div>
-        <button onClick={create} className="btn-accent">
-          <i className="bx bx-plus" /> Nouvelle page
-        </button>
-      </header>
+      <PageHeader
+        title="Pages du site"
+        subtitle="Gère le contenu, l'ordre et la visibilité de chaque page."
+        actions={
+          <button onClick={openCreate} className="btn-accent">
+            <i className="bx bx-plus" /> Nouvelle page
+          </button>
+        }
+      />
 
       {loading ? (
-        <p className="text-muted">Chargement…</p>
+        <Loading />
+      ) : err ? (
+        <ErrorState message="Impossible de charger les pages." onRetry={load} />
+      ) : pages.length === 0 ? (
+        <EmptyState
+          icon="bx-file"
+          title="Aucune page"
+          hint="Créez votre première page pour commencer à structurer le site."
+          action={
+            <button onClick={openCreate} className="btn-accent">
+              <i className="bx bx-plus" /> Nouvelle page
+            </button>
+          }
+        />
       ) : (
         <div className="card divide-y divide-line">
           {pages.map((p) => (
@@ -78,13 +125,31 @@ export default function PagesList() {
               <Link href={`/pages/${p.id}`} className="btn-ghost">
                 <i className="bx bx-edit" /> Éditer
               </Link>
-              <button onClick={() => del(p)} className="btn-danger" title="Supprimer">
+              <button onClick={() => del(p)} className="btn-danger" title="Supprimer" aria-label={`Supprimer la page ${p.title}`}>
                 <i className="bx bx-trash" />
               </button>
             </div>
           ))}
         </div>
       )}
+
+      <Modal
+        open={newOpen}
+        title="Nouvelle page"
+        onClose={() => setNewOpen(false)}
+        footer={
+          <>
+            <button onClick={() => setNewOpen(false)} className="btn-ghost">Annuler</button>
+            <button onClick={submitNew} disabled={creating || !newTitle.trim()} className="btn-accent">
+              {creating ? "Création…" : "Créer"}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); submitNew(); }}>
+          <TextField label="Titre de la page" value={newTitle} onChange={setNewTitle} placeholder="Ex. À propos" />
+        </form>
+      </Modal>
     </div>
   );
 }

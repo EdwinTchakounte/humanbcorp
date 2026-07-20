@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, listAll } from "@/lib/api";
+import { Loading, EmptyState, PageHeader } from "@/components/ui";
 import type { ChatProjectItem, ChatMessageItem, MessagerieOverview } from "@/lib/types";
 
 function fmtDate(iso: string) {
@@ -42,10 +43,7 @@ export default function MessageriePage() {
 
   return (
     <div className="p-8">
-      <header className="mb-6">
-        <h1 className="text-2xl">Messagerie</h1>
-        <p className="text-sm text-muted">Conversations et messages de l&apos;assistant.</p>
-      </header>
+      <PageHeader title="Messagerie" subtitle="Conversations et messages de l'assistant." />
 
       {overview && (
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -64,9 +62,9 @@ export default function MessageriePage() {
       )}
 
       {loading ? (
-        <p className="text-muted">Chargement…</p>
+        <Loading />
       ) : projects.length === 0 ? (
-        <p className="text-muted">Aucune conversation.</p>
+        <EmptyState icon="bx-chat" title="Aucune conversation" hint="Les échanges avec l'assistant apparaîtront ici." />
       ) : (
         <div className="grid gap-6 md:grid-cols-[260px_1fr]">
           {/* Liste des conversations */}
@@ -95,7 +93,7 @@ export default function MessageriePage() {
           {/* Fil de messages */}
           <div className="card p-5">
             {shown.length === 0 ? (
-              <p className="text-sm text-muted">Aucun message dans cette conversation.</p>
+              <EmptyState icon="bx-message-square-detail" title="Aucun message" hint="Cette conversation ne contient pas encore de message." />
             ) : (
               <div className="space-y-4">
                 {shown.map((m) => (

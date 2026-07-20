@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, listAll } from "@/lib/api";
 import { TextField, TextArea, Toggle } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import SectionEditor from "@/components/SectionEditor";
 import type { Page, Section } from "@/lib/types";
 
 export default function PageEditor({ params }: { params: { id: string } }) {
+  const toast = useToast();
   const id = params.id;
   const [page, setPage] = useState<Page | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -50,7 +52,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
       });
       setMetaDirty(false);
     } catch (e) {
-      alert("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
+      toast.error("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSavingMeta(false);
     }
@@ -66,7 +68,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
       await api(`/cms/pages/${page.id}/`, { method: "PATCH", body: { is_active: v } });
     } catch {
       setPage((p) => (p ? { ...p, is_active: prev } : p));
-      alert("Impossible de changer la publication de la page.");
+      toast.error("Impossible de changer la publication de la page.");
     }
   }
 
@@ -96,7 +98,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
         renum.map((s) => api(`/cms/sections/${s.id}/`, { method: "PATCH", body: { order: s.order } }))
       );
     } catch {
-      alert("Impossible de réordonner les sections.");
+      toast.error("Impossible de réordonner les sections.");
       load();
     }
   }

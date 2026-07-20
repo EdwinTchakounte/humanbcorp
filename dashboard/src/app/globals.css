@@ -30,4 +30,13 @@
   }
   .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-muted; }
   .card { @apply rounded-xl border border-line bg-white shadow-hbc-sm; }
+  /* Pastille de statut — tons sémantiques cohérents dans tout le dashboard. */
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .badge-neutral { @apply badge bg-brand-soft text-muted; }
+  .badge-success { @apply badge bg-green-100 text-green-700; }
+  .badge-warning { @apply badge bg-amber-100 text-amber-700; }
+  .badge-danger  { @apply badge bg-red-100 text-red-700; }
+  .badge-info    { @apply badge bg-brand-soft text-brand; }
+  /* Barre de squelette pour le chargement (aucun saut de mise en page). */
+  .skeleton { @apply animate-pulse rounded bg-brand-soft; }
 }

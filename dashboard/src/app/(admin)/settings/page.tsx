@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { TextField, TextArea } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 
 interface Settings {
   brand_name: string;
@@ -24,6 +25,7 @@ interface Settings {
 }
 
 export default function SettingsPage() {
+  const toast = useToast();
   const [s, setS] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -46,8 +48,9 @@ export default function SettingsPage() {
       await api("/cms/settings/1/", { method: "PATCH", body: s });
       setDirty(false);
       setSaved(true);
+      toast.success("Réglages enregistrés.");
     } catch (e) {
-      alert("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
+      toast.error("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }

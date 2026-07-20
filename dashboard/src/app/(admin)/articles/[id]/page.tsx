@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { TextField, TextArea, Toggle } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import MediaPicker from "@/components/MediaPicker";
 import type { Article, Media } from "@/lib/types";
 
 export default function ArticleEditor({ params }: { params: { id: string } }) {
+  const toast = useToast();
   const [a, setA] = useState<Article | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -40,7 +42,7 @@ export default function ArticleEditor({ params }: { params: { id: string } }) {
       setDirty(false);
       setSaved(true);
     } catch (e) {
-      alert("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
+      toast.error("Échec de l'enregistrement : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }
@@ -57,7 +59,7 @@ export default function ArticleEditor({ params }: { params: { id: string } }) {
       await api(`/cms/articles/${a.id}/`, { method: "PATCH", body: { is_active: v } });
     } catch {
       setA((p) => (p ? { ...p, is_active: prev } : p));
-      alert("Impossible de changer la publication de l'article.");
+      toast.error("Impossible de changer la publication de l'article.");
     }
   }
 

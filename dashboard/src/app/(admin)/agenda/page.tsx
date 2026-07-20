@@ -189,7 +189,7 @@ export default function AgendaPage() {
     <div className="p-8">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-xl text-brand-deep">Vue d&apos;ensemble</h2>
+          <h1 className="text-2xl">Agenda</h1>
           <p className="text-sm text-muted">Gérez vos événements et rendez-vous.</p>
         </div>
         <div className="flex items-center gap-2">

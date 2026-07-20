@@ -2,31 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { api, listAll } from "@/lib/api";
-import { Modal, Pagination, PAGE_SIZE, TextField, SelectField } from "@/components/ui";
+import { Modal, Pagination, PAGE_SIZE, TextField, SelectField, Badge, Loading, EmptyState, PageHeader } from "@/components/ui";
+import { formatMoney, formatDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import type { InscriptionItem, OrderItem, InscriptionsOverview, PublicationItem } from "@/lib/types";
 
-function fmtAmount(v: string | number) {
-  const n = Number(String(v).replace(/\s/g, "").replace(",", "."));
-  if (!n) return "—";
-  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-}
-function fmtDate(iso: string) {
-  return iso ? new Date(iso).toLocaleDateString("fr-FR", { dateStyle: "medium" }) : "—";
-}
-
-const INS_STYLE: Record<number, string> = {
-  0: "bg-gray-100 text-gray-500",
-  1: "bg-amber-50 text-amber-600",
-  2: "bg-green-50 text-green-700",
-  3: "bg-red-50 text-red-600",
-};
-const ORDER_STYLE: Record<number, string> = {
-  1: "bg-amber-50 text-amber-600",
-  2: "bg-green-50 text-green-700",
-  3: "bg-blue-50 text-blue-600",
-  4: "bg-red-50 text-red-600",
-};
+type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
+const INS_TONE: Record<number, BadgeTone> = { 0: "neutral", 1: "warning", 2: "success", 3: "danger" };
+const ORDER_TONE: Record<number, BadgeTone> = { 1: "warning", 2: "success", 3: "info", 4: "danger" };
 
 export default function InscriptionsPage() {
   const [tab, setTab] = useState<"inscriptions" | "orders">("inscriptions");
@@ -112,7 +95,7 @@ export default function InscriptionsPage() {
   }
 
   async function encaisser(order: OrderItem) {
-    if (!confirm(`Encaisser la commande #${order.id} (${fmtAmount(order.total_amount)}) en manuel ?`)) return;
+    if (!confirm(`Encaisser la commande #${order.id} (${formatMoney(order.total_amount)}) en manuel ?`)) return;
     setBusy(order.id);
     setFlash(null);
     try {
@@ -171,23 +154,23 @@ export default function InscriptionsPage() {
         { label: "Inscriptions", value: overview.counts.inscriptions, icon: "bx-user-check" },
         { label: "Confirmées", value: overview.counts.confirmed, icon: "bx-check-circle" },
         { label: "Commandes", value: overview.counts.orders, icon: "bx-cart" },
-        { label: "Total payé", value: fmtAmount(overview.total_orders_paid), icon: "bx-wallet", accent: true },
+        { label: "Total payé", value: formatMoney(overview.total_orders_paid), icon: "bx-wallet", accent: true },
       ]
     : [];
 
   return (
     <div className="p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl">Inscriptions &amp; Paniers</h1>
-          <p className="text-sm text-muted">Inscriptions des participants et commandes.</p>
-        </div>
-        {isAdmin && (
-          <button onClick={() => setAddOpen(true)} className="btn-accent">
-            <i className="bx bx-user-plus" /> Inscrire un apprenant
-          </button>
-        )}
-      </header>
+      <PageHeader
+        title="Inscriptions & Paniers"
+        subtitle="Inscriptions des participants et commandes."
+        actions={
+          isAdmin && (
+            <button onClick={() => setAddOpen(true)} className="btn-accent">
+              <i className="bx bx-user-plus" /> Inscrire un apprenant
+            </button>
+          )
+        }
+      />
 
       {flash && (
         <div
@@ -239,10 +222,21 @@ export default function InscriptionsPage() {
       </div>
 
       {loading ? (
-        <p className="text-muted">Chargement…</p>
+        <Loading />
       ) : tab === "inscriptions" ? (
         ins.length === 0 ? (
-          <p className="text-muted">Aucune inscription.</p>
+          <EmptyState
+            icon="bx-user-check"
+            title="Aucune inscription"
+            hint="Les inscriptions des participants apparaîtront ici."
+            action={
+              isAdmin && (
+                <button onClick={() => setAddOpen(true)} className="btn-accent">
+                  <i className="bx bx-user-plus" /> Inscrire un apprenant
+                </button>
+              )
+            }
+          />
         ) : (
           <div className="card overflow-x-auto">
             <table className="w-full text-sm">
@@ -260,11 +254,9 @@ export default function InscriptionsPage() {
                   <tr key={i.id} className="border-b border-line/60 last:border-0">
                     <td className="px-5 py-3 font-medium text-brand-deep">{i.participant_name}</td>
                     <td className="px-5 py-3">{i.publication_title}</td>
-                    <td className="px-5 py-3 text-muted">{fmtDate(i.created_at)}</td>
+                    <td className="px-5 py-3 text-muted">{formatDate(i.created_at)}</td>
                     <td className="px-5 py-3">
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${INS_STYLE[i.status] || ""}`}>
-                        {i.status_label}
-                      </span>
+                      <Badge tone={INS_TONE[i.status] ?? "neutral"}>{i.status_label}</Badge>
                     </td>
                     <td className="px-5 py-3 text-right">
                       {/* Le lien d'accès n'a de sens que sur une inscription confirmée. */}
@@ -284,7 +276,7 @@ export default function InscriptionsPage() {
           </div>
         )
       ) : orders.length === 0 ? (
-        <p className="text-muted">Aucune commande.</p>
+        <EmptyState icon="bx-cart" title="Aucune commande" hint="Les commandes passées par les participants apparaîtront ici." />
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
@@ -301,12 +293,10 @@ export default function InscriptionsPage() {
               {pagedOrders.map((o) => (
                 <tr key={o.id} className="border-b border-line/60 last:border-0">
                   <td className="px-5 py-3 font-medium text-brand-deep">{o.buyer_name}</td>
-                  <td className="px-5 py-3 font-semibold">{fmtAmount(o.total_amount)}</td>
-                  <td className="px-5 py-3 text-muted">{fmtDate(o.created_at)}</td>
+                  <td className="px-5 py-3 font-semibold">{formatMoney(o.total_amount)}</td>
+                  <td className="px-5 py-3 text-muted">{formatDate(o.created_at)}</td>
                   <td className="px-5 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${ORDER_STYLE[o.status] || ""}`}>
-                      {o.status_label}
-                    </span>
+                    <Badge tone={ORDER_TONE[o.status] ?? "neutral"}>{o.status_label}</Badge>
                   </td>
                   {writable && (
                     <td className="px-5 py-3">
@@ -409,7 +399,7 @@ export default function InscriptionsPage() {
         {payOrder && (
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              Montant : <span className="font-semibold text-brand-deep">{fmtAmount(payOrder.total_amount)}</span>.
+              Montant : <span className="font-semibold text-brand-deep">{formatMoney(payOrder.total_amount)}</span>.
               Un push de paiement (STK) sera envoyé sur le téléphone du client.
             </p>
             <TextField

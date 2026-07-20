@@ -90,9 +90,48 @@ export function apiBase() {
   return API;
 }
 
-/** Récupère une liste paginée DRF complète (suit `next`). */
+/** Télécharge un binaire protégé (ex. CV) en portant le jeton, puis déclenche
+ *  l'enregistrement côté navigateur. L'URL média brute n'est pas exploitable
+ *  directement : l'endpoint exige l'authentification. */
+export async function downloadFile(path: string, filename?: string): Promise<void> {
+  const access = tokens.access;
+  const res = await fetch(`${API}/api/v1${path}`, {
+    headers: access ? { Authorization: `Bearer ${access}` } : {},
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  if (filename) a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Récupère une liste paginée DRF complète (suit réellement `next`).
+ *
+ * DRF renvoie `next` en URL absolue ; on la ramène à un chemin relatif à
+ * `/api/v1` pour réutiliser `api()` (auth + refresh). Sans cette boucle, toute
+ * liste de plus d'une page serveur était silencieusement tronquée. */
+type Paged<T> = { results?: T[]; next?: string | null };
+
 export async function listAll<T>(path: string): Promise<T[]> {
-  const first = await api<{ results?: T[]; next?: string | null } | T[]>(path);
-  if (Array.isArray(first)) return first;
-  return first.results ?? [];
+  const out: T[] = [];
+  let nextPath: string | null = path;
+  while (nextPath !== null) {
+    const p: string = nextPath;
+    const page = (await api<Paged<T> | T[]>(p)) as Paged<T> | T[];
+    if (Array.isArray(page)) return page;
+    out.push(...(page.results ?? []));
+    const raw = page.next ?? null;
+    if (raw === null) {
+      nextPath = null;
+    } else {
+      const idx = raw.indexOf("/api/v1");
+      nextPath = idx >= 0 ? raw.slice(idx + "/api/v1".length) : null;
+    }
+  }
+  return out;
 }

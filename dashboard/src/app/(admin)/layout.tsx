@@ -5,10 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import CommandPalette from "@/components/CommandPalette";
+import { ToastProvider } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 
-// Routes appartenant au module CMS (réservé aux profils admin).
-const CMS_PREFIXES = ["/", "/articles", "/media", "/settings", "/pages"];
+// Routes réservées aux profils admin (module CMS + module RH, tous deux admin-only).
+// Un non-admin qui y arrive en direct est renvoyé vers son premier module.
+const CMS_PREFIXES = ["/", "/articles", "/media", "/settings", "/pages", "/rh"];
 const isCmsRoute = (path: string) =>
   CMS_PREFIXES.some((p) => (p === "/" ? path === "/" : path.startsWith(p)));
 
@@ -39,6 +41,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
+    <ToastProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar fixe, non scrollable */}
       <Sidebar />
@@ -65,5 +68,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
+    </ToastProvider>
   );
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { listAll } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { ThemeItem, PublicationItem } from "@/lib/types";
+import type { ThemeItem, PublicationItem, Article, Page } from "@/lib/types";
 
 /**
  * Recherche rapide (⌘K / Ctrl-K).
@@ -32,12 +32,15 @@ export default function CommandPalette() {
   const [sel, setSel] = useState(0);
   const [themes, setThemes] = useState<ThemeItem[]>([]);
   const [pubs, setPubs] = useState<PublicationItem[]>([]);
+  const [arts, setArts] = useState<Article[]>([]);
+  const [pages, setPages] = useState<Page[]>([]);
   const [charge, setCharge] = useState(false);
   const [pret, setPret] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const peutFormations = !!profile?.modules.find((m) => m.key === "formations");
   const peutPublications = !!profile?.modules.find((m) => m.key === "publications");
+  const peutCms = !!profile?.modules.find((m) => m.key === "cms");
 
   // Raccourci clavier global.
   useEffect(() => {
@@ -60,12 +63,16 @@ export default function CommandPalette() {
     Promise.all([
       peutFormations ? listAll<ThemeItem>("/modules/themes/").catch(() => []) : Promise.resolve([]),
       peutPublications ? listAll<PublicationItem>("/modules/publications/").catch(() => []) : Promise.resolve([]),
-    ]).then(([t, p]) => {
+      peutCms ? listAll<Article>("/cms/articles/").catch(() => []) : Promise.resolve([]),
+      peutCms ? listAll<Page>("/cms/pages/").catch(() => []) : Promise.resolve([]),
+    ]).then(([t, p, a, pg]) => {
       setThemes(t);
       setPubs(p);
+      setArts(a);
+      setPages(pg);
       setPret(true); // chargement terminé — permet de distinguer « vide » de « en cours »
     });
-  }, [ouvert, charge, authed, peutFormations, peutPublications]);
+  }, [ouvert, charge, authed, peutFormations, peutPublications, peutCms]);
 
   // Focus + reset à l'ouverture.
   useEffect(() => {
@@ -98,12 +105,28 @@ export default function CommandPalette() {
         href: `/publications?edit=${p.id}`,
         cat: "Sessions",
       })),
+      ...arts.map((a) => ({
+        id: `a-${a.id}`,
+        label: a.title,
+        sous: "Article — ouvrir l'éditeur",
+        icone: "bx-edit",
+        href: `/articles/${a.id}`,
+        cat: "Articles",
+      })),
+      ...pages.map((pg) => ({
+        id: `pg-${pg.id}`,
+        label: pg.title,
+        sous: "Page — ouvrir l'éditeur",
+        icone: "bx-file",
+        href: `/pages/${pg.id}`,
+        cat: "Pages",
+      })),
     ];
     const filtres = needle
       ? items.filter((i) => norm(i.label).includes(needle))
       : items;
     return filtres.slice(0, 20);
-  }, [q, themes, pubs]);
+  }, [q, themes, pubs, arts, pages]);
 
   function aller(c: Cible) {
     setOuvert(false);
@@ -159,7 +182,7 @@ export default function CommandPalette() {
                   setSel(0);
                 }}
                 onKeyDown={onKeyList}
-                placeholder="Rechercher une formation, une session…"
+                placeholder="Rechercher une formation, une session, un article, une page…"
                 className="w-full bg-transparent py-4 text-ink outline-none"
                 aria-label="Recherche rapide"
               />

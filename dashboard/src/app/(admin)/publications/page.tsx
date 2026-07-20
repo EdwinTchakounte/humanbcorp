@@ -2,15 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, listAll } from "@/lib/api";
-import { Toggle, Pagination, PAGE_SIZE, Modal, TextField, TextArea, SelectField } from "@/components/ui";
+import { Toggle, Pagination, PAGE_SIZE, Modal, TextField, TextArea, SelectField, Badge } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import { formatMoney } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import type { TeacherItem, PublicationItem, PublicationsOverview, ThemeItem } from "@/lib/types";
-
-function fmtPrice(p: string) {
-  const n = Number(p);
-  if (!n) return "Gratuit";
-  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
-}
 
 const EMPTY = {
   id: 0,
@@ -29,6 +25,11 @@ const EMPTY = {
   capacite: "",
   acces_duree_mois: "",
   instructors: [] as number[],
+  // Champs affichés sur la fiche publique et le flyer de partage.
+  show_price: true,
+  show_dates: true,
+  show_places: true,
+  show_categorie: true,
 };
 
 // ISO (UTC) -> valeur d'un <input type="datetime-local">, en heure locale.
@@ -40,6 +41,7 @@ function toLocalInput(iso: string | null | undefined) {
 }
 
 export default function PublicationsPage() {
+  const toast = useToast();
   const { canWrite, profile } = useAuth();
   const isAdmin = !!profile?.is_admin;
   const writable = canWrite("publications");
@@ -52,6 +54,8 @@ export default function PublicationsPage() {
   const [themes, setThemes] = useState<ThemeItem[]>([]);
   const [categorie, setCategorie] = useState("");
   const [loading, setLoading] = useState(true);
+  // Rechargement léger au changement de filtre : la liste reste visible.
+  const [refetching, setRefetching] = useState(false);
   const [page, setPage] = useState(1);
 
   const [open, setOpen] = useState(false);
@@ -95,16 +99,25 @@ export default function PublicationsPage() {
   async function onFilter(cat: string) {
     setCategorie(cat);
     setPage(1);
-    setLoading(true);
-    await load(cat);
-    setLoading(false);
+    setRefetching(true);
+    try {
+      await load(cat);
+    } finally {
+      setRefetching(false);
+    }
   }
 
   const pagedItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function togglePrivacy(p: PublicationItem) {
-    await api(`/modules/publications/${p.id}/`, { method: "PATCH", body: { is_private: !p.is_private } });
-    setItems((xs) => xs.map((x) => (x.id === p.id ? { ...x, is_private: !x.is_private } : x)));
+    const next = !p.is_private;
+    setItems((xs) => xs.map((x) => (x.id === p.id ? { ...x, is_private: next } : x)));
+    try {
+      await api(`/modules/publications/${p.id}/`, { method: "PATCH", body: { is_private: next } });
+    } catch {
+      setItems((xs) => xs.map((x) => (x.id === p.id ? { ...x, is_private: !next } : x)));
+      toast.error("Impossible de changer la visibilité de la publication.");
+    }
   }
 
   function openCreate() {
@@ -129,6 +142,10 @@ export default function PublicationsPage() {
       capacite: p.capacite == null ? "" : String(p.capacite),
       acces_duree_mois: p.acces_duree_mois == null ? "" : String(p.acces_duree_mois),
       instructors: p.instructors ?? (p.instructors_detail ?? []).map((i) => i.id),
+      show_price: p.show_price ?? true,
+      show_dates: p.show_dates ?? true,
+      show_places: p.show_places ?? true,
+      show_categorie: p.show_categorie ?? true,
     });
     setErr("");
     setOpen(true);
@@ -165,6 +182,9 @@ export default function PublicationsPage() {
         if (form.categorie) fd.set("categorie", form.categorie);
         if (form.parent) fd.set("parent", form.parent);
         form.themes.forEach((t) => fd.append("themes", String(t)));
+        (["show_price", "show_dates", "show_places", "show_categorie"] as const).forEach((k) =>
+          fd.set(k, form[k] ? "true" : "false")
+        );
         fd.set("image", form.image);
         await api(path, { method, body: fd, isForm: true });
       } else {
@@ -180,6 +200,10 @@ export default function PublicationsPage() {
           date_fin: cohorte ? iso(form.date_fin) : null,
           capacite: num(form.capacite),
           acces_duree_mois: num(form.acces_duree_mois),
+          show_price: form.show_price,
+          show_dates: form.show_dates,
+          show_places: form.show_places,
+          show_categorie: form.show_categorie,
         };
         if (isAdmin) body.instructors = form.instructors;
         if (form.categorie) body.categorie = Number(form.categorie);
@@ -261,7 +285,7 @@ export default function PublicationsPage() {
       ) : items.length === 0 ? (
         <p className="text-muted">Aucune publication. {writable && "Clique « Nouvelle publication »."}</p>
       ) : (
-        <>
+        <div className={refetching ? "pointer-events-none opacity-50 transition" : "transition"}>
           <div className="card divide-y divide-line">
             {pagedItems.map((p) => (
               <div key={p.id} className="flex items-center gap-4 px-5 py-3.5">
@@ -277,20 +301,16 @@ export default function PublicationsPage() {
                   <div className="truncate font-medium text-brand-deep">{p.title}</div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
                     {p.categorie_name && <span><i className="bx bx-category" /> {p.categorie_name}</span>}
-                    <span><i className="bx bx-money" /> {fmtPrice(p.price)}</span>
+                    <span><i className="bx bx-money" /> {formatMoney(p.price, "Gratuit")}</span>
                     {(p.themes_titles?.length ?? 0) > 0 && (
                       <span className="text-brand"><i className="bx bx-link" /> {p.themes_titles!.map((t) => t.title).join(", ")}</span>
                     )}
                     {p.children_count > 0 && <span><i className="bx bx-sitemap" /> {p.children_count} sous-publi.</span>}
                   </div>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                    p.is_private ? "bg-gray-100 text-gray-500" : "bg-green-50 text-green-700"
-                  }`}
-                >
+                <Badge tone={p.is_private ? "neutral" : "success"}>
                   {p.is_private ? "Privé" : "Public"}
-                </span>
+                </Badge>
                 {writable && (
                   <>
                     <button onClick={() => openEdit(p)} className="btn-ghost shrink-0 text-xs" title="Éditer">
@@ -306,7 +326,7 @@ export default function PublicationsPage() {
             ))}
           </div>
           <Pagination page={page} total={items.length} onPage={setPage} />
-        </>
+        </div>
       )}
 
       <Modal
@@ -338,7 +358,7 @@ export default function PublicationsPage() {
 
           {/* Lien vers formation(s) / thème(s) */}
           <div>
-            <label className="label">Formation(s) liée(s) — le contenu pédagogique débloqué à l'achat</label>
+            <label className="label">Formation(s) liée(s) — le contenu pédagogique débloqué à l&apos;achat</label>
             <div className="flex flex-wrap gap-2">
               {themes.map((t) => {
                 const on = form.themes.includes(t.id);
@@ -353,7 +373,7 @@ export default function PublicationsPage() {
                   </button>
                 );
               })}
-              {themes.length === 0 && <span className="text-xs text-muted">Aucune formation. Crée-en d'abord dans « Formations ».</span>}
+              {themes.length === 0 && <span className="text-xs text-muted">Aucune formation. Crée-en d&apos;abord dans « Formations ».</span>}
             </div>
           </div>
 
@@ -441,6 +461,32 @@ export default function PublicationsPage() {
             <input type="checkbox" checked={form.is_private} onChange={(e) => setForm({ ...form, is_private: e.target.checked })} />
             Privé (non visible sur la vitrine)
           </label>
+
+          {/* Ce que la fiche publique et le flyer de partage montrent. */}
+          <div className="border-t border-line pt-4">
+            <p className="label mb-0">Champs affichés sur la fiche et le flyer</p>
+            <p className="mb-3 text-xs text-muted">
+              Un champ désactivé disparaît de la page ET du flyer partagé. Masquer le prix
+              affiche « Prix sur demande » — l&apos;inscription reste possible.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                ["show_price", "Prix"],
+                ["show_dates", "Dates de session"],
+                ["show_places", "Places restantes"],
+                ["show_categorie", "Catégorie"],
+              ] as const).map(([cle, libelle]) => (
+                <div key={cle} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2">
+                  <span className="text-sm text-ink">{libelle}</span>
+                  <Toggle
+                    checked={form[cle]}
+                    onChange={(v) => setForm({ ...form, [cle]: v })}
+                    label={form[cle] ? "Affiché" : "Masqué"}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

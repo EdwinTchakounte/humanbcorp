@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { Loading, PageHeader } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import type { SuiviResponse, SuiviFormation, SuiviLearner } from "@/lib/types";
 
@@ -139,17 +140,17 @@ export default function SuiviPage() {
 
   return (
     <div className="p-8">
-      <header className="mb-6">
-        <h1 className="text-2xl">Suivi apprenants</h1>
-        <p className="text-sm text-muted">
-          {profile?.is_teacher && !profile?.is_admin
+      <PageHeader
+        title="Suivi apprenants"
+        subtitle={
+          profile?.is_teacher && !profile?.is_admin
             ? "Progression et résultats des apprenants de vos formations."
-            : "Progression et résultats des apprenants, formation par formation."}
-        </p>
-      </header>
+            : "Progression et résultats des apprenants, formation par formation."
+        }
+      />
 
       {loading ? (
-        <p className="text-muted">Chargement…</p>
+        <Loading />
       ) : err ? (
         <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>
       ) : formations.length === 0 ? (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, listAll } from "@/lib/api";
-import { Modal, TextField, SelectField } from "@/components/ui";
+import { Modal, TextField, SelectField, Loading } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import type { ThemeItem, SeanceItem, ActivityItem } from "@/lib/types";
 
@@ -205,23 +205,37 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
     await loadSeances();
   }
 
-  if (loading) return <div className="p-8 text-muted">Chargement…</div>;
+  if (loading) return <Loading />;
 
   return (
     <div className="p-8">
       <Link href="/formations" className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-brand">
         <i className="bx bx-left-arrow-alt" /> Formations
       </Link>
+      {err && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{err}</span>
+          <button onClick={() => setErr("")} aria-label="Masquer l'erreur" className="text-red-400 hover:text-red-700">
+            <i className="bx bx-x" />
+          </button>
+        </div>
+      )}
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl">Contenu — {theme?.title}</h1>
           <p className="text-sm text-muted">Arbre du contenu : séance → activité → contenus.</p>
         </div>
-        {writable && (
-          <button onClick={() => setSDraft({ title: "", s_type: "0" })} className="btn-brand text-sm">
-            <i className="bx bx-plus" /> Séance
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Voir le rendu réel côté apprenant avant de publier. */}
+          <Link href={`/formations/${themeId}/apercu`} className="btn-ghost text-sm">
+            <i className="bx bx-show" /> Aperçu apprenant
+          </Link>
+          {writable && (
+            <button onClick={() => setSDraft({ title: "", s_type: "0" })} className="btn-brand text-sm">
+              <i className="bx bx-plus" /> Séance
+            </button>
+          )}
+        </div>
       </header>
 
       {seances.length === 0 ? (

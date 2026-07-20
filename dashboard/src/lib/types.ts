@@ -109,6 +109,7 @@ export interface Profile {
   email: string;
   is_admin: boolean;
   is_teacher?: boolean;
+  is_recruiter?: boolean;
   is_staff: boolean;
   is_superuser: boolean;
   groups: string[];
@@ -272,6 +273,11 @@ export interface SuiviResponse {
 }
 
 export interface PublicationItem {
+  // Bascules d'affichage (fiche publique + flyer de partage)
+  show_price?: boolean;
+  show_dates?: boolean;
+  show_places?: boolean;
+  show_categorie?: boolean;
   id: number;
   title: string;
   description: string;
@@ -391,3 +397,153 @@ export const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "cta", label: "Appel à l'action" },
   { value: "richtext", label: "Texte riche" },
 ];
+
+// --- RH / Recrutement (super-admin, non-tenant) --------------------------
+export interface JobOffer {
+  id: number;
+  title: string;
+  slug: string;
+  department: string;
+  location: string;
+  contract_type: string;
+  contract_label: string;
+  salary: string;
+  description: string;
+  profile: string;
+  is_published: boolean;
+  closing_date: string | null;
+  applications_count: number;
+  // Compte recruteur de suivi (lecture seule côté recruteur) ; null = HBC en propre
+  owner: number | null;
+  owner_name: string | null;
+  // Entreprise qui recrute (révélée uniquement en premium)
+  company_name: string;
+  company_logo_url: string | null;
+  company_website: string;
+  // Formule commerciale
+  plan: "classic" | "premium";
+  is_featured: boolean;
+  // Candidature directe (premium)
+  apply_email: string;
+  apply_url: string;
+  apply_mode: "platform" | "direct";
+  // Bascules d'affichage
+  show_company: boolean;
+  show_salary: boolean;
+  show_location: boolean;
+  show_contract: boolean;
+  show_department: boolean;
+  show_closing_date: boolean;
+  /** Accroche calculée côté serveur — aperçu exact de ce que verra le public. */
+  headline: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationItem {
+  id: number;
+  offer: number | null;
+  offer_title: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  cover_letter: string;
+  cv_url: string | null;
+  status: number;
+  status_label: string;
+  rating: number | null;
+  assigned_to: number | null;
+  assigned_to_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationNote {
+  id: number;
+  body: string;
+  author_name: string;
+  created_at: string;
+}
+
+export interface RhOverview {
+  offers: { total: number; published: number };
+  applications: { total: number; rejected: number };
+  pipeline: { value: number; label: string; count: number }[];
+  statuses: { value: number; label: string }[];
+}
+
+/** Vue d'ensemble du monitoring (santé technique + activité). */
+export interface MonitoringOverview {
+  statut: "ok" | "attention" | "critique";
+  alertes: string[];
+  genere_le: string;
+  services: {
+    database: "ok" | "down";
+    scheduler: { running: boolean; schedules: number; last_success: string | null };
+  };
+  paiements: { en_attente: number; bloques: number; seuil_minutes: number; valides_24h: number };
+  webhooks_erreurs_24h: number;
+  emails_echec_24h: number;
+  activite_recente: {
+    id: number; action: string; entite_type: string; entite_id: string;
+    user: string | null; created_at: string;
+  }[];
+}
+
+/** Une entrée du journal d'audit (action sensible tracée). */
+export interface AuditEntry {
+  id: number;
+  action: string;
+  entite_type: string;
+  entite_id: string;
+  user: number | null;
+  user_name: string | null;
+  details: Record<string, unknown>;
+  ip: string;
+  created_at: string;
+}
+
+export interface AuditFacets {
+  actions: string[];
+  entite_types: string[];
+  total: number;
+}
+
+/** Espace recruteur (lecture seule) : sous-ensemble des offres du compte. */
+export interface RecruiterOffer {
+  id: number;
+  title: string;
+  slug: string;
+  department: string;
+  location: string;
+  contract_type: string;
+  contract_label: string;
+  salary: string;
+  is_published: boolean;
+  closing_date: string | null;
+  applications_count: number;
+  plan: "classic" | "premium";
+  is_featured: boolean;
+  created_at: string;
+}
+
+/** Espace recruteur : dossier candidat visible (sans notes internes HBC). */
+export interface RecruiterApplication {
+  id: number;
+  offer: number | null;
+  offer_title: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  cover_letter: string;
+  cv_url: string | null;
+  status: number;
+  status_label: string;
+  rating: number | null;
+  created_at: string;
+  updated_at: string;
+}

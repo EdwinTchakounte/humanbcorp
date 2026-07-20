@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Toggle, TextField, TextArea } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import MediaPicker from "@/components/MediaPicker";
 import type { Card, Media } from "@/lib/types";
 
@@ -13,6 +14,7 @@ export default function CardEditor({
   card: Card;
   onDeleted: (id: number) => void;
 }) {
+  const toast = useToast();
   const [c, setC] = useState<Card>(card);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,7 +40,7 @@ export default function CardEditor({
       await api(`/cms/cards/${c.id}/`, { method: "PATCH", body: payload });
       setDirty(false);
     } catch (e) {
-      alert("Échec de l'enregistrement de l'élément : " + String(e instanceof Error ? e.message : e).slice(0, 200));
+      toast.error("Échec de l'enregistrement de l'élément : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }
@@ -52,7 +54,7 @@ export default function CardEditor({
       await api(`/cms/cards/${c.id}/`, { method: "PATCH", body: { is_active: v } });
     } catch {
       setC((p) => ({ ...p, is_active: prev }));
-      alert("Impossible de changer la visibilité de l'élément.");
+      toast.error("Impossible de changer la visibilité de l'élément.");
     }
   }
 

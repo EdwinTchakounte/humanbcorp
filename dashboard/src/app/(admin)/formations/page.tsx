@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, listAll } from "@/lib/api";
 import { Toggle, Pagination, PAGE_SIZE, Modal, TextField, SelectField } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 import type { ThemeItem, FormationsOverview, TeacherItem } from "@/lib/types";
 
@@ -23,6 +24,7 @@ const EMPTY_FORM = {
 };
 
 export default function FormationsPage() {
+  const toast = useToast();
   const { canWrite, profile } = useAuth();
   const writable = canWrite("formations");
   const isAdmin = !!profile?.is_admin;
@@ -35,6 +37,9 @@ export default function FormationsPage() {
   const [classes, setClasses] = useState<Opt[]>([]);
   const [session, setSession] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // Rechargement « léger » (changement de filtre) : la liste reste affichée et
+  // s'estompe, au lieu de disparaître derrière « Chargement… ».
+  const [refetching, setRefetching] = useState(false);
   const [page, setPage] = useState(1);
 
   // Modal création/édition
@@ -82,9 +87,12 @@ export default function FormationsPage() {
   async function onFilter(sess: string) {
     setSession(sess);
     setPage(1);
-    setLoading(true);
-    await loadThemes(sess);
-    setLoading(false);
+    setRefetching(true);
+    try {
+      await loadThemes(sess);
+    } finally {
+      setRefetching(false);
+    }
   }
 
   const pagedThemes = themes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -94,8 +102,14 @@ export default function FormationsPage() {
   );
 
   async function toggle(t: ThemeItem) {
-    await api(`/modules/themes/${t.id}/`, { method: "PATCH", body: { is_visible: !t.is_visible } });
-    setThemes((xs) => xs.map((x) => (x.id === t.id ? { ...x, is_visible: !x.is_visible } : x)));
+    const next = !t.is_visible;
+    setThemes((xs) => xs.map((x) => (x.id === t.id ? { ...x, is_visible: next } : x)));
+    try {
+      await api(`/modules/themes/${t.id}/`, { method: "PATCH", body: { is_visible: next } });
+    } catch {
+      setThemes((xs) => xs.map((x) => (x.id === t.id ? { ...x, is_visible: !next } : x)));
+      toast.error("Impossible de changer la visibilité de la formation.");
+    }
   }
 
   function openCreate() {
@@ -266,7 +280,7 @@ export default function FormationsPage() {
       ) : themes.length === 0 ? (
         <p className="text-muted">Aucune formation. {writable && "Clique « Nouvelle formation » pour en créer une."}</p>
       ) : (
-        <>
+        <div className={refetching ? "pointer-events-none opacity-50 transition" : "transition"}>
           <div className="card divide-y divide-line">
             {pagedThemes.map((t) => (
               <div key={t.id} className="flex items-center gap-4 px-5 py-3.5">
@@ -316,7 +330,7 @@ export default function FormationsPage() {
             ))}
           </div>
           <Pagination page={page} total={themes.length} onPage={setPage} />
-        </>
+        </div>
       )}
 
       <Modal

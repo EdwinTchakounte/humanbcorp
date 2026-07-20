@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Toggle, TextField, TextArea } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import MediaPicker from "@/components/MediaPicker";
 import CardEditor from "@/components/CardEditor";
 import { SECTION_TYPES, type Card, type Media, type Section } from "@/lib/types";
@@ -20,6 +21,7 @@ export default function SectionEditor({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const toast = useToast();
   const [s, setS] = useState<Section>(section);
   const [cards, setCards] = useState<Card[]>(section.cards || []);
   const [open, setOpen] = useState(false);
@@ -45,7 +47,7 @@ export default function SectionEditor({
       });
       setDirty(false);
     } catch (e) {
-      alert("Échec de l'enregistrement de la section : " + String(e instanceof Error ? e.message : e).slice(0, 200));
+      toast.error("Échec de l'enregistrement de la section : " + String(e instanceof Error ? e.message : e).slice(0, 200));
     } finally {
       setSaving(false);
     }
@@ -60,7 +62,7 @@ export default function SectionEditor({
       await api(`/cms/sections/${s.id}/`, { method: "PATCH", body: { is_active: v } });
     } catch {
       setS((p) => ({ ...p, is_active: prev }));
-      alert("Impossible de changer la visibilité de la section.");
+      toast.error("Impossible de changer la visibilité de la section.");
     }
   }
 

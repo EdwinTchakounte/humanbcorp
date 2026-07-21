@@ -46,3 +46,6 @@ gunicorn==22.0.0
 django-anymail==15.0
 django-q2==1.10.0
 django-picklefield==3.4.0
+# Schéma OpenAPI (DRF) + utilitaires dates — importés par apps_coop.payments
+drf-spectacular==0.30.0
+python-dateutil==2.9.0.post0

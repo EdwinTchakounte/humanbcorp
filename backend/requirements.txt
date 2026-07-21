@@ -41,3 +41,8 @@ psycopg[binary]==3.2.3
 # Static files + WSGI server
 whitenoise==6.7.0
 gunicorn==22.0.0
+
+# Refonte 2026 — mail transactionnel Brevo (backend anymail) + ordonnanceur cron
+django-anymail==15.0
+django-q2==1.10.0
+django-picklefield==3.4.0

@@ -1,21 +1,29 @@
 # ---------------------------------------------------------------------------
-# Stack de PRODUCTION — branché sur le reverse-proxy nginx MUTUALISÉ du VPS.
+# Stack de PRODUCTION — refonte DÉCOUPLÉE, branchée sur le nginx MUTUALISÉ du VPS.
 #
-# Le nginx central (projet Docker "backend", conteneur backend-nginx-1) détient
-# les ports 80/443, termine le TLS et route humanbcorp.com vers le conteneur
-# `humanbcorp_web` via le réseau externe `backend_default`.
+# Évolution de l'ancien monolithe : on GARDE la base `humanbcorp_db` (mêmes
+# données) et le volume média `media_volume` (fichiers uploadés référencés par la
+# base), on REMPLACE l'unique `humanbcorp_web` par 3 services :
+#   - humanbcorp_api        (Django/gunicorn)     -> api.humanbcorp.com
+#   - humanbcorp_vitrine    (Next.js standalone)  -> humanbcorp.com / www
+#   - humanbcorp_dashboard  (Next.js standalone)  -> dashboard.humanbcorp.com
+#   - humanbcorp_qcluster   (django-q2, interne)
 #
-# => Ce stack n'embarque DONC PAS de nginx et n'expose AUCUN port sur l'hôte.
+# Le nginx central (projet "backend", conteneur backend-nginx-1) détient 80/443,
+# termine le TLS et route chaque sous-domaine vers le bon conteneur via le réseau
+# externe `backend_default`. Ce stack n'expose donc AUCUN port sur l'hôte.
+#
+# ⚠️ DÉPLOYER SOUS LE MÊME NOM DE PROJET `humanbcorp` (dossier nommé humanbcorp
+#    OU `docker compose -p humanbcorp ...`) pour RÉADOPTER les volumes existants
+#    `humanbcorp_pgdata` / `humanbcorp_media_volume` (sinon = base vide !).
 #
 #   docker compose -f docker-compose.prod.yml pull
 #   docker compose -f docker-compose.prod.yml up -d
-#   docker compose -f docker-compose.prod.yml logs -f humanbcorp_web
+#   docker compose -f docker-compose.prod.yml logs -f humanbcorp_api
 # ---------------------------------------------------------------------------
 
 services:
-  # Service nommé `humanbcorp_db` (et non `db`) : le web est aussi sur
-  # `backend_default` où d'autres stacks exposent déjà un `db` — nom unique
-  # obligatoire pour que l'app résolve la BONNE base.
+  # Base — INCHANGÉE (mêmes données que l'ancien stack, volume pgdata réadopté).
   humanbcorp_db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -33,12 +41,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # NB: le service est nommé `humanbcorp_web` (et non `web`) pour éviter toute
-  # collision d'alias avec les autres applis déjà présentes sur `backend_default`
-  # (afrikamode expose déjà un service `web`). Le nginx central le joint par ce nom.
-  humanbcorp_web:
-    image: ${WEB_IMAGE}
-    container_name: humanbcorp_web
+  # API + back-office Django (ex-`humanbcorp_web`). Sert /api/v1/* et l'admin.
+  # Joint par le nginx central sous le nom `humanbcorp_api`. Applique les
+  # migrations au boot (entrypoint) sur la base EXISTANTE -> sauvegarde avant !
+  humanbcorp_api:
+    image: ${API_IMAGE:-ghcr.io/edwintchakounte/humanbcorp/backend:latest}
+    container_name: humanbcorp_api
     restart: unless-stopped
     env_file:
       - .env
@@ -46,7 +54,7 @@ services:
       POSTGRES_HOST: humanbcorp_db
       POSTGRES_PORT: 5432
     volumes:
-      - media_volume:/app/mediafiles   # médias uploadés, servis par le nginx central
+      - media_volume:/app/mediafiles   # fichiers uploadés — À PRÉSERVER
     networks:
       - internal
       - proxy
@@ -55,13 +63,19 @@ services:
         condition: service_healthy
     expose:
       - "8000"
+    healthcheck:
+      # Requiert `localhost` dans ALLOWED_HOSTS (sinon DisallowedHost).
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/').status==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
-  # Ordonnanceur django-q2 : réconciliation des paiements EN_ATTENTE (10 min) et
-  # alerte des paiements bloqués (horaire). Indispensable — sans lui, un webhook
-  # Tara perdu laisse un paiement bloqué indéfiniment. Bypass de l'entrypoint
-  # (migrations gérées par humanbcorp_web) ; ne fait qu'exécuter le cluster.
+  # Ordonnanceur django-q2 : réconciliation paiements EN_ATTENTE (10 min) +
+  # alerte paiements bloqués (horaire). Sans lui, un webhook Tara perdu = paiement
+  # bloqué indéfiniment. Bypass entrypoint (migrations gérées par l'API).
   humanbcorp_qcluster:
-    image: ${WEB_IMAGE}
+    image: ${API_IMAGE:-ghcr.io/edwintchakounte/humanbcorp/backend:latest}
     restart: unless-stopped
     env_file:
       - .env
@@ -75,12 +89,45 @@ services:
       humanbcorp_db:
         condition: service_healthy
 
+  # Vitrine publique (Next standalone). NEXT_PUBLIC_* figées au build de l'image.
+  humanbcorp_vitrine:
+    image: ${VITRINE_IMAGE:-ghcr.io/edwintchakounte/humanbcorp/vitrine:latest}
+    container_name: humanbcorp_vitrine
+    restart: unless-stopped
+    networks:
+      - proxy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Dashboard / back-office (Next standalone).
+  humanbcorp_dashboard:
+    image: ${DASHBOARD_IMAGE:-ghcr.io/edwintchakounte/humanbcorp/dashboard:latest}
+    container_name: humanbcorp_dashboard
+    restart: unless-stopped
+    networks:
+      - proxy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
 networks:
   internal:
+    # Réseau privé du projet (nom réel : humanbcorp_internal). Réadopté tel quel.
   proxy:
     external: true
     name: backend_default      # réseau partagé du nginx central
 
 volumes:
-  pgdata:
-  media_volume:
+  pgdata:          # -> humanbcorp_pgdata (existant, données à conserver)
+  media_volume:    # -> humanbcorp_media_volume (existant, uploads à conserver)

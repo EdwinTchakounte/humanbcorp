@@ -8,15 +8,40 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}   # -> ghcr.io/<owner>/<repo>
 
 jobs:
+  # Build découplé : 3 images (backend API + vitrine + dashboard) poussées sous
+  #   ghcr.io/<owner>/<repo>/{backend,vitrine,dashboard}
+  # (même convention que gathe-finance : .../<projet>/<composant>).
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write        # needed to push to GHCR
-
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            build_args: ""
+          - component: vitrine
+            context: ./web
+            dockerfile: ./web/Dockerfile
+            # NEXT_PUBLIC_* figées AU BUILD → passées ici avec les URLs de prod.
+            # Surchargeable via les "Variables" du dépôt (Settings → Variables).
+            build_args: |
+              NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'https://humanbcorp.com' }}
+              NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.humanbcorp.com' }}
+              NEXT_PUBLIC_DASHBOARD_URL=${{ vars.NEXT_PUBLIC_DASHBOARD_URL || 'https://dashboard.humanbcorp.com' }}
+              NEXT_PUBLIC_REVALIDATE=${{ vars.NEXT_PUBLIC_REVALIDATE || '60' }}
+          - component: dashboard
+            context: ./dashboard
+            dockerfile: ./dashboard/Dockerfile
+            build_args: |
+              NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.humanbcorp.com' }}
+              NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'https://humanbcorp.com' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,29 +60,29 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # Force lowercase — GHCR requires lowercase image names.
-          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          # Force lowercase — GHCR exige des noms d'image en minuscules.
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
             type=ref,event=tag
 
-      - name: Build and push
+      - name: Build and push ${{ matrix.component }}
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
+          build-args: ${{ matrix.build_args }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
 
-  # Déploiement continu : SSH sur le serveur et pull de la nouvelle image.
-  # Activer en posant la variable de dépôt DEPLOY_ENABLED=true et les secrets :
+  # Déploiement continu : SSH sur le serveur, pull des 3 images et up du stack.
+  # Activer via la variable de dépôt DEPLOY_ENABLED=true et les secrets :
   #   SSH_HOST, SSH_USER, SSH_KEY (clé privée), SSH_PORT (optionnel).
-  # Le serveur doit déjà contenir le dossier du stack (DEPLOY_PATH) avec un .env
-  # et docker-compose.prod.yml.
+  # Le serveur doit contenir DEPLOY_PATH avec .env + docker-compose.prod.yml.
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest

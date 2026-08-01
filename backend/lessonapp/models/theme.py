@@ -10,6 +10,11 @@ class Theme(Abstract):
     title = models.CharField(max_length=400)
     is_visible = models.BooleanField(null=False,default=False)
     image = models.ImageField(upload_to='img',null=True)
+    # Horodatage de la dernière modification du CONTENU de la formation (séance,
+    # activité, question, composant, document…). `updated_at` (auto_now) ne bouge
+    # qu'à la sauvegarde du Theme lui-même ; ce champ est bumpé par signaux dès
+    # qu'un élément enfant change, pour signaler les mises à jour à l'apprenant.
+    content_updated_at = models.DateTimeField(null=True, blank=True, default=None)
     # Héritage scolaire (année → séquence/trimestre) : facultatif désormais. Une
     # formation professionnelle n'appartient pas à un trimestre ; c'est la
     # cohorte (contents.Publication) qui porte le calendrier. Conservé nullable

@@ -251,6 +251,8 @@ export interface LearnerFormation {
   image: string | null;
   has_content: boolean;
   progress: Progress;
+  // Du contenu a été ajouté/modifié depuis la dernière consultation → badge « MàJ ».
+  has_update?: boolean;
   // Session : dates et échéance d'accès (durée configurée sur l'offre).
   mode: number;
   date_debut: string | null;

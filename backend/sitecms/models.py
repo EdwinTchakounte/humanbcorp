@@ -301,3 +301,29 @@ class AdresseCommande(models.Model):
 
     def __str__(self):
         return f"Adresse commande #{self.order_id} — {self.buyer_email}"
+
+
+# ---------------------------------------------------------------------------
+# Dernière consultation d'une formation par un apprenant (badges « mis à jour »)
+# ---------------------------------------------------------------------------
+class FormationSeen(models.Model):
+    """Mémorise quand un apprenant a consulté le contenu d'une formation.
+
+    Comparé à `Theme.content_updated_at`, permet d'afficher un badge « mis à
+    jour » dans l'espace apprenant tant que du contenu est plus récent que sa
+    dernière visite. Un enregistrement par (apprenant, publication).
+    """
+
+    member = models.ForeignKey(
+        "auth.User", on_delete=models.CASCADE, related_name="formations_vues"
+    )
+    publication = models.ForeignKey(
+        "contents.Publication", on_delete=models.CASCADE, related_name="vues_apprenants"
+    )
+    seen_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = ("member", "publication")
+
+    def __str__(self):
+        return f"{self.member_id} a vu pub #{self.publication_id} @ {self.seen_at:%Y-%m-%d %H:%M}"

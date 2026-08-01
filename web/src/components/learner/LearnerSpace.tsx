@@ -1121,7 +1121,14 @@ export default function LearnerSpace({ token }: { token: string }) {
                         <i className={`bx ${f.acces_expire ? "bx-lock-alt" : "bxs-graduation"}`} />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-semibold leading-tight text-ink">{f.title}</h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="truncate text-sm font-semibold leading-tight text-ink">{f.title}</h3>
+                          {f.has_update && !f.acces_expire && (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent" title="Du nouveau contenu a été ajouté depuis votre dernière visite">
+                              <i className="bx bx-bell text-[11px]" /> MàJ
+                            </span>
+                          )}
+                        </div>
                         {f.acces_expire ? (
                           <p className="truncate text-xs font-medium text-amber-700">
                             Terminé{f.acces_fin ? ` le ${fmtDate(f.acces_fin)}` : ""}

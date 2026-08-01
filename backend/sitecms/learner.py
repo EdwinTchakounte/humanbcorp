@@ -403,9 +403,17 @@ def build_schedule(publication):
 # ---------------------------------------------------------------------------
 def _space_payload(request, user):
     """Corps de l'espace apprenant : ses formations confirmées + agenda."""
+    from django.db.models import Max
+
+    from .models import FormationSeen
+
     inscriptions = (
         Inscription.objects.filter(participant=user, status=Inscription.CONFIRMED, is_deleted=False)
         .select_related("publication", "publication__espace")
+    )
+    # Dernière consultation de chaque formation par cet apprenant (badges MàJ).
+    seen_at = dict(
+        FormationSeen.objects.filter(member=user).values_list("publication_id", "seen_at")
     )
     seen = set()
     formations = []
@@ -417,6 +425,14 @@ def _space_payload(request, user):
         # L'offre expirée reste listée (l'apprenant doit comprendre pourquoi elle
         # est fermée) mais son contenu n'est plus servi — cf. `my_formation`.
         fin = pub.fin_acces(depuis=ins.created_at)
+        # Badge « mis à jour » : du contenu a changé depuis la dernière visite.
+        # (Une formation jamais ouverte n'est pas « mise à jour » — elle est
+        # simplement nouvelle ; pas de badge tant qu'elle n'a pas été vue.)
+        content_maj = pub.themes.filter(is_deleted=False).aggregate(
+            m=Max("content_updated_at")
+        )["m"]
+        vu = seen_at.get(pub.id)
+        has_update = bool(content_maj and vu and vu < content_maj)
         formations.append({
             "publication_id": pub.id,
             "title": pub.title,
@@ -428,6 +444,7 @@ def _space_payload(request, user):
             "ecole": pub.espace.nom if pub.espace_id else None,
             "has_content": pub.themes.exists(),
             "progress": _publication_progress(user, pub),
+            "has_update": has_update,
             "mode": pub.mode,
             "date_debut": pub.date_debut,
             "date_fin": pub.date_fin,
@@ -469,6 +486,12 @@ def _formation_payload(request, user, publication_id):
         }, status.HTTP_403_FORBIDDEN
 
     pub = ins.publication
+    # Mémorise la consultation : réinitialise le badge « mis à jour » côté espace.
+    from .models import FormationSeen
+
+    FormationSeen.objects.update_or_create(
+        member=user, publication=pub, defaults={"seen_at": timezone.now()}
+    )
     # `is_deleted` est un soft-delete : sans ce filtre, une formation supprimée
     # resterait servie aux apprenants tant que le M2M Publication↔Theme n'est
     # pas dénoué à la main.

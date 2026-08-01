@@ -222,6 +222,7 @@ export interface QuizOptionEdit {
   id?: number;
   title: string;
   is_answer: boolean;
+  image?: string | null;
 }
 export interface QuizQuestionItem {
   id: number;
@@ -229,8 +230,10 @@ export interface QuizQuestionItem {
   description: string;
   points: number;
   number: number;
+  kind: number; // 1=QCM 2=Vrai/Faux 3=Texte 4=Numérique 5=Association 6=Ordonnancement
+  image?: string | null;
   input_type: number; // 1=checkbox 2=radio
-  options: { id: number; title: string; is_answer: boolean }[];
+  options: { id: number; title: string; is_answer: boolean; image?: string | null }[];
 }
 
 export interface FormationsOverview {

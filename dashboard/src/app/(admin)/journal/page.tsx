@@ -102,7 +102,7 @@ export default function JournalPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.count / 50)) : 1;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Journal d'audit"
         subtitle="Traçabilité des actions sensibles : qui a fait quoi, quand — journal immuable."

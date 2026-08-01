@@ -186,9 +186,26 @@ function QuizBlock({
   onComplete: OnComplete;
 }) {
   const [answers, setAnswers] = useState<Record<number, number[]>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<number, string>>({});
+  // Association : {questionId: {leftId: rightText}}. Ordonnancement : {questionId: [ids ordonnés]}.
+  const [matchAnswers, setMatchAnswers] = useState<Record<number, Record<number, string>>>({});
+  const [orderAnswers, setOrderAnswers] = useState<Record<number, number[]>>({});
   const [result, setResult] = useState<SubmitQuizResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const locked = result !== null;
+
+  // Ordre courant d'une question d'ordonnancement (état, sinon ordre servi).
+  const orderOf = (q: LearnerActivity["questions"][number]) =>
+    orderAnswers[q.id] ?? (q.order_items ?? []).map((i) => i.id);
+
+  function moveOrder(qid: number, arr: number[], idx: number, dir: -1 | 1) {
+    if (locked) return;
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    const next = [...arr];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setOrderAnswers((p) => ({ ...p, [qid]: next }));
+  }
 
   function toggle(questionId: number, optionId: number, isCheckbox: boolean) {
     if (locked) return;
@@ -202,8 +219,24 @@ function QuizBlock({
   }
 
   async function onSubmit() {
+    // Fusionne réponses à options (QCM/VF) et saisies (texte/numérique).
+    const payload: Record<number, unknown> = {};
+    for (const q of activity.questions) {
+      if (q.kind === 3 || q.kind === 4) {
+        const v = (textAnswers[q.id] ?? "").trim();
+        if (v) payload[q.id] = [v];
+      } else if (q.kind === 5) {
+        const m = matchAnswers[q.id] || {};
+        if (Object.keys(m).length) payload[q.id] = m;
+      } else if (q.kind === 6) {
+        payload[q.id] = orderOf(q); // toujours un ordre (celui servi si non touché)
+      } else {
+        const ids = answers[q.id] || [];
+        if (ids.length) payload[q.id] = ids;
+      }
+    }
     setBusy(true);
-    const res = await submitQuiz(token, activity.id, answers);
+    const res = await submitQuiz(token, activity.id, payload);
     setBusy(false);
     if (res) {
       setResult(res);
@@ -213,6 +246,9 @@ function QuizBlock({
 
   function reset() {
     setAnswers({});
+    setTextAnswers({});
+    setMatchAnswers({});
+    setOrderAnswers({});
     setResult(null);
   }
 
@@ -248,32 +284,238 @@ function QuizBlock({
               )}
             </p>
             {q.description && <p className="mb-2 text-sm text-muted">{q.description}</p>}
-            <ul className="mt-2 space-y-1.5">
-              {q.options.map((o) => {
-                const isCheckbox = o.input_type === 1;
-                const selected = (answers[q.id] || []).includes(o.id);
-                // Après correction : vert = bonne réponse, rouge = cochée mais fausse
-                let tone = "";
-                if (r) {
-                  if (r.correct_option_ids.includes(o.id)) tone = "text-green-700 font-medium";
-                  else if (r.selected_option_ids.includes(o.id)) tone = "text-red-600 line-through";
-                }
-                return (
-                  <li key={o.id} className={`flex items-center gap-2 text-sm ${tone || "text-ink"}`}>
-                    <input
-                      type={isCheckbox ? "checkbox" : "radio"}
-                      name={`q-${q.id}`}
-                      checked={selected}
+            {q.image && (
+              // Illustration de l'énoncé.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={q.image} alt="" className="mb-3 max-h-64 w-auto rounded-lg border border-line/70" />
+            )}
+
+            {q.kind === 5 ? (
+              // Association : chaque élément gauche → menu déroulant des choix.
+              <div className="mt-2 space-y-2">
+                {(q.match_left ?? []).map((l) => (
+                  <div key={l.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 rounded-lg bg-brand-soft/40 px-3 py-2 text-sm font-medium text-ink">
+                      {l.text}
+                    </span>
+                    <i className="bx bx-right-arrow-alt shrink-0 text-muted" />
+                    <select
                       disabled={locked}
-                      onChange={() => toggle(q.id, o.id, isCheckbox)}
-                      className="accent-brand"
-                    />
-                    {o.title}
-                    {r && r.correct_option_ids.includes(o.id) && <i className="bx bx-check text-green-600" />}
-                  </li>
-                );
-              })}
-            </ul>
+                      value={matchAnswers[q.id]?.[l.id] ?? ""}
+                      onChange={(e) =>
+                        setMatchAnswers((p) => ({ ...p, [q.id]: { ...(p[q.id] || {}), [l.id]: e.target.value } }))
+                      }
+                      className="hbc-input w-[45%] shrink-0"
+                    >
+                      <option value="">—</option>
+                      {(q.match_right ?? []).map((rt, i) => (
+                        <option key={i} value={rt}>
+                          {rt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {r && r.correct_pairs && (
+                  <div
+                    className={`mt-2 rounded-lg px-3 py-2 text-sm ${
+                      r.is_correct ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-800"
+                    }`}
+                  >
+                    {r.is_correct ? (
+                      <p className="font-medium">
+                        <i className="bx bx-check" /> Associations correctes
+                      </p>
+                    ) : (
+                      <>
+                        <p className="font-medium">Bonnes associations :</p>
+                        <ul className="mt-1 list-inside list-disc">
+                          {r.correct_pairs.map((p, i) => (
+                            <li key={i}>
+                              {p.left} → {p.right}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : q.kind === 6 ? (
+              // Ordonnancement : monter / descendre chaque élément.
+              <div className="mt-2 space-y-2">
+                {orderOf(q).map((id, idx, arr) => {
+                  const item = (q.order_items ?? []).find((i) => i.id === id);
+                  return (
+                    <div
+                      key={id}
+                      className="flex items-center gap-2 rounded-lg border border-line/70 bg-white px-3 py-2 text-sm"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand">
+                        {idx + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">{item?.text}</span>
+                      <button
+                        type="button"
+                        disabled={locked || idx === 0}
+                        onClick={() => moveOrder(q.id, arr, idx, -1)}
+                        aria-label="Monter"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand disabled:opacity-30"
+                      >
+                        <i className="bx bx-chevron-up text-lg" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={locked || idx === arr.length - 1}
+                        onClick={() => moveOrder(q.id, arr, idx, 1)}
+                        aria-label="Descendre"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand disabled:opacity-30"
+                      >
+                        <i className="bx bx-chevron-down text-lg" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {r && r.is_correct && (
+                  <p className="mt-2 text-sm font-medium text-green-700">
+                    <i className="bx bx-check" /> Ordre correct
+                  </p>
+                )}
+                {r && !r.is_correct && r.correct_order && (
+                  <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <p className="font-medium">Ordre correct :</p>
+                    <ol className="mt-1 list-inside list-decimal">
+                      {r.correct_order.map((tx, i) => (
+                        <li key={i}>{tx}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            ) : q.kind === 3 || q.kind === 4 ? (
+              // Texte libre / numérique : saisie directe.
+              <div className="mt-2">
+                <input
+                  type={q.kind === 4 ? "number" : "text"}
+                  inputMode={q.kind === 4 ? "decimal" : "text"}
+                  value={textAnswers[q.id] ?? ""}
+                  disabled={locked}
+                  onChange={(e) => setTextAnswers((p) => ({ ...p, [q.id]: e.target.value }))}
+                  placeholder={q.kind === 4 ? "Votre réponse (nombre)" : "Votre réponse"}
+                  className="hbc-input max-w-sm"
+                />
+                {r && (
+                  <p className={`mt-2 flex items-center gap-1.5 text-sm font-medium ${r.is_correct ? "text-green-700" : "text-red-600"}`}>
+                    {r.is_correct ? (
+                      <>
+                        <i className="bx bx-check text-lg" /> Bonne réponse
+                      </>
+                    ) : (
+                      <>
+                        <i className="bx bx-x text-lg" /> Réponse attendue&nbsp;: {(r.correct_values || []).join("  /  ")}
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            ) : q.kind === 2 ? (
+              // Vrai / Faux : deux gros boutons.
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                {q.options.map((o) => {
+                  const selected = (answers[q.id] || []).includes(o.id);
+                  const isVrai = /^(vrai|true|oui|yes)/i.test(o.title.trim());
+                  let cls = selected
+                    ? "border-accent bg-accent/10 text-brand-deep ring-2 ring-accent/40"
+                    : "border-line/70 text-ink hover:border-brand";
+                  if (r) {
+                    if (r.correct_option_ids.includes(o.id)) cls = "border-green-500 bg-green-50 text-green-700";
+                    else if (r.selected_option_ids.includes(o.id)) cls = "border-red-400 bg-red-50 text-red-600";
+                  }
+                  return (
+                    <button
+                      type="button"
+                      key={o.id}
+                      disabled={locked}
+                      onClick={() => toggle(q.id, o.id, false)}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 py-5 font-heading text-base font-semibold transition disabled:cursor-default ${cls}`}
+                    >
+                      <i className={`bx ${isVrai ? "bx-check-circle" : "bx-x-circle"} text-3xl`} />
+                      {o.title}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : q.options.some((o) => o.image) ? (
+              // Quiz à choix d'IMAGES : grille de cartes cliquables.
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {q.options.map((o) => {
+                  const isCheckbox = o.input_type === 1;
+                  const selected = (answers[q.id] || []).includes(o.id);
+                  let ring = selected
+                    ? "border-accent ring-2 ring-accent/40"
+                    : "border-line/70 hover:border-brand";
+                  if (r) {
+                    if (r.correct_option_ids.includes(o.id)) ring = "border-green-500 ring-2 ring-green-400/50";
+                    else if (r.selected_option_ids.includes(o.id)) ring = "border-red-400 ring-2 ring-red-300/50";
+                  }
+                  return (
+                    <button
+                      type="button"
+                      key={o.id}
+                      disabled={locked}
+                      onClick={() => toggle(q.id, o.id, isCheckbox)}
+                      className={`relative overflow-hidden rounded-xl border-2 bg-white text-left transition disabled:cursor-default ${ring}`}
+                    >
+                      {o.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={o.image} alt={o.title} className="aspect-video w-full object-cover" />
+                      )}
+                      <span className="flex items-center gap-2 px-3 py-2 text-sm">
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center border ${
+                            isCheckbox ? "rounded" : "rounded-full"
+                          } ${selected ? "border-accent bg-accent text-white" : "border-muted"}`}
+                        >
+                          {selected && <i className="bx bx-check text-xs" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{o.title}</span>
+                        {r && r.correct_option_ids.includes(o.id) && (
+                          <i className="bx bx-check shrink-0 text-green-600" />
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              // Quiz textuel classique (radio / checkbox).
+              <ul className="mt-2 space-y-1.5">
+                {q.options.map((o) => {
+                  const isCheckbox = o.input_type === 1;
+                  const selected = (answers[q.id] || []).includes(o.id);
+                  // Après correction : vert = bonne réponse, rouge = cochée mais fausse
+                  let tone = "";
+                  if (r) {
+                    if (r.correct_option_ids.includes(o.id)) tone = "text-green-700 font-medium";
+                    else if (r.selected_option_ids.includes(o.id)) tone = "text-red-600 line-through";
+                  }
+                  return (
+                    <li key={o.id} className={`flex items-center gap-2 text-sm ${tone || "text-ink"}`}>
+                      <input
+                        type={isCheckbox ? "checkbox" : "radio"}
+                        name={`q-${q.id}`}
+                        checked={selected}
+                        disabled={locked}
+                        onChange={() => toggle(q.id, o.id, isCheckbox)}
+                        className="accent-brand"
+                      />
+                      {o.title}
+                      {r && r.correct_option_ids.includes(o.id) && <i className="bx bx-check text-green-600" />}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         );
       })}
@@ -449,6 +691,259 @@ function AbonnementAgenda({ url }: { url: string }) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Anneau de progression circulaire (SVG). */
+function ProgressRing({ percent, size = 56 }: { percent: number; size?: number }) {
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c - (Math.min(100, Math.max(0, percent)) / 100) * c;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-line/60" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={off}
+          className={percent === 100 ? "stroke-green-500" : "stroke-accent"}
+          style={{ transition: "stroke-dashoffset .6s ease" }}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-brand-deep">
+        {percent}%
+      </span>
+    </div>
+  );
+}
+
+/** En-tête de progression (anneau + compteur + expiration). */
+function ProgressSummary({
+  done,
+  total,
+  percent,
+  accesFin,
+}: {
+  done: number;
+  total: number;
+  percent: number;
+  accesFin: string | null;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <ProgressRing percent={percent} />
+        <div className="min-w-0">
+          <p className="font-heading font-semibold text-brand-deep">Ma progression</p>
+          <p className="text-xs text-muted">
+            {done}/{total} activité{total > 1 ? "s" : ""} terminée{done > 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+      {accesFin && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+          <i className="bx bx-time-five text-accent" /> Accès jusqu&apos;au {fmtDate(accesFin)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Sommaire cliquable thèmes → séances, avec pastilles d'avancement. */
+function ThemeNav({
+  themes,
+  onJump,
+}: {
+  themes: MyFormation["themes"];
+  onJump: (id: string) => void;
+}) {
+  return (
+    <nav className="space-y-0.5">
+      {themes.map((th) => (
+        <div key={th.id}>
+          <button
+            onClick={() => onJump(`th-${th.id}`)}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium text-ink transition-colors hover:bg-brand-soft"
+          >
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                th.progress.percent === 100 ? "bg-green-500" : th.progress.done > 0 ? "bg-accent" : "bg-line"
+              }`}
+            />
+            <span className="min-w-0 flex-1 truncate">{th.title}</span>
+            {th.progress.total > 0 && (
+              <span className="shrink-0 text-xs font-semibold text-muted">{th.progress.percent}%</span>
+            )}
+          </button>
+          {th.seances.length > 0 && (
+            <div className="ml-3 border-l border-line/70 pl-2">
+              {th.seances.map((s) => {
+                const sd = s.activities.filter((a) => a.completed).length;
+                const st = s.activities.length;
+                const full = st > 0 && sd === st;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => onJump(`se-${s.id}`)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs text-muted transition-colors hover:bg-brand-soft hover:text-ink"
+                  >
+                    <i className={`bx ${full ? "bxs-check-circle text-green-500" : "bx-circle"} text-sm shrink-0`} />
+                    <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                    {st > 0 && (
+                      <span className="shrink-0 tabular-nums">
+                        {sd}/{st}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * Contenu d'une formation ouverte : deux colonnes sur desktop (contenu +
+ * sidebar de progression sticky), et sur mobile un panneau « Progression &
+ * sommaire » repliable en haut. Les liens du sommaire défilent en douceur vers
+ * la section (ancres `th-…` / `se-…`, décalées sous l'en-tête collant).
+ */
+function FormationContent({
+  content,
+  token,
+  onComplete,
+  accesFin,
+}: {
+  content: MyFormation;
+  token: string;
+  onComplete: OnComplete;
+  accesFin: string | null;
+}) {
+  const [navOpen, setNavOpen] = useState(false);
+
+  const done = content.themes.reduce((n, t) => n + t.progress.done, 0);
+  const total = content.themes.reduce((n, t) => n + t.progress.total, 0);
+  const percent = total ? Math.round((100 * done) / total) : 0;
+
+  function jump(id: string) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setNavOpen(false);
+  }
+
+  return (
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-8">
+      {/* Sidebar mobile : repliable, douce */}
+      <div className="mb-5 lg:hidden">
+        <div className="overflow-hidden rounded-2xl border border-line/70 bg-white shadow-hbc-sm">
+          <button
+            onClick={() => setNavOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3"
+            aria-expanded={navOpen}
+          >
+            <ProgressSummary done={done} total={total} percent={percent} accesFin={accesFin} />
+            <i className={`bx bx-chevron-down text-2xl text-muted transition-transform ${navOpen ? "rotate-180" : ""}`} />
+          </button>
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-hbc ${
+              navOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="border-t border-line px-3 py-3">
+                <ThemeNav themes={content.themes} onJump={jump} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contenu principal */}
+      <div className="min-w-0 space-y-8">
+        {content.schedule.length > 0 && (
+          <div className="rounded-xl border border-brand/20 bg-brand-soft/40 p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-deep">
+              <i className="bx bx-calendar" /> Planning des séances
+            </p>
+            <ul className="space-y-2">
+              {content.schedule.map((ev) => {
+                const link = ev.meetings.find((m) => m.link_url)?.link_url;
+                const shown = ev.meetings.find((m) => m.link_url) ?? ev.meetings[0];
+                return (
+                  <li key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    {ev.seance_order != null && (
+                      <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">
+                        Séance {ev.seance_order}
+                      </span>
+                    )}
+                    <span className="font-medium text-ink">{ev.seance_title || ev.title}</span>
+                    <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
+                    {shown && (
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand">
+                        {MEET_TYPE[shown.m_type] ?? ""}
+                      </span>
+                    )}
+                    {link && (
+                      <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent">
+                        <i className="bx bx-video" /> Rejoindre
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {content.themes.map((th) => (
+          <div key={th.id} id={`th-${th.id}`} className="scroll-mt-24">
+            <h2 className="mb-2 text-2xl">{th.title}</h2>
+            {th.progress.total > 0 && (
+              <div className="mb-4 max-w-sm">
+                <ProgressBar percent={th.progress.percent} />
+              </div>
+            )}
+            {th.objectifs.length > 0 && (
+              <div className="mb-4 rounded-xl border border-line/70 bg-white p-4">
+                <p className="mb-1 text-sm font-semibold text-brand-deep">Objectifs</p>
+                <ul className="list-inside list-disc text-sm text-muted">
+                  {th.objectifs.map((o, i) => (
+                    <li key={i}>{o}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="space-y-4">
+              {th.seances.map((s) => (
+                <div key={s.id} id={`se-${s.id}`} className="scroll-mt-24">
+                  <SeanceBlock s={s} token={token} onComplete={onComplete} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sidebar desktop : sticky */}
+      <aside className="hidden lg:block">
+        <div className="sticky top-24 space-y-4 rounded-2xl border border-line/70 bg-white p-5 shadow-hbc-sm">
+          <ProgressSummary done={done} total={total} percent={percent} accesFin={accesFin} />
+          <div className="border-t border-line pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Sommaire</p>
+            <ThemeNav themes={content.themes} onJump={jump} />
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -647,72 +1142,12 @@ export default function LearnerSpace({ token }: { token: string }) {
                   ) : !content || content.themes.length === 0 ? (
                     <p className="text-muted">Le contenu de cette formation n’est pas encore disponible.</p>
                   ) : (
-                    <div className="space-y-8">
-                      {content.schedule.length > 0 && (
-                        <div className="rounded-xl border border-brand/20 bg-brand-soft/40 p-4">
-                          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-deep">
-                            <i className="bx bx-calendar" /> Planning des séances
-                          </p>
-                          <ul className="space-y-2">
-                            {content.schedule.map((ev) => {
-                              const link = ev.meetings.find((m) => m.link_url)?.link_url;
-                              // Le badge doit décrire la visio qu'on propose de rejoindre,
-                              // pas un autre rendez-vous du même créneau.
-                              const shown = ev.meetings.find((m) => m.link_url) ?? ev.meetings[0];
-                              return (
-                                <li key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                  {/* Le créneau qui couvre une séance du programme
-                                      l'annonce : l'apprenant relie une date à un
-                                      chapitre plutôt qu'à un titre d'événement. */}
-                                  {ev.seance_order != null && (
-                                    <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">
-                                      Séance {ev.seance_order}
-                                    </span>
-                                  )}
-                                  <span className="font-medium text-ink">{ev.seance_title || ev.title}</span>
-                                  <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
-                                  {shown && (
-                                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand">
-                                      {MEET_TYPE[shown.m_type] ?? ""}
-                                    </span>
-                                  )}
-                                  {link && (
-                                    <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent">
-                                      <i className="bx bx-video" /> Rejoindre
-                                    </a>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      )}
-                      {content.themes.map((th) => (
-                        <div key={th.id}>
-                          <h2 className="mb-2 text-2xl">{th.title}</h2>
-                          {th.progress.total > 0 && (
-                            <div className="mb-4 max-w-sm">
-                              <ProgressBar percent={th.progress.percent} />
-                            </div>
-                          )}
-                          {th.objectifs.length > 0 && (
-                            <div className="mb-4 rounded-xl border border-line/70 bg-white p-4">
-                              <p className="mb-1 text-sm font-semibold text-brand-deep">Objectifs</p>
-                              <ul className="list-inside list-disc text-sm text-muted">
-                                {th.objectifs.map((o, i) => (
-                                  <li key={i}>{o}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          <div className="space-y-4">
-                            {th.seances.map((s) => (
-                              <SeanceBlock key={s.id} s={s} token={token} onComplete={patchCompleted} />
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <FormationContent
+                      content={content}
+                      token={token}
+                      onComplete={patchCompleted}
+                      accesFin={f.acces_fin}
+                    />
                   )}
                 </div>
               )}

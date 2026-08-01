@@ -1006,7 +1006,19 @@ class ActivityDocViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _quiz_question_payload(question, aq):
+def _media_url(request, f):
+    """URL absolue d'un fichier média (ou None). Absolue car le dashboard vit
+    sur un autre hôte que l'API : une URL relative pointerait vers le mauvais domaine."""
+    if not f:
+        return None
+    try:
+        url = f.url
+    except ValueError:
+        return None
+    return request.build_absolute_uri(url) if request is not None else url
+
+
+def _quiz_question_payload(question, aq, request=None):
     """Sérialise une question de quiz + ses options (pour l'authoring)."""
     from material.models import InputQuestionBox
 
@@ -1016,10 +1028,15 @@ def _quiz_question_payload(question, aq):
         "id": question.id,
         "title": question.title,
         "description": question.description,
+        "kind": getattr(question, "kind", 1),  # 1=QCM 2=Vrai/Faux
+        "image": _media_url(request, question.image),
         "points": aq.points if aq else 1,
         "number": aq.number if aq else 0,
         "input_type": input_type,  # 1=checkbox 2=radio
-        "options": [{"id": o.id, "title": o.title, "is_answer": o.is_answer} for o in options],
+        "options": [
+            {"id": o.id, "title": o.title, "is_answer": o.is_answer, "image": _media_url(request, o.image)}
+            for o in options
+        ],
     }
 
 
@@ -1054,39 +1071,178 @@ class QuizQuestionViewSet(viewsets.ViewSet):
             .select_related("question")
             .order_by("number", "id")
         )
-        return Response([_quiz_question_payload(aq.question, aq) for aq in aqs])
+        return Response([_quiz_question_payload(aq.question, aq, request=request) for aq in aqs])
 
-    def _write_options(self, question, input_type, options):
+    @staticmethod
+    def _parse_options(raw):
+        """Les options arrivent en liste JSON (corps JSON) ou en chaîne JSON
+        (corps multipart, quand on joint des images). On accepte les deux."""
+        if isinstance(raw, str):
+            import json
+            try:
+                raw = json.loads(raw)
+            except (ValueError, TypeError):
+                return []
+        return raw if isinstance(raw, list) else []
+
+    def _write_options(self, question, input_type, options, files=None):
+        """Réécrit les options. Une option peut porter une image (quiz à choix
+        d'images) via un fichier multipart nommé ``option_image_<i>``.
+
+        À l'édition, une option existante conservée sans nouvelle image garde la
+        sienne : le front la marque ``keep_image`` avec son ``id``. On relève les
+        fichiers AVANT suppression — Django ne retire pas le fichier disque à la
+        suppression du modèle, la référence reste donc valable — puis on les
+        réattache aux options recréées.
+        """
         from material.models import InputQuestionBox
 
+        parsed = self._parse_options(options)
+        prev_images = {
+            b.pk: b.image.name
+            for b in InputQuestionBox.objects.filter(question=question)
+            if b.image
+        }
         InputQuestionBox.objects.filter(question=question).delete()
-        for o in options or []:
+        for i, o in enumerate(parsed):
             title = (o.get("title") or "").strip()
-            if not title:
+            new_img = files.get(f"option_image_{i}") if files is not None else None
+            kept_name = None
+            if new_img is None and o.get("keep_image"):
+                try:
+                    kept_name = prev_images.get(int(o.get("id")))
+                except (TypeError, ValueError):
+                    kept_name = None
+            # Une option purement visuelle (image sans libellé) est valide.
+            if not title and not new_img and not kept_name:
                 continue
-            InputQuestionBox.objects.create(
-                title=title, is_answer=bool(o.get("is_answer")), input_type=input_type, question=question
+            box = InputQuestionBox(
+                title=title, is_answer=bool(o.get("is_answer")),
+                input_type=input_type, question=question,
             )
+            if new_img is not None:
+                box.image = new_img
+            elif kept_name:
+                box.image.name = kept_name
+            box.save()
 
-    def _persist_question(self, activity, data, user):
+    @staticmethod
+    def _kind_of(data):
+        from lessonapp.models import Question
+        try:
+            k = int(data.get("kind", Question.QCM) or Question.QCM)
+        except (TypeError, ValueError):
+            k = Question.QCM
+        return k if k in dict(Question.KIND_CHOICES) else Question.QCM
+
+    def _truefalse_options(self, data):
+        """Options d'une question Vrai/Faux : reprend celles fournies, sinon les
+        génère depuis un booléen `correct` (True par défaut)."""
+        opts = self._parse_options(data.get("options"))
+        if opts:
+            return opts
+        correct = str(data.get("correct", "true")).lower() not in ("false", "0", "no", "")
+        return [{"title": "Vrai", "is_answer": correct}, {"title": "Faux", "is_answer": not correct}]
+
+    def _accepted_options(self, data):
+        """Réponses acceptées d'une question texte/numérique : chaque valeur devient
+        une option `is_answer=True`. Source : `accepted` (liste/CSV) ou `options`.
+        Pour le numérique, une valeur peut s'écrire « 42 » ou « 42|0.5 » (tolérance)."""
+        acc = data.get("accepted")
+        if isinstance(acc, str):
+            import json
+            try:
+                acc = json.loads(acc)
+            except (ValueError, TypeError):
+                acc = [a.strip() for a in acc.split(",")]
+        if isinstance(acc, list) and acc:
+            return [{"title": str(a).strip(), "is_answer": True} for a in acc if str(a).strip()]
+        # Repli : options fournies « à plat », forcées en réponses acceptées.
+        return [
+            {"title": (o.get("title") or "").strip(), "is_answer": True}
+            for o in self._parse_options(data.get("options"))
+            if (o.get("title") or "").strip()
+        ]
+
+    @staticmethod
+    def _as_list(raw):
+        if isinstance(raw, str):
+            import json
+            try:
+                return json.loads(raw)
+            except (ValueError, TypeError):
+                return []
+        return raw if isinstance(raw, list) else []
+
+    def _association_options(self, data):
+        """Paires d'association → options « gauche||droite » (is_answer=True).
+        Source : `pairs: [{left, right}]` ou options « à plat » {title,color}."""
+        pairs = self._as_list(data.get("pairs"))
+        out = []
+        for p in pairs:
+            left = str(p.get("left") or "").strip()
+            right = str(p.get("right") or "").strip()
+            if left and right:
+                out.append({"title": f"{left}||{right}", "is_answer": True})
+        return out
+
+    def _ordering_options(self, data):
+        """Éléments à ordonner → options « position||texte » (is_answer=True).
+        Source : `items: [texte, ...]` DANS L'ORDRE CORRECT."""
+        items = self._as_list(data.get("items"))
+        out = []
+        for i, it in enumerate(items, start=1):
+            text = str(it).strip()
+            if text:
+                out.append({"title": f"{i}||{text}", "is_answer": True})
+        return out
+
+    def _write_typed_options(self, question, kind, data):
+        """Écrit les options selon le type de question. Renvoie True si géré."""
+        from lessonapp.models import Question
+
+        if kind == Question.TRUE_FALSE:
+            self._write_options(question, 2, self._truefalse_options(data), files=None)
+            return True
+        if kind in (Question.FREE_TEXT, Question.NUMERIC):
+            self._write_options(question, 2, self._accepted_options(data), files=None)
+            return True
+        if kind == Question.ASSOCIATION:
+            self._write_options(question, 2, self._association_options(data), files=None)
+            return True
+        if kind == Question.ORDERING:
+            self._write_options(question, 2, self._ordering_options(data), files=None)
+            return True
+        return False
+
+    def _persist_question(self, activity, data, user, files=None):
         """Crée Bloc + Question + Activityquestion + options depuis un dict à plat."""
         from lessonapp.models import Question, Activityquestion
         from lessonapp.models.bloc import Bloc
 
         title = (data.get("title") or "").strip()
+        kind = self._kind_of(data)
         bloc = Bloc.objects.create(title=title[:400], created_by=user, categorie=Bloc.QUESTION)
-        q = Question.objects.create(title=title, description=(data.get("description") or ""), bloc=bloc)
+        q = Question.objects.create(
+            title=title, description=(data.get("description") or ""), bloc=bloc, kind=kind
+        )
+        # Image d'énoncé (facultative) — fichier multipart « image ».
+        if files is not None and files.get("image"):
+            q.image = files.get("image")
+            q.save(update_fields=["image"])
         n = Activityquestion.objects.filter(activity=activity).count() + 1
         try:
             points = int(data.get("points", 1) or 1)
         except (TypeError, ValueError):
             points = 1
         aq = Activityquestion.objects.create(activity=activity, question=q, points=points, number=n)
-        try:
-            input_type = int(data.get("input_type", 2) or 2)
-        except (TypeError, ValueError):
-            input_type = 2
-        self._write_options(q, input_type, data.get("options"))
+        # Vrai/Faux, texte libre et numérique gèrent leurs options ; sinon QCM.
+        if not self._write_typed_options(q, kind, data):
+            try:
+                input_type = int(data.get("input_type", 2) or 2)
+            except (TypeError, ValueError):
+                input_type = 2
+            self._write_options(q, input_type, data.get("options"), files=files)
         return q, aq
 
     def create(self, request):
@@ -1099,8 +1255,8 @@ class QuizQuestionViewSet(viewsets.ViewSet):
         _assert_theme_access(request.user, getattr(getattr(activity, "seance", None), "theme", None))
         if not (d.get("title") or "").strip():
             return Response({"detail": "Intitulé de la question requis."}, status=status.HTTP_400_BAD_REQUEST)
-        q, aq = self._persist_question(activity, d, request.user)
-        return Response(_quiz_question_payload(q, aq), status=status.HTTP_201_CREATED)
+        q, aq = self._persist_question(activity, d, request.user, files=request.FILES)
+        return Response(_quiz_question_payload(q, aq, request=request), status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"], url_path="template")
     def template(self, request):
@@ -1135,7 +1291,7 @@ class QuizQuestionViewSet(viewsets.ViewSet):
         except Exception as exc:  # noqa: BLE001 — fichier corrompu / format inattendu
             return Response({"detail": f"Fichier illisible : {exc}"}, status=status.HTTP_400_BAD_REQUEST)
         created = [
-            _quiz_question_payload(*self._persist_question(activity, q, request.user))
+            _quiz_question_payload(*self._persist_question(activity, q, request.user), request=request)
             for q in questions
         ]
         return Response(
@@ -1150,11 +1306,19 @@ class QuizQuestionViewSet(viewsets.ViewSet):
         if q is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         _assert_theme_access(request.user, self._question_theme(q))
+        from lessonapp.models import Question
         d = request.data
         if "title" in d:
             q.title = (d.get("title") or "").strip() or q.title
         if "description" in d:
             q.description = d.get("description") or ""
+        if "kind" in d:
+            q.kind = self._kind_of(d)
+        # Image d'énoncé : remplacement (fichier « image ») ou retrait (« image_clear »).
+        if request.FILES.get("image"):
+            q.image = request.FILES.get("image")
+        elif str(d.get("image_clear") or "").lower() in ("1", "true", "yes"):
+            q.image = None
         q.save()
         aq = Activityquestion.objects.filter(question=q).first()
         if aq and "points" in d:
@@ -1163,10 +1327,19 @@ class QuizQuestionViewSet(viewsets.ViewSet):
                 aq.save(update_fields=["points"])
             except (TypeError, ValueError):
                 pass
-        if "options" in d:
+        # Réécriture des options. Les types spéciaux (Vrai/Faux, texte, numérique)
+        # régénèrent leurs options dès qu'on touche au type ou aux réponses.
+        typed = q.kind in (
+            Question.TRUE_FALSE, Question.FREE_TEXT, Question.NUMERIC,
+            Question.ASSOCIATION, Question.ORDERING,
+        )
+        touch = any(k in d for k in ("options", "kind", "correct", "accepted", "pairs", "items"))
+        if typed and touch:
+            self._write_typed_options(q, q.kind, d)
+        elif not typed and "options" in d:
             input_type = int(d.get("input_type", 2) or 2)
-            self._write_options(q, input_type, d.get("options"))
-        return Response(_quiz_question_payload(q, aq))
+            self._write_options(q, input_type, d.get("options"), files=request.FILES)
+        return Response(_quiz_question_payload(q, aq, request=request))
 
     def update(self, request, pk=None):
         return self._update(request, pk)

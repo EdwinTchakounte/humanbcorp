@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ChatWidget from "@/components/ChatWidget";
+import { CartProvider } from "@/lib/cart";
+import CartDrawer from "@/components/cart/CartDrawer";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://humanbcorp.com";
 
@@ -50,8 +52,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#1C2F57" />
       </head>
       <body className="antialiased">
-        {children}
-        <ChatWidget />
+        <CartProvider>
+          {children}
+          <CartDrawer />
+          <ChatWidget />
+        </CartProvider>
       </body>
     </html>
   );

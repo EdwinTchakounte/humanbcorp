@@ -49,7 +49,7 @@ export default function MediaLibrary() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Médiathèque"
         subtitle={`${items.length} image(s)`}

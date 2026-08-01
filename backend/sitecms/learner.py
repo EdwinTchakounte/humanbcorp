@@ -218,27 +218,57 @@ def build_theme_content(theme, request, user=None, reveal_answers=False):
             questions = []
             if activity.a_type == Activity.QUIZZ:
                 aqs = Activityquestion.objects.filter(activity=activity).select_related("question", "question__bloc")
+                import random
+
+                # Types dont les options portent le corrigé → jamais servies telles
+                # quelles à l'apprenant (texte/numérique/association/ordonnancement).
+                ANSWER_KINDS = (
+                    Question.FREE_TEXT, Question.NUMERIC, Question.ASSOCIATION, Question.ORDERING,
+                )
                 for qi, aq in enumerate(aqs, start=1):
                     q = aq.question
-                    options = [
+                    q_kind = getattr(q, "kind", Question.QCM)
+                    boxes = list(InputQuestionBox.objects.filter(question=q))
+                    hide_options = q_kind in ANSWER_KINDS and not reveal_answers
+                    options = [] if hide_options else [
                         {
                             "id": o.pk,
                             "title": o.title,
                             "input_type": o.input_type,
+                            "image": _abs(request, o.image.url) if o.image else None,
                             # Corrigé visible uniquement en aperçu auteur.
                             **({"is_answer": o.is_answer} if reveal_answers else {}),
                         }
-                        for o in InputQuestionBox.objects.filter(question=q)
+                        for o in boxes
                     ]
-                    questions.append({
+                    qpayload = {
                         "id": q.pk,
                         "index": qi,
                         "title": q.title,
                         "description": q.description,
+                        "kind": q_kind,  # 1=QCM 2=VF 3=Texte 4=Num 5=Assoc 6=Ordre
+                        "image": _abs(request, q.image.url) if q.image else None,
                         "points": aq.points,
                         "number": aq.number,
                         "options": options,
-                    })
+                    }
+                    # Association : colonne gauche (avec id) + colonne droite MÉLANGÉE
+                    # (les bonnes réponses, mais sans le lien gauche↔droite).
+                    if q_kind == Question.ASSOCIATION and not reveal_answers:
+                        left, right = [], []
+                        for o in boxes:
+                            l, _, r = o.title.partition("||")
+                            left.append({"id": o.pk, "text": l})
+                            right.append(r)
+                        random.shuffle(right)
+                        qpayload["match_left"] = left
+                        qpayload["match_right"] = right
+                    # Ordonnancement : éléments MÉLANGÉS (l'ordre correct est caché).
+                    elif q_kind == Question.ORDERING and not reveal_answers:
+                        items = [{"id": o.pk, "text": o.title.partition("||")[2]} for o in boxes]
+                        random.shuffle(items)
+                        qpayload["order_items"] = items
+                    questions.append(qpayload)
 
             # Blocs de contenu (texte / image / vidéo / audio — embed ou fichier)
             components = [
@@ -509,39 +539,125 @@ def _learner_can_access_activity(user, activity) -> bool:
     return any(not acces_expire(ins) for ins in inscriptions)
 
 
+def _norm_text(s) -> str:
+    """Normalise une réponse texte : sans accents, casse ni espaces superflus.
+    Rend la correction tolérante (« Élève » == « eleve »)."""
+    import unicodedata
+
+    s = unicodedata.normalize("NFKD", str(s or ""))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return " ".join(s.strip().casefold().split())
+
+
+def _parse_num(s):
+    """Convertit une saisie en nombre (virgule ou point décimal), ou None."""
+    try:
+        return float(str(s).strip().replace(",", ".").replace(" ", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _first(raw):
+    """Extrait la saisie texte/numérique d'une réponse (liste à un élément ou chaîne)."""
+    if isinstance(raw, (list, tuple)):
+        return raw[0] if raw else ""
+    return raw if raw is not None else ""
+
+
 def _score_quiz(activity, answers: dict):
     """Corrige un quiz. Renvoie (score, max_score, results).
 
-    Une question est **juste** si l'ensemble des options cochées == l'ensemble
-    des options correctes (vrai pour radio comme pour checkbox).
+    Correction **par type de question** (`Question.kind`) :
+      - QCM / Vrai-Faux : l'ensemble des options cochées == l'ensemble des correctes ;
+      - Texte libre : la saisie normalisée figure dans les réponses acceptées ;
+      - Numérique : la saisie == une valeur acceptée, à sa tolérance près
+        (option stockée « valeur » ou « valeur|tolérance »).
+
+    Pour texte/numérique, les réponses acceptées sont portées par les
+    `InputQuestionBox` marquées `is_answer` (leur `title` = la réponse attendue).
     """
-    from lessonapp.models import Activityquestion
+    from lessonapp.models import Activityquestion, Question
     from material.models import InputQuestionBox
 
     total = max_total = 0
     results = []
     for aq in Activityquestion.objects.filter(activity=activity).select_related("question"):
         q = aq.question
-        correct = set(
-            InputQuestionBox.objects.filter(question=q, is_answer=True).values_list("id", flat=True)
-        )
+        kind = getattr(q, "kind", Question.QCM)
         raw = answers.get(str(q.id), answers.get(q.id, [])) or []
-        try:
-            selected = {int(x) for x in raw}
-        except (TypeError, ValueError):
-            selected = set()
-        is_correct = bool(correct) and selected == correct
+
+        res = {"question_id": q.id, "kind": kind, "points": aq.points}
+
+        if kind in (Question.FREE_TEXT, Question.NUMERIC):
+            accepted = list(
+                InputQuestionBox.objects.filter(question=q, is_answer=True).values_list("title", flat=True)
+            )
+            given = _first(raw)
+            if kind == Question.NUMERIC:
+                num = _parse_num(given)
+                is_correct = False
+                display = []
+                for a in accepted:
+                    val_str, sep, tol_str = str(a).partition("|")
+                    val = _parse_num(val_str)
+                    tol = _parse_num(tol_str) or 0.0
+                    if val is not None and num is not None and abs(num - val) <= tol + 1e-9:
+                        is_correct = True
+                    # Affichage lisible : « 3.14 » ou « 3.14 (±0.01) ».
+                    display.append(f"{val_str.strip()} (±{tol_str.strip()})" if sep and tol else val_str.strip())
+                res["correct_values"] = display
+            else:  # FREE_TEXT
+                acc_norm = {_norm_text(a) for a in accepted}
+                is_correct = bool(acc_norm) and _norm_text(given) in acc_norm
+                res["correct_values"] = list(accepted)
+            res["given_text"] = str(given)
+            res["correct_option_ids"] = []
+            res["selected_option_ids"] = []
+        elif kind == Question.ASSOCIATION:
+            boxes = list(InputQuestionBox.objects.filter(question=q))
+            given_map = raw if isinstance(raw, dict) else {}
+            pairs, ok = [], bool(boxes)
+            for o in boxes:
+                left, _, right = o.title.partition("||")
+                pairs.append({"left": left, "right": right})
+                chosen = given_map.get(str(o.pk), given_map.get(o.pk, ""))
+                if _norm_text(chosen) != _norm_text(right):
+                    ok = False
+            is_correct = ok
+            res["correct_pairs"] = pairs
+            res["correct_option_ids"] = []
+            res["selected_option_ids"] = []
+        elif kind == Question.ORDERING:
+            boxes = list(InputQuestionBox.objects.filter(question=q))
+            # Ordre canonique = tri par la position encodée « position||texte ».
+            ordered = sorted(boxes, key=lambda o: _parse_num(o.title.partition("||")[0]) or 0)
+            canonical = [o.pk for o in ordered]
+            try:
+                given_ids = [int(x) for x in raw]
+            except (TypeError, ValueError):
+                given_ids = []
+            is_correct = bool(canonical) and given_ids == canonical
+            res["correct_order"] = [o.title.partition("||")[2] for o in ordered]
+            res["correct_option_ids"] = []
+            res["selected_option_ids"] = []
+        else:  # QCM / TRUE_FALSE : comparaison d'ensembles d'IDs
+            correct = set(
+                InputQuestionBox.objects.filter(question=q, is_answer=True).values_list("id", flat=True)
+            )
+            try:
+                selected = {int(x) for x in raw}
+            except (TypeError, ValueError):
+                selected = set()
+            is_correct = bool(correct) and selected == correct
+            res["correct_option_ids"] = sorted(correct)
+            res["selected_option_ids"] = sorted(selected)
+
         earned = aq.points if is_correct else 0
         total += earned
         max_total += aq.points
-        results.append({
-            "question_id": q.id,
-            "is_correct": is_correct,
-            "points": aq.points,
-            "points_earned": earned,
-            "correct_option_ids": sorted(correct),
-            "selected_option_ids": sorted(selected),
-        })
+        res["is_correct"] = is_correct
+        res["points_earned"] = earned
+        results.append(res)
     return total, max_total, results
 
 

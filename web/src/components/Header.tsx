@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { NavItem, SiteSettings } from "@/lib/types";
+import CartButton from "@/components/cart/CartButton";
 
 const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
 
@@ -145,6 +146,7 @@ export default function Header({
           >
             {t.other}
           </Link>
+          <CartButton label={lang === "en" ? "Cart" : "Panier"} />
           <a href={DASHBOARD_URL} className="btn-brand ml-1 !px-5 !py-2 text-xs">
             <i className="bx bx-user" aria-hidden /> {t.login}
           </a>
@@ -158,6 +160,7 @@ export default function Header({
           >
             {t.other}
           </Link>
+          <CartButton label={lang === "en" ? "Cart" : "Panier"} />
           <button onClick={() => setOpen((v) => !v)} aria-label="Menu" className="text-brand-deep">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}

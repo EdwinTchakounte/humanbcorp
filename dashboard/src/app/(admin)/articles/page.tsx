@@ -63,7 +63,7 @@ export default function ArticlesList() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Articles du blog"
         subtitle={`${items.length} article(s)`}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -18,6 +18,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { ready, authed, profile } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Referme le tiroir mobile à chaque changement de page.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!ready) return;
@@ -43,14 +49,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <ToastProvider>
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar fixe, non scrollable */}
-      <Sidebar />
+      {/* Sidebar : statique en desktop, tiroir coulissant en mobile */}
+      <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
 
       {/* Colonne principale */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header fixe */}
-        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-line bg-white px-8">
-          <Breadcrumbs />
+        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-line bg-white px-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              onClick={() => setNavOpen(true)}
+              aria-label="Ouvrir le menu"
+              className="-ml-1 rounded-lg p-2 text-ink hover:bg-brand-soft/60 lg:hidden"
+            >
+              <i className="bx bx-menu text-2xl" />
+            </button>
+            <Breadcrumbs />
+          </div>
           <div className="flex items-center gap-3 text-sm">
             <CommandPalette />
             <span className="hidden text-muted sm:inline">{profile?.full_name}</span>

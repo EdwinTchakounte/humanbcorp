@@ -81,7 +81,7 @@ export default function PagesList() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Pages du site"
         subtitle="Gère le contenu, l'ordre et la visibilité de chaque page."

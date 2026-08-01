@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function MonEspacePage({ params }: { params: { token: string } }) {
   return (
     <section className="py-14 md:py-20">
-      <div className="container-hbc max-w-4xl">
+      <div className="container-hbc max-w-6xl">
         <LearnerSpace token={params.token} />
       </div>
     </section>

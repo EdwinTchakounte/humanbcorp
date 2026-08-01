@@ -8,8 +8,10 @@ export const metadata: Metadata = {
 
 export default function MonEspacePage({ params }: { params: { token: string } }) {
   return (
-    <section className="py-14 md:py-20">
-      <div className="container-hbc max-w-6xl">
+    <section className="py-10 md:py-14">
+      {/* Espace client en pleine largeur (pas de conteneur centré) : on exploite
+          tout l'écran, avec un simple padding latéral responsive. */}
+      <div className="w-full px-4 md:px-6 lg:px-8">
         <LearnerSpace token={params.token} />
       </div>
     </section>

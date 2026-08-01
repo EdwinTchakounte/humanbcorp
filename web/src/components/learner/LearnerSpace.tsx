@@ -971,20 +971,19 @@ export default function LearnerSpace({ token }: { token: string }) {
           return;
         }
         setSpace(s);
-        // Auto-ouvre le contenu s'il n'y a qu'une seule formation.
-        const withContent = s.formations.filter((f) => f.has_content);
-        if (withContent.length === 1) openFormation(withContent[0].publication_id);
+        // Auto-sélectionne la première formation avec contenu accessible pour
+        // que le panneau principal ne soit jamais vide à l'arrivée.
+        const first = s.formations.find((f) => f.has_content && !f.acces_expire);
+        if (first) selectFormation(first.publication_id);
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  async function openFormation(pubId: number) {
-    if (openId === pubId) {
-      setOpenId(null);
-      setContent(null);
-      return;
-    }
+  // Sélectionne une formation et charge son contenu dans le panneau principal.
+  // (Navigation type « sidebar » : re-cliquer sur l'active ne la referme pas.)
+  async function selectFormation(pubId: number) {
+    if (openId === pubId) return;
     setOpenId(pubId);
     setContent(null);
     setLoadingContent(true);
@@ -1093,66 +1092,75 @@ export default function LearnerSpace({ token }: { token: string }) {
       {space.formations.length === 0 ? (
         <p className="text-muted">Aucune formation confirmée pour le moment.</p>
       ) : (
-        <div className="space-y-4">
-          {space.formations.map((f) => (
-            <div key={f.publication_id} className="card overflow-hidden">
-              <button
-                onClick={() => f.has_content && !f.acces_expire && openFormation(f.publication_id)}
-                className="flex w-full items-center gap-4 p-5 text-left"
-              >
-                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${f.acces_expire ? "bg-gray-100 text-gray-400" : "bg-brand-soft text-brand"}`}>
-                  <i className={`bx ${f.acces_expire ? "bx-lock-alt" : "bxs-graduation"}`} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg leading-tight">{f.title}</h3>
-                  {/* L'offre expirée reste listée : l'apprenant doit comprendre
-                      pourquoi elle est fermée plutôt que de la voir disparaître. */}
-                  {f.acces_expire ? (
-                    <p className="truncate text-sm font-medium text-amber-700">
-                      Accès terminé{f.acces_fin ? ` le ${fmtDate(f.acces_fin)}` : ""}
-                    </p>
-                  ) : f.has_content && f.progress.total > 0 ? (
-                    <div className="mt-2 max-w-xs">
-                      <ProgressBar percent={f.progress.percent} />
+        /* Deux panneaux pleine largeur : à gauche la navigation entre formations,
+           à droite le contenu de celle sélectionnée. Sur mobile, la liste passe
+           au-dessus (défilement horizontal) et le contenu dessous. */
+        <div className="lg:grid lg:grid-cols-[19rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+          {/* Sidebar : liste des formations */}
+          <aside className="mb-6 lg:mb-0 lg:sticky lg:top-24">
+            <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+              Mes formations ({space.formations.length})
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-2 lg:overflow-visible lg:pb-0">
+              {space.formations.map((f) => {
+                const active = openId === f.publication_id;
+                const disabled = !f.has_content || f.acces_expire;
+                return (
+                  <button
+                    key={f.publication_id}
+                    onClick={() => !disabled && selectFormation(f.publication_id)}
+                    disabled={disabled}
+                    className={`shrink-0 rounded-xl border p-3 text-left transition lg:w-full ${
+                      active
+                        ? "border-brand bg-brand-soft/60 shadow-hbc-sm"
+                        : "border-line/70 bg-white hover:border-brand/50"
+                    } ${disabled ? "cursor-default opacity-60" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl ${f.acces_expire ? "bg-gray-100 text-gray-400" : "bg-brand-soft text-brand"}`}>
+                        <i className={`bx ${f.acces_expire ? "bx-lock-alt" : "bxs-graduation"}`} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-sm font-semibold leading-tight text-ink">{f.title}</h3>
+                        {f.acces_expire ? (
+                          <p className="truncate text-xs font-medium text-amber-700">
+                            Terminé{f.acces_fin ? ` le ${fmtDate(f.acces_fin)}` : ""}
+                          </p>
+                        ) : f.has_content && f.progress.total > 0 ? (
+                          <div className="mt-1.5 w-40 lg:w-full"><ProgressBar percent={f.progress.percent} /></div>
+                        ) : (
+                          <p className="truncate text-xs text-muted">
+                            {f.has_content ? "Contenu disponible" : "En préparation"}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="truncate text-sm text-muted">
-                      {f.has_content ? "Contenu disponible" : "Contenu en préparation"}
-                    </p>
-                  )}
-                  {!f.acces_expire && f.acces_fin && (
-                    <p className="mt-1 text-xs text-muted">
-                      <i className="bx bx-time-five" /> Accès jusqu&apos;au {fmtDate(f.acces_fin)}
-                    </p>
-                  )}
-                </div>
-                {f.has_content && !f.acces_expire && (
-                  <i
-                    className={`bx bx-chevron-down text-2xl text-muted transition ${
-                      openId === f.publication_id ? "rotate-180" : ""
-                    }`}
-                  />
-                )}
-              </button>
-
-              {openId === f.publication_id && (
-                <div className="border-t border-line bg-brand-soft/30 p-5">
-                  {loadingContent ? (
-                    <p className="text-muted">Chargement du contenu…</p>
-                  ) : !content || content.themes.length === 0 ? (
-                    <p className="text-muted">Le contenu de cette formation n’est pas encore disponible.</p>
-                  ) : (
-                    <FormationContent
-                      content={content}
-                      token={token}
-                      onComplete={patchCompleted}
-                      accesFin={f.acces_fin}
-                    />
-                  )}
-                </div>
-              )}
+                  </button>
+                );
+              })}
             </div>
-          ))}
+          </aside>
+
+          {/* Panneau principal : contenu de la formation sélectionnée */}
+          <div className="min-w-0">
+            {openId === null ? (
+              <div className="card p-10 text-center text-muted">
+                <i className="bx bx-book-open mb-2 text-3xl text-brand/50" />
+                <p>Sélectionnez une formation pour afficher son contenu.</p>
+              </div>
+            ) : loadingContent ? (
+              <p className="text-muted">Chargement du contenu…</p>
+            ) : !content || content.themes.length === 0 ? (
+              <div className="card p-8 text-muted">Le contenu de cette formation n’est pas encore disponible.</div>
+            ) : (
+              <FormationContent
+                content={content}
+                token={token}
+                onComplete={patchCompleted}
+                accesFin={space.formations.find((f) => f.publication_id === openId)?.acces_fin ?? null}
+              />
+            )}
+          </div>
         </div>
       )}
         </>

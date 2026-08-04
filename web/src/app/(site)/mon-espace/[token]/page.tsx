@@ -9,11 +9,11 @@ export const metadata: Metadata = {
 export default function MonEspacePage({ params }: { params: { token: string } }) {
   return (
     <section className="py-10 md:py-14">
-      {/* Espace client en pleine largeur (pas de conteneur centré) : on exploite
-          tout l'écran. Le `px-safe` extérieur réserve l'encoche (paysage, PWA
-          installée) ; le padding responsive reste sur le conteneur intérieur. */}
+      {/* Espace client vraiment pleine largeur : plus de marges latérales, juste
+          un filet minimal pour ne pas coller au bord (et `px-safe` pour réserver
+          l'encoche en paysage sur PWA installée). */}
       <div className="px-safe">
-        <div className="w-full px-4 md:px-6 lg:px-8">
+        <div className="w-full px-2 sm:px-3">
           <LearnerSpace token={params.token} />
         </div>
       </div>

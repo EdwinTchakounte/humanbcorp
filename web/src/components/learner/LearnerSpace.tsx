@@ -1269,11 +1269,6 @@ export default function LearnerSpace({ token }: { token: string }) {
         <Souscrire token={token} onChangement={rechargerEspace} />
       ) : (
         <>
-      {/* Abonnement agenda : proposé seulement s'il y a des séances à suivre. */}
-      {space.agenda_url && space.formations.length > 0 && (
-        <AbonnementAgenda url={space.agenda_url} />
-      )}
-
       {space.formations.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-line bg-paper/60 p-8 text-center md:p-12">
           <span className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-soft text-3xl text-brand">
@@ -1376,6 +1371,14 @@ export default function LearnerSpace({ token }: { token: string }) {
           </div>
         </div>
         </>
+      )}
+
+      {/* Abonnement agenda : utilitaire secondaire, placé sous le contenu
+          (sur mobile, le sélecteur de formation + le contenu restent prioritaires). */}
+      {space.agenda_url && space.formations.length > 0 && (
+        <div className="mt-8">
+          <AbonnementAgenda url={space.agenda_url} />
+        </div>
       )}
         </>
       )}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ChatWidget from "@/components/ChatWidget";
 import { CartProvider } from "@/lib/cart";
@@ -36,6 +36,18 @@ export const metadata: Metadata = {
     images: ["/brand/logo.png"],
   },
   twitter: { card: "summary_large_image" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "HBC-RH" },
+};
+
+// Séparé de `metadata` (contrat Next 14). `viewportFit: cover` fait passer le
+// contenu sous l'encoche et la barre d'accueil en PWA installée ; les `env(safe-
+// area-inset-*)` (voir globals.css) réservent alors l'espace utile. `maximumScale`
+// n'est PAS bridé : brider le zoom nuit à l'accessibilité.
+export const viewport: Viewport = {
+  themeColor: "#1C2F57",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -49,7 +61,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
         <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
-        <meta name="theme-color" content="#1C2F57" />
       </head>
       <body className="antialiased">
         <CartProvider>

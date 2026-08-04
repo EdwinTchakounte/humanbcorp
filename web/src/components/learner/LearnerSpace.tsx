@@ -360,18 +360,18 @@ function QuizBlock({
                         disabled={locked || idx === 0}
                         onClick={() => moveOrder(q.id, arr, idx, -1)}
                         aria-label="Monter"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand disabled:opacity-30"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand disabled:opacity-30"
                       >
-                        <i className="bx bx-chevron-up text-lg" />
+                        <i className="bx bx-chevron-up text-xl" />
                       </button>
                       <button
                         type="button"
                         disabled={locked || idx === arr.length - 1}
                         onClick={() => moveOrder(q.id, arr, idx, 1)}
                         aria-label="Descendre"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand disabled:opacity-30"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-brand-soft hover:text-brand disabled:opacity-30"
                       >
-                        <i className="bx bx-chevron-down text-lg" />
+                        <i className="bx bx-chevron-down text-xl" />
                       </button>
                     </div>
                   );
@@ -489,7 +489,7 @@ function QuizBlock({
               </div>
             ) : (
               // Quiz textuel classique (radio / checkbox).
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-2 space-y-1">
                 {q.options.map((o) => {
                   const isCheckbox = o.input_type === 1;
                   const selected = (answers[q.id] || []).includes(o.id);
@@ -500,17 +500,24 @@ function QuizBlock({
                     else if (r.selected_option_ids.includes(o.id)) tone = "text-red-600 line-through";
                   }
                   return (
-                    <li key={o.id} className={`flex items-center gap-2 text-sm ${tone || "text-ink"}`}>
-                      <input
-                        type={isCheckbox ? "checkbox" : "radio"}
-                        name={`q-${q.id}`}
-                        checked={selected}
-                        disabled={locked}
-                        onChange={() => toggle(q.id, o.id, isCheckbox)}
-                        className="accent-brand"
-                      />
-                      {o.title}
-                      {r && r.correct_option_ids.includes(o.id) && <i className="bx bx-check text-green-600" />}
+                    <li key={o.id}>
+                      {/* Toute la ligne est cliquable (zone tactile large). */}
+                      <label
+                        className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${tone || "text-ink"} ${
+                          locked ? "" : "cursor-pointer hover:bg-brand-soft/40"
+                        }`}
+                      >
+                        <input
+                          type={isCheckbox ? "checkbox" : "radio"}
+                          name={`q-${q.id}`}
+                          checked={selected}
+                          disabled={locked}
+                          onChange={() => toggle(q.id, o.id, isCheckbox)}
+                          className="h-4 w-4 shrink-0 accent-brand"
+                        />
+                        <span className="min-w-0 flex-1">{o.title}</span>
+                        {r && r.correct_option_ids.includes(o.id) && <i className="bx bx-check shrink-0 text-green-600" />}
+                      </label>
                     </li>
                   );
                 })}
@@ -520,12 +527,21 @@ function QuizBlock({
         );
       })}
 
+      {/* Sur mobile, l'action reste collée en bas de l'écran (au-dessus de la
+          barre d'accueil) : plus besoin de scroller jusqu'au bout d'un long quiz.
+          Sur desktop (sm:), redevient un bouton inline classique. */}
       {!result ? (
-        <button onClick={onSubmit} disabled={busy} className="btn-brand text-sm disabled:opacity-50">
-          {busy ? "Validation…" : "Valider mes réponses"}
-        </button>
+        <div className="sticky bottom-safe z-10 sm:static sm:bottom-auto">
+          <button
+            onClick={onSubmit}
+            disabled={busy}
+            className="btn-brand w-full justify-center text-sm shadow-hbc-lg disabled:opacity-50 sm:w-auto sm:shadow-none"
+          >
+            {busy ? "Validation…" : "Valider mes réponses"}
+          </button>
+        </div>
       ) : (
-        <button onClick={reset} className="btn-ghost text-sm">
+        <button onClick={reset} className="btn-ghost w-full justify-center text-sm sm:w-auto">
           <i className="bx bx-refresh" /> Recommencer
         </button>
       )}
@@ -599,9 +615,9 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
 
 function SeanceBlock({ s, token, onComplete }: { s: LearnerSeance; token: string; onComplete: OnComplete }) {
   return (
-    <div className="card p-6">
+    <div className="card rounded-2xl p-5 md:p-6">
       <div className="mb-4 flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
           {s.index}
         </span>
         <div>
@@ -948,6 +964,129 @@ function FormationContent({
   );
 }
 
+/** Petite statistique de l'en-tête (formations, progression globale…). */
+function HeroStat({ icon, value, label }: { icon: string; value: string | number; label: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-line/70 bg-white px-4 py-3 shadow-hbc-sm">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-xl text-brand">
+        <i className={`bx ${icon}`} />
+      </span>
+      <div className="leading-tight">
+        <p className="font-heading text-xl font-bold text-brand-deep">{value}</p>
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Pastille « MàJ » (nouveau contenu depuis la dernière visite). */
+function UpdateBadge() {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent"
+      title="Du nouveau contenu a été ajouté depuis votre dernière visite"
+    >
+      <i className="bx bx-bell text-[11px]" /> MàJ
+    </span>
+  );
+}
+
+/**
+ * Sélecteur de formation sur mobile : un bouton pleine largeur affichant la
+ * formation courante, qui déplie la liste des autres. Bien plus ergonomique au
+ * pouce qu'un carrousel horizontal de vignettes serrées. (Desktop : la sidebar
+ * verticale reste affichée à la place.)
+ */
+function MobileFormationSwitcher({
+  formations,
+  openId,
+  onSelect,
+}: {
+  formations: MySpace["formations"];
+  openId: number | null;
+  onSelect: (pubId: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const active = formations.find((f) => f.publication_id === openId);
+  const anyUpdate = formations.some((f) => f.has_update && !f.acces_expire);
+
+  return (
+    <div className="relative mb-5 lg:hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 rounded-2xl border border-line/70 bg-white p-3 text-left shadow-hbc-sm"
+      >
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${active?.acces_expire ? "bg-gray-100 text-gray-400" : "bg-brand-soft text-brand"}`}>
+          <i className={`bx ${active?.acces_expire ? "bx-lock-alt" : "bxs-graduation"}`} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted">
+            Ma formation ({formations.length})
+          </span>
+          <span className="block truncate font-semibold text-ink">
+            {active?.title ?? "Choisir une formation"}
+          </span>
+        </span>
+        {!open && anyUpdate && <UpdateBadge />}
+        <i className={`bx bx-chevron-down shrink-0 text-2xl text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          {/* Voile de fermeture au tap en dehors. */}
+          <button
+            aria-label="Fermer"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <div className="absolute inset-x-0 top-[calc(100%+0.5rem)] z-40 max-h-[70vh] overflow-y-auto overscroll-contain rounded-2xl border border-line/70 bg-white p-2 shadow-hbc-lg">
+            {formations.map((f) => {
+              const active = openId === f.publication_id;
+              const disabled = !f.has_content || f.acces_expire;
+              return (
+                <button
+                  key={f.publication_id}
+                  onClick={() => {
+                    if (!disabled) onSelect(f.publication_id);
+                    setOpen(false);
+                  }}
+                  disabled={disabled}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                    active ? "bg-brand-soft/70" : "hover:bg-brand-soft/40"
+                  } ${disabled ? "opacity-60" : ""}`}
+                >
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg ${f.acces_expire ? "bg-gray-100 text-gray-400" : "bg-brand-soft text-brand"}`}>
+                    <i className={`bx ${f.acces_expire ? "bx-lock-alt" : "bxs-graduation"}`} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-semibold text-ink">{f.title}</span>
+                      {f.has_update && !f.acces_expire && <UpdateBadge />}
+                    </span>
+                    {f.acces_expire ? (
+                      <span className="block truncate text-xs font-medium text-amber-700">
+                        Terminé{f.acces_fin ? ` le ${fmtDate(f.acces_fin)}` : ""}
+                      </span>
+                    ) : f.has_content && f.progress.total > 0 ? (
+                      <span className="mt-1 block"><ProgressBar percent={f.progress.percent} /></span>
+                    ) : (
+                      <span className="block truncate text-xs text-muted">
+                        {f.has_content ? "Contenu disponible" : "En préparation"}
+                      </span>
+                    )}
+                  </span>
+                  {active && <i className="bx bx-check shrink-0 text-lg text-brand" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function LearnerSpace({ token }: { token: string }) {
   const [space, setSpace] = useState<MySpace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1031,12 +1170,20 @@ export default function LearnerSpace({ token }: { token: string }) {
     });
   }
 
-  if (loading) return <p className="text-muted">Chargement…</p>;
+  if (loading)
+    return (
+      <div className="flex min-h-[45vh] flex-col items-center justify-center gap-3 text-muted">
+        <i className="bx bx-loader-alt animate-spin text-4xl text-brand" />
+        <p className="text-sm font-medium">Chargement de votre espace…</p>
+      </div>
+    );
 
   if (invalid || !space)
     return (
-      <div className="card p-8 text-center">
-        <i className="bx bx-error-circle mb-3 text-4xl text-accent" />
+      <div className="mx-auto max-w-lg rounded-3xl border border-line/70 bg-white p-8 text-center shadow-hbc-sm md:p-10">
+        <span className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-4xl text-accent">
+          <i className="bx bx-error-circle" />
+        </span>
         <h2 className="text-xl">Lien d’accès invalide ou expiré</h2>
         <p className="mt-2 text-muted">
           Vérifiez le lien reçu par e-mail, ou contactez-nous si le problème persiste.
@@ -1046,38 +1193,76 @@ export default function LearnerSpace({ token }: { token: string }) {
 
   return (
     <div>
-      <header className="mb-6">
-        <p className="eyebrow">Mon espace</p>
-        <h1 className="mt-2 text-3xl md:text-4xl">Bonjour {space.learner.name} 👋</h1>
-        <p className="mt-3 text-muted">
-          Retrouvez ici le contenu de vos formations, et inscrivez-vous à de nouvelles.
-        </p>
+      {/* En-tête « dashboard » : avatar-initiale, salutation et statistiques
+          synthétiques (nombre de formations + progression globale). */}
+      <header className="mb-8 overflow-hidden rounded-3xl border border-line/70 bg-gradient-to-br from-brand-soft via-white to-white p-5 shadow-hbc-sm md:p-7">
+        <div className="flex flex-wrap items-center gap-4 md:gap-6">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand font-heading text-2xl font-bold text-white shadow-hbc md:h-16 md:w-16">
+            {space.learner.name.trim().charAt(0).toUpperCase() || "?"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow">Mon espace</p>
+            <h1 className="mt-1 text-2xl md:text-3xl">Bonjour {space.learner.name} 👋</h1>
+            <p className="mt-1 text-sm text-muted">
+              Retrouvez ici le contenu de vos formations, et inscrivez-vous à de nouvelles.
+            </p>
+          </div>
+          {space.formations.length > 0 && (
+            <div className="flex w-full gap-3 sm:w-auto">
+              <div className="flex-1 sm:flex-none">
+                <HeroStat icon="bxs-graduation" value={space.formations.length} label="Formations" />
+              </div>
+              {(() => {
+                const done = space.formations.reduce((n, f) => n + f.progress.done, 0);
+                const total = space.formations.reduce((n, f) => n + f.progress.total, 0);
+                if (!total) return null;
+                return (
+                  <div className="flex-1 sm:flex-none">
+                    <HeroStat icon="bx-line-chart" value={`${Math.round((100 * done) / total)}%`} label="Complété" />
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Deux usages distincts — apprendre / s'inscrire — donc deux onglets.
           Les mêler noierait le catalogue commercial sous le contenu pédagogique. */}
-      <div className="mb-8 flex gap-1 border-b border-line" role="tablist">
+      <div className="mb-8 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
         {(
           [
             ["formations", "Mes formations", "bx-book-open"],
             ["souscrire", "S’inscrire à une formation", "bx-cart-add"],
           ] as const
-        ).map(([id, label, icon]) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={onglet === id}
-            onClick={() => setOnglet(id)}
-            className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-3 font-heading text-sm font-semibold transition ${
-              onglet === id
-                ? "border-accent text-brand-deep"
-                : "border-transparent text-muted hover:text-brand"
-            }`}
-          >
-            <i className={`bx ${icon} text-lg`} />
-            {label}
-          </button>
-        ))}
+        ).map(([id, label, icon]) => {
+          const selected = onglet === id;
+          return (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setOnglet(id)}
+              className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 font-heading text-sm font-semibold transition ${
+                selected
+                  ? "border-accent text-brand-deep"
+                  : "border-transparent text-muted hover:text-brand"
+              }`}
+            >
+              <i className={`bx ${icon} text-lg`} />
+              {label}
+              {id === "formations" && space.formations.length > 0 && (
+                <span
+                  className={`ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold ${
+                    selected ? "bg-accent/15 text-accent" : "bg-line/70 text-muted"
+                  }`}
+                >
+                  {space.formations.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {onglet === "souscrire" ? (
@@ -1090,18 +1275,37 @@ export default function LearnerSpace({ token }: { token: string }) {
       )}
 
       {space.formations.length === 0 ? (
-        <p className="text-muted">Aucune formation confirmée pour le moment.</p>
+        <div className="rounded-3xl border border-dashed border-line bg-paper/60 p-8 text-center md:p-12">
+          <span className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-soft text-3xl text-brand">
+            <i className="bx bxs-graduation" />
+          </span>
+          <h3 className="text-lg">Aucune formation pour le moment</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+            Dès qu’une inscription est confirmée, votre formation apparaît ici. Vous pouvez aussi
+            vous inscrire dès maintenant.
+          </p>
+          <button onClick={() => setOnglet("souscrire")} className="btn-accent mt-5 text-sm">
+            <i className="bx bx-cart-add" /> Découvrir les formations
+          </button>
+        </div>
       ) : (
         /* Deux panneaux pleine largeur : à gauche la navigation entre formations,
            à droite le contenu de celle sélectionnée. Sur mobile, la liste passe
            au-dessus (défilement horizontal) et le contenu dessous. */
+        <>
+        {/* Mobile : sélecteur déroulant plein largeur (remplace le carrousel). */}
+        <MobileFormationSwitcher
+          formations={space.formations}
+          openId={openId}
+          onSelect={selectFormation}
+        />
         <div className="lg:grid lg:grid-cols-[19rem_minmax(0,1fr)] lg:items-start lg:gap-6">
-          {/* Sidebar : liste des formations */}
-          <aside className="mb-6 lg:mb-0 lg:sticky lg:top-24">
+          {/* Sidebar desktop : liste verticale des formations */}
+          <aside className="hidden lg:sticky lg:top-24 lg:block">
             <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
               Mes formations ({space.formations.length})
             </p>
-            <div className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-2 lg:overflow-visible lg:pb-0">
+            <div className="flex flex-col gap-2">
               {space.formations.map((f) => {
                 const active = openId === f.publication_id;
                 const disabled = !f.has_content || f.acces_expire;
@@ -1110,7 +1314,7 @@ export default function LearnerSpace({ token }: { token: string }) {
                     key={f.publication_id}
                     onClick={() => !disabled && selectFormation(f.publication_id)}
                     disabled={disabled}
-                    className={`shrink-0 rounded-xl border p-3 text-left transition lg:w-full ${
+                    className={`w-full rounded-xl border p-3 text-left transition ${
                       active
                         ? "border-brand bg-brand-soft/60 shadow-hbc-sm"
                         : "border-line/70 bg-white hover:border-brand/50"
@@ -1123,18 +1327,14 @@ export default function LearnerSpace({ token }: { token: string }) {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <h3 className="truncate text-sm font-semibold leading-tight text-ink">{f.title}</h3>
-                          {f.has_update && !f.acces_expire && (
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent" title="Du nouveau contenu a été ajouté depuis votre dernière visite">
-                              <i className="bx bx-bell text-[11px]" /> MàJ
-                            </span>
-                          )}
+                          {f.has_update && !f.acces_expire && <UpdateBadge />}
                         </div>
                         {f.acces_expire ? (
                           <p className="truncate text-xs font-medium text-amber-700">
                             Terminé{f.acces_fin ? ` le ${fmtDate(f.acces_fin)}` : ""}
                           </p>
                         ) : f.has_content && f.progress.total > 0 ? (
-                          <div className="mt-1.5 w-40 lg:w-full"><ProgressBar percent={f.progress.percent} /></div>
+                          <div className="mt-1.5 w-full"><ProgressBar percent={f.progress.percent} /></div>
                         ) : (
                           <p className="truncate text-xs text-muted">
                             {f.has_content ? "Contenu disponible" : "En préparation"}
@@ -1151,14 +1351,20 @@ export default function LearnerSpace({ token }: { token: string }) {
           {/* Panneau principal : contenu de la formation sélectionnée */}
           <div className="min-w-0">
             {openId === null ? (
-              <div className="card p-10 text-center text-muted">
+              <div className="card rounded-2xl p-10 text-center text-muted">
                 <i className="bx bx-book-open mb-2 text-3xl text-brand/50" />
                 <p>Sélectionnez une formation pour afficher son contenu.</p>
               </div>
             ) : loadingContent ? (
-              <p className="text-muted">Chargement du contenu…</p>
+              <div className="flex min-h-[30vh] flex-col items-center justify-center gap-3 text-muted">
+                <i className="bx bx-loader-alt animate-spin text-3xl text-brand" />
+                <p className="text-sm">Chargement du contenu…</p>
+              </div>
             ) : !content || content.themes.length === 0 ? (
-              <div className="card p-8 text-muted">Le contenu de cette formation n’est pas encore disponible.</div>
+              <div className="card rounded-2xl p-8 text-center text-muted">
+                <i className="bx bx-time-five mb-2 text-3xl text-brand/50" />
+                <p>Le contenu de cette formation n’est pas encore disponible.</p>
+              </div>
             ) : (
               <FormationContent
                 content={content}
@@ -1169,6 +1375,7 @@ export default function LearnerSpace({ token }: { token: string }) {
             )}
           </div>
         </div>
+        </>
       )}
         </>
       )}

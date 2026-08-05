@@ -1,0 +1,35 @@
+[
+  {
+    "id": "app-espace",
+    "label": "Espace apprenant",
+    "device": "desktop",
+    "url": "http://localhost:4400/mon-espace/eyJtZW1iZXIiOjM1OH0:1wrcdt:Ls-PWm9kuY4FNI8WEi9yufVy2uU_xYpT_wy0QKW6rC4",
+    "status": 200,
+    "title": "Mon espace — HBC-RH | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "app-compte",
+    "label": "Apprenant — mon compte",
+    "device": "desktop",
+    "url": "http://localhost:4400/mon-espace/eyJtZW1iZXIiOjM1OH0:1wrcdt:Ls-PWm9kuY4FNI8WEi9yufVy2uU_xYpT_wy0QKW6rC4/compte",
+    "status": 200,
+    "title": "Définir mon mot de passe | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "app-espace",
+    "label": "Espace apprenant",
+    "device": "mobile",
+    "url": "http://localhost:4400/mon-espace/eyJtZW1iZXIiOjM1OH0:1wrcdt:Ls-PWm9kuY4FNI8WEi9yufVy2uU_xYpT_wy0QKW6rC4",
+    "status": 200,
+    "title": "Mon espace — HBC-RH | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  }
+]

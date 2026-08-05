@@ -1,0 +1,156 @@
+[
+  {
+    "id": "pub-accueil",
+    "label": "Accueil vitrine",
+    "device": "desktop",
+    "url": "http://localhost:4400/",
+    "status": 200,
+    "title": "Human Brain Corporation-RH | Libérer le potentiel humain | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-formations",
+    "label": "Catalogue formations",
+    "device": "desktop",
+    "url": "http://localhost:4400/formations",
+    "status": 200,
+    "title": "Formations | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-formation",
+    "label": "Formation — détail (Robotique)",
+    "device": "desktop",
+    "url": "http://localhost:4400/formations/16",
+    "status": 200,
+    "title": "Robotique pour enfants | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-blog",
+    "label": "Blog — liste",
+    "device": "desktop",
+    "url": "http://localhost:4400/blog",
+    "status": 200,
+    "title": "Blog | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-article",
+    "label": "Blog — article",
+    "device": "desktop",
+    "url": "http://localhost:4400/blog/5-cles-pour-reussir-vos-recrutements",
+    "status": 200,
+    "title": "5 clés pour réussir vos recrutements | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-carrieres",
+    "label": "Carrières — offres",
+    "device": "desktop",
+    "url": "http://localhost:4400/carrieres",
+    "status": 200,
+    "title": "Carrières | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-offre",
+    "label": "Carrières — offre détail",
+    "device": "desktop",
+    "url": "http://localhost:4400/carrieres/responsable-administratif-et-financier",
+    "status": 200,
+    "title": "Responsable Administratif et Financier — Carrières | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-ressources",
+    "label": "Ressources",
+    "device": "desktop",
+    "url": "http://localhost:4400/ressources",
+    "status": 200,
+    "title": "Ressources | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-panier",
+    "label": "Panier",
+    "device": "desktop",
+    "url": "http://localhost:4400/panier",
+    "status": 200,
+    "title": "Mon panier | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-apropos",
+    "label": "Page — À propos",
+    "device": "desktop",
+    "url": "http://localhost:4400/a-propos",
+    "status": 200,
+    "title": "À propos | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-accueil",
+    "label": "Accueil vitrine",
+    "device": "mobile",
+    "url": "http://localhost:4400/",
+    "status": 200,
+    "title": "Human Brain Corporation-RH | Libérer le potentiel humain | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-formations",
+    "label": "Catalogue formations",
+    "device": "mobile",
+    "url": "http://localhost:4400/formations",
+    "status": 200,
+    "title": "Formations | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-formation",
+    "label": "Formation — détail (Robotique)",
+    "device": "mobile",
+    "url": "http://localhost:4400/formations/16",
+    "status": 200,
+    "title": "Robotique pour enfants | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "id": "pub-panier",
+    "label": "Panier",
+    "device": "mobile",
+    "url": "http://localhost:4400/panier",
+    "status": 200,
+    "title": "Mon panier | HBC-RH",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  }
+]

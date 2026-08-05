@@ -252,7 +252,10 @@ class TaraProvider(PaymentProviderBase):
         """URL de retour après checkout Tara — page vitrine qui affiche un
         statut au membre. Le webhook arrive en parallèle côté backend.
         """
-        base = getattr(settings, "PUBLIC_BASE_URL", "").rstrip("/")
+        # Le navigateur du membre doit revenir sur la VITRINE publique
+        # (SITE_PUBLIC_URL), pas sur le host de l'API (PUBLIC_BASE_URL) : ce
+        # dernier ne sert que du JSON/DRF et renverrait un 404 à l'usager.
+        base = getattr(settings, "SITE_PUBLIC_URL", "").rstrip("/")
         # On pointe vers la racine — le navigateur revient en mode "Paiement
         # terminé" simple. À termes une page /payment-return/<id>/ pourrait
         # surfacer plus de détails au membre.

@@ -8,11 +8,25 @@ import CommandPalette from "@/components/CommandPalette";
 import { ToastProvider } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 
-// Routes réservées aux profils admin (module CMS + module RH, tous deux admin-only).
-// Un non-admin qui y arrive en direct est renvoyé vers son premier module.
-const CMS_PREFIXES = ["/", "/articles", "/media", "/settings", "/pages", "/rh"];
-const isCmsRoute = (path: string) =>
-  CMS_PREFIXES.some((p) => (p === "/" ? path === "/" : path.startsWith(p)));
+// Sous-routes rattachées au module « cms » (une seule entrée `modules` côté API,
+// mais plusieurs écrans dans le dashboard).
+const CMS_SUBROUTES = ["/", "/articles", "/media", "/settings", "/pages"];
+
+// Ensemble des préfixes de routes réellement autorisés pour un profil, dérivé de
+// ses modules (`profile.modules`). Sert de garde unique : toute route hors de cet
+// ensemble (deep-link vers un module non attribué) renvoie vers le premier module.
+function allowedPrefixes(modules: { key: string; path?: string }[]): string[] {
+  const set = new Set<string>();
+  for (const m of modules) {
+    if (m.key === "cms") CMS_SUBROUTES.forEach((r) => set.add(r));
+    else if (m.path) set.add(m.path);
+  }
+  return Array.from(set);
+}
+const matchesPrefix = (path: string, prefix: string) =>
+  prefix === "/" ? path === "/" : path === prefix || path.startsWith(prefix + "/");
+const isAllowedRoute = (path: string, prefixes: string[]) =>
+  prefixes.some((p) => matchesPrefix(path, p));
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { ready, authed, profile } = useAuth();
@@ -31,8 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace("/login");
       return;
     }
-    const hasCms = profile?.modules.some((m) => m.key === "cms");
-    if (profile && !hasCms && isCmsRoute(pathname)) {
+    if (profile && !isAllowedRoute(pathname, allowedPrefixes(profile.modules))) {
       const firstNative = profile.modules.find((m) => m.native && m.path);
       router.replace(firstNative?.path || "/agenda");
     }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api, listAll, apiBase, tokens } from "@/lib/api";
 import { Modal, TextField, TextArea, SelectField } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
-import type { ActivityItem, ComponentItem, ActivityDocItem, QuizQuestionItem, QuizOptionEdit } from "@/lib/types";
+import type { ActivityItem, ComponentItem, ActivityDocItem, QuizQuestionItem } from "@/lib/types";
 
 const DOC_TYPES = [
   { value: "1", label: "Cours" },
@@ -19,6 +19,23 @@ const INPUT_TYPES = [
   { value: "1", label: "Choix multiple (plusieurs bonnes réponses)" },
 ];
 
+// Les 6 types de quiz (miroir de Question.KIND_CHOICES côté backend).
+const KIND_QCM = "1", KIND_TF = "2", KIND_TEXT = "3", KIND_NUM = "4", KIND_ASSOC = "5", KIND_ORDER = "6";
+const KIND_TYPES = [
+  { value: KIND_QCM, label: "QCM (choix avec/sans image)" },
+  { value: KIND_TF, label: "Vrai / Faux" },
+  { value: KIND_TEXT, label: "Texte libre" },
+  { value: KIND_NUM, label: "Numérique" },
+  { value: KIND_ASSOC, label: "Association (relier)" },
+  { value: KIND_ORDER, label: "Ordonnancement" },
+];
+const KIND_LABEL: Record<number, string> = {
+  1: "QCM", 2: "Vrai/Faux", 3: "Texte libre", 4: "Numérique", 5: "Association", 6: "Ordonnancement",
+};
+const KIND_ICON: Record<number, string> = {
+  1: "bx-list-check", 2: "bx-toggle-left", 3: "bx-text", 4: "bx-hash", 5: "bx-link", 6: "bx-sort-alt-2",
+};
+
 type CompDraft = {
   id?: number;
   title: string;
@@ -30,7 +47,131 @@ type CompDraft = {
   audioFile: File | null;
 };
 type DocDraft = { title: string; url: string; m_type: string; file: File | null };
-type QDraft = { id?: number; title: string; description: string; points: string; input_type: string; options: QuizOptionEdit[] };
+// Option de QCM : peut porter une image (nouvelle via `file`, ou existante via `image`).
+type QOptDraft = { id?: number; title: string; is_answer: boolean; file?: File | null; image?: string | null };
+type QDraft = {
+  id?: number;
+  kind: string;               // "1".."6"
+  title: string;
+  description: string;
+  points: string;
+  // Image d'énoncé (facultative, tous types)
+  imageFile: File | null;
+  image?: string | null;      // URL existante
+  imageClear?: boolean;
+  // QCM
+  input_type: string;         // "1" multiple / "2" unique
+  options: QOptDraft[];
+  // Vrai/Faux
+  correct: boolean;
+  // Texte libre / Numérique — réponses acceptées (num : "42" ou "42|0.5")
+  accepted: string[];
+  // Association
+  pairs: { left: string; right: string }[];
+  // Ordonnancement (dans l'ordre correct)
+  items: string[];
+};
+
+// Brouillon vierge pour une nouvelle question.
+function emptyQDraft(): QDraft {
+  return {
+    kind: KIND_QCM, title: "", description: "", points: "1",
+    imageFile: null, image: null, imageClear: false,
+    input_type: "2",
+    options: [{ title: "", is_answer: true }, { title: "", is_answer: false }],
+    correct: true,
+    accepted: [""],
+    pairs: [{ left: "", right: "" }, { left: "", right: "" }],
+    items: ["", ""],
+  };
+}
+
+// Reconstruit un brouillon éditable depuis une question existante (décode les
+// options encodées : "gauche||droite", "position||texte", réponses acceptées…).
+function draftFromQuestion(q: QuizQuestionItem): QDraft {
+  const base = emptyQDraft();
+  base.id = q.id;
+  base.kind = String(q.kind || 1);
+  base.title = q.title;
+  base.description = q.description || "";
+  base.points = String(q.points);
+  base.image = q.image || null;
+  base.input_type = String(q.input_type || 2);
+  const opts = q.options || [];
+  switch (q.kind) {
+    case 2: { // Vrai/Faux
+      const vrai = opts.find((o) => /^vrai$/i.test(o.title));
+      base.correct = vrai ? vrai.is_answer : (opts[0]?.is_answer ?? true);
+      break;
+    }
+    case 3:
+    case 4: // Texte / Numérique → réponses acceptées
+      base.accepted = opts.length ? opts.map((o) => o.title) : [""];
+      break;
+    case 5: // Association → paires gauche||droite
+      base.pairs = opts.length
+        ? opts.map((o) => { const [l, r] = o.title.split("||"); return { left: l || "", right: r || "" }; })
+        : [{ left: "", right: "" }];
+      break;
+    case 6: { // Ordonnancement → items triés par position
+      const parsed = opts.map((o) => { const [p, t] = o.title.split("||"); return { p: Number(p) || 0, t: t || "" }; });
+      parsed.sort((a, b) => a.p - b.p);
+      base.items = parsed.length ? parsed.map((x) => x.t) : ["", ""];
+      break;
+    }
+    default: // QCM
+      base.options = opts.length
+        ? opts.map((o) => ({ id: o.id, title: o.title, is_answer: o.is_answer, image: o.image || null }))
+        : [{ title: "", is_answer: true }];
+  }
+  return base;
+}
+
+// Aperçu lisible des réponses d'une question, selon son type.
+function QuestionAnswersPreview({ q }: { q: QuizQuestionItem }) {
+  const opts = q.options || [];
+  if (q.kind === 5) {
+    return (
+      <ul className="mt-1 space-y-0.5 text-sm text-ink">
+        {opts.map((o) => {
+          const [l, r] = o.title.split("||");
+          return <li key={o.id}><span className="font-medium">{l}</span> <i className="bx bx-right-arrow-alt align-middle text-muted" /> {r}</li>;
+        })}
+      </ul>
+    );
+  }
+  if (q.kind === 6) {
+    const parsed = opts.map((o) => { const [p, t] = o.title.split("||"); return { p: Number(p) || 0, t }; }).sort((a, b) => a.p - b.p);
+    return (
+      <ol className="mt-1 space-y-0.5 text-sm text-ink">
+        {parsed.map((x, k) => <li key={k}><span className="font-semibold text-brand">{k + 1}.</span> {x.t}</li>)}
+      </ol>
+    );
+  }
+  if (q.kind === 3 || q.kind === 4) {
+    return (
+      <p className="mt-1 text-sm">
+        <span className="text-muted">Réponse(s) acceptée(s) : </span>
+        <span className="font-medium text-green-700">{opts.map((o) => o.title).join(" · ") || "—"}</span>
+      </p>
+    );
+  }
+  // QCM / Vrai-Faux : liste des options, bonnes en vert, vignette d'image si présente.
+  return (
+    <ul className="mt-1 space-y-0.5 text-sm">
+      {opts.map((o) => (
+        <li key={o.id} className={`flex items-center gap-2 ${o.is_answer ? "text-green-700" : "text-muted"}`}>
+          <i className={`bx ${o.is_answer ? "bx-check-circle" : "bx-circle"} align-middle`} />
+          {o.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={o.image} alt="" className="h-8 w-8 rounded border border-line object-cover" />
+          )}
+          {o.title}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function ActivityContentPage({ params }: { params: { id: string; aid: string } }) {
   const themeId = params.id;
@@ -89,16 +230,60 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
     setSaving(true);
     setErr("");
     try {
-      const body = {
+      const kind = qDraft.kind;
+      // QCM : options non vides (libellé OU image) ; on garde l'ordre pour aligner option_image_<i>.
+      const qcmOptions = qDraft.options.filter((o) => o.title.trim() || o.file || o.image);
+      const hasOptionImage = kind === KIND_QCM && qcmOptions.some((o) => o.file);
+      const useForm = !!qDraft.imageFile || qDraft.imageClear || hasOptionImage;
+
+      // Construit le corps typé (valeurs sérialisées en chaînes pour le multipart).
+      const typed: Record<string, unknown> = {
         activity: activityId,
         title: qDraft.title,
         description: qDraft.description,
         points: Number(qDraft.points) || 1,
-        input_type: Number(qDraft.input_type),
-        options: qDraft.options.filter((o) => o.title.trim()),
+        kind: Number(kind),
       };
-      if (qDraft.id) await api(`/modules/quiz-questions/${qDraft.id}/`, { method: "PATCH", body });
-      else await api("/modules/quiz-questions/", { method: "POST", body });
+      if (kind === KIND_QCM) {
+        typed.input_type = Number(qDraft.input_type);
+        // `keep_image` : conserver l'image existante d'une option non modifiée
+        // (id présent, image actuelle, aucun nouveau fichier).
+        typed.options = qcmOptions.map((o) => ({
+          title: o.title,
+          is_answer: o.is_answer,
+          ...(o.id ? { id: o.id } : {}),
+          keep_image: !!(o.id && o.image && !o.file),
+        }));
+      } else if (kind === KIND_TF) {
+        typed.correct = qDraft.correct;
+      } else if (kind === KIND_TEXT || kind === KIND_NUM) {
+        typed.accepted = qDraft.accepted.map((a) => a.trim()).filter(Boolean);
+      } else if (kind === KIND_ASSOC) {
+        typed.pairs = qDraft.pairs
+          .map((p) => ({ left: p.left.trim(), right: p.right.trim() }))
+          .filter((p) => p.left && p.right);
+      } else if (kind === KIND_ORDER) {
+        typed.items = qDraft.items.map((i) => i.trim()).filter(Boolean);
+      }
+
+      let body: FormData | Record<string, unknown>;
+      if (useForm) {
+        const fd = new FormData();
+        for (const [k, v] of Object.entries(typed)) {
+          // Les objets/tableaux passent en JSON (le backend accepte la chaîne JSON).
+          fd.set(k, typeof v === "object" ? JSON.stringify(v) : String(v));
+        }
+        if (qDraft.imageFile) fd.set("image", qDraft.imageFile);
+        if (qDraft.imageClear && !qDraft.imageFile) fd.set("image_clear", "1");
+        if (hasOptionImage) qcmOptions.forEach((o, i) => { if (o.file) fd.set(`option_image_${i}`, o.file); });
+        body = fd;
+      } else {
+        body = typed;
+      }
+
+      const opts = { method: qDraft.id ? "PATCH" : "POST", body, isForm: useForm } as const;
+      if (qDraft.id) await api(`/modules/quiz-questions/${qDraft.id}/`, opts);
+      else await api("/modules/quiz-questions/", opts);
       setQDraft(null);
       await loadQuestions();
     } catch (e) {
@@ -144,7 +329,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
     await api(`/modules/quiz-questions/${q.id}/`, { method: "DELETE" });
     await loadQuestions();
   }
-  function setOpt(i: number, patch: Partial<QuizOptionEdit>) {
+  function setOpt(i: number, patch: Partial<QOptDraft>) {
     setQDraft((d) => (d ? { ...d, options: d.options.map((o, k) => (k === i ? { ...o, ...patch } : o)) } : d));
   }
 
@@ -213,7 +398,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
   if (loading) return <div className="p-8 text-muted">Chargement…</div>;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <Link href={`/formations/${themeId}/contenu`} className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-brand">
         <i className="bx bx-left-arrow-alt" /> Contenu de la formation
       </Link>
@@ -233,7 +418,7 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
                   <i className="bx bx-upload" /> Importer
                 </button>
                 <button
-                  onClick={() => setQDraft({ title: "", description: "", points: "1", input_type: "2", options: [{ title: "", is_answer: true }, { title: "", is_answer: false }] })}
+                  onClick={() => setQDraft(emptyQDraft())}
                   className="btn-brand text-sm"
                 >
                   <i className="bx bx-plus" /> Question
@@ -250,21 +435,23 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
                   <div className="flex items-start gap-3">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">{i + 1}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium text-ink">{q.title} <span className="text-xs font-normal text-muted">({q.points} pts · {q.input_type === 1 ? "choix multiple" : "choix unique"})</span></div>
-                      <ul className="mt-1 space-y-0.5 text-sm">
-                        {q.options.map((o) => (
-                          <li key={o.id} className={o.is_answer ? "text-green-700" : "text-muted"}>
-                            <i className={`bx ${o.is_answer ? "bx-check-circle" : "bx-circle"} align-middle`} /> {o.title}
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-ink">{q.title}</span>
+                        <span className="badge-info gap-1"><i className={`bx ${KIND_ICON[q.kind] || "bx-list-check"}`} /> {KIND_LABEL[q.kind] || "QCM"}</span>
+                        <span className="text-xs text-muted">{q.points} pts</span>
+                      </div>
+                      {q.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={q.image} alt="" className="mt-2 h-20 rounded-lg border border-line object-cover" />
+                      )}
+                      <QuestionAnswersPreview q={q} />
                     </div>
                     {writable && (
                       <div className="flex gap-1">
-                        <button onClick={() => setQDraft({ id: q.id, title: q.title, description: q.description, points: String(q.points), input_type: String(q.input_type), options: q.options.map((o) => ({ id: o.id, title: o.title, is_answer: o.is_answer })) })} className="btn-ghost text-xs">
+                        <button onClick={() => setQDraft(draftFromQuestion(q))} className="btn-ghost text-xs" title="Modifier">
                           <i className="bx bx-edit" />
                         </button>
-                        <button onClick={() => delQuestion(q)} className="btn-ghost text-xs text-red-500">
+                        <button onClick={() => delQuestion(q)} className="btn-ghost text-xs text-red-500" title="Supprimer">
                           <i className="bx bx-trash" />
                         </button>
                       </div>
@@ -441,51 +628,140 @@ export default function ActivityContentPage({ params }: { params: { id: string; 
       >
         {qDraft && (
           <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SelectField label="Type de question" value={qDraft.kind} onChange={(v) => setQDraft({ ...qDraft, kind: v })} options={KIND_TYPES} />
+              <TextField label="Points" value={qDraft.points} onChange={(v) => setQDraft({ ...qDraft, points: v.replace(/[^0-9]/g, "") })} />
+            </div>
             <TextField label="Intitulé de la question" value={qDraft.title} onChange={(v) => setQDraft({ ...qDraft, title: v })} />
             <TextField label="Consigne (optionnel)" value={qDraft.description} onChange={(v) => setQDraft({ ...qDraft, description: v })} />
-            <div className="grid grid-cols-2 gap-3">
-              <TextField label="Points" value={qDraft.points} onChange={(v) => setQDraft({ ...qDraft, points: v.replace(/[^0-9]/g, "") })} />
-              <SelectField label="Type" value={qDraft.input_type} onChange={(v) => setQDraft({ ...qDraft, input_type: v })} options={INPUT_TYPES} />
+
+            {/* Image d'énoncé (facultative, tous types) */}
+            <div className="rounded-lg border border-line p-3">
+              <label className="label"><i className="bx bx-image" /> Image de la question (optionnel)</label>
+              {qDraft.image && !qDraft.imageClear && !qDraft.imageFile && (
+                <div className="mb-2 flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qDraft.image} alt="" className="h-16 rounded border border-line object-cover" />
+                  <button onClick={() => setQDraft({ ...qDraft, imageClear: true })} className="btn-ghost text-xs text-red-500"><i className="bx bx-trash" /> Retirer</button>
+                </div>
+              )}
+              <input type="file" accept="image/*" onChange={(e) => setQDraft({ ...qDraft, imageFile: e.target.files?.[0] ?? null, imageClear: false })} className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand" />
+              {qDraft.imageFile && <p className="mt-1 text-xs text-emerald-600">{qDraft.imageFile.name}</p>}
             </div>
-            <div>
-              <label className="label">Réponses (cochez la/les bonne(s))</label>
-              <div className="space-y-2">
-                {qDraft.options.map((o, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      type={qDraft.input_type === "1" ? "checkbox" : "radio"}
-                      name="correct"
-                      checked={o.is_answer}
-                      onChange={() =>
-                        setQDraft((d) =>
-                          d
-                            ? {
-                                ...d,
-                                options: d.options.map((x, k) =>
-                                  d.input_type === "1"
-                                    ? k === i
-                                      ? { ...x, is_answer: !x.is_answer }
-                                      : x
-                                    : { ...x, is_answer: k === i }
-                                ),
-                              }
-                            : d
-                        )
-                      }
-                      className="accent-brand"
-                      title="Bonne réponse"
-                    />
-                    <input className="input flex-1" value={o.title} placeholder={`Réponse ${i + 1}`} onChange={(e) => setOpt(i, { title: e.target.value })} />
-                    <button onClick={() => setQDraft((d) => (d ? { ...d, options: d.options.filter((_, k) => k !== i) } : d))} className="btn-ghost text-red-500" title="Retirer">
-                      <i className="bx bx-x" />
-                    </button>
+
+            {/* ------- Éditeur selon le type ------- */}
+            {qDraft.kind === KIND_QCM && (
+              <div>
+                <SelectField label="Mode de réponse" value={qDraft.input_type} onChange={(v) => setQDraft({ ...qDraft, input_type: v })} options={INPUT_TYPES} />
+                <label className="label mt-3">Réponses (cochez la/les bonne(s), image d&apos;option possible)</label>
+                <div className="space-y-2">
+                  {qDraft.options.map((o, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type={qDraft.input_type === "1" ? "checkbox" : "radio"}
+                        name="correct"
+                        checked={o.is_answer}
+                        onChange={() =>
+                          setQDraft((d) => d ? { ...d, options: d.options.map((x, k) => d.input_type === "1" ? (k === i ? { ...x, is_answer: !x.is_answer } : x) : { ...x, is_answer: k === i }) } : d)
+                        }
+                        className="accent-brand"
+                        title="Bonne réponse"
+                      />
+                      <input className="input flex-1" value={o.title} placeholder={`Réponse ${i + 1}`} onChange={(e) => setOpt(i, { title: e.target.value })} />
+                      <label className="shrink-0 cursor-pointer rounded-lg bg-brand-soft px-2 py-1.5 text-xs font-semibold text-brand" title="Image de cette option">
+                        <i className="bx bx-image-add" />
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => setOpt(i, { file: e.target.files?.[0] ?? null })} />
+                      </label>
+                      <button onClick={() => setQDraft((d) => (d ? { ...d, options: d.options.filter((_, k) => k !== i) } : d))} className="btn-ghost text-red-500" title="Retirer">
+                        <i className="bx bx-x" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {/* Vignettes des images d'option (nouvelles ou existantes) */}
+                {qDraft.options.some((o) => o.file || o.image) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {qDraft.options.map((o, i) => (o.file || o.image) ? (
+                      <span key={i} className="inline-flex items-center gap-1 rounded bg-brand-soft/60 px-2 py-1 text-xs text-brand">
+                        R{i + 1} : {o.file ? o.file.name : "image actuelle"}
+                        <button onClick={() => setOpt(i, { file: null, image: null })} className="text-red-500"><i className="bx bx-x" /></button>
+                      </span>
+                    ) : null)}
                   </div>
-                ))}
+                )}
+                <button onClick={() => setQDraft((d) => (d ? { ...d, options: [...d.options, { title: "", is_answer: false }] } : d))} className="mt-2 text-sm font-semibold text-accent">
+                  <i className="bx bx-plus" /> Ajouter une réponse
+                </button>
               </div>
-              <button onClick={() => setQDraft((d) => (d ? { ...d, options: [...d.options, { title: "", is_answer: false }] } : d))} className="mt-2 text-sm font-semibold text-accent">
-                <i className="bx bx-plus" /> Ajouter une réponse
-              </button>
-            </div>
+            )}
+
+            {qDraft.kind === KIND_TF && (
+              <div>
+                <label className="label">Bonne réponse</label>
+                <div className="flex gap-2">
+                  <button onClick={() => setQDraft({ ...qDraft, correct: true })} className={`btn flex-1 ${qDraft.correct ? "bg-green-600 text-white" : "border border-line bg-white text-ink"}`}>
+                    <i className="bx bx-check" /> Vrai
+                  </button>
+                  <button onClick={() => setQDraft({ ...qDraft, correct: false })} className={`btn flex-1 ${!qDraft.correct ? "bg-red-600 text-white" : "border border-line bg-white text-ink"}`}>
+                    <i className="bx bx-x" /> Faux
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(qDraft.kind === KIND_TEXT || qDraft.kind === KIND_NUM) && (
+              <div>
+                <label className="label">
+                  {qDraft.kind === KIND_NUM ? "Valeurs acceptées (ex. « 3.14 » ou « 3.14|0.01 » avec tolérance)" : "Réponses acceptées (toutes les orthographes valides)"}
+                </label>
+                <div className="space-y-2">
+                  {qDraft.accepted.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input className="input flex-1" value={a} placeholder={qDraft.kind === KIND_NUM ? "42  ou  42|0.5" : `Réponse acceptée ${i + 1}`}
+                        onChange={(e) => setQDraft((d) => d ? { ...d, accepted: d.accepted.map((x, k) => k === i ? e.target.value : x) } : d)} />
+                      <button onClick={() => setQDraft((d) => (d ? { ...d, accepted: d.accepted.filter((_, k) => k !== i) } : d))} className="btn-ghost text-red-500"><i className="bx bx-x" /></button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setQDraft((d) => (d ? { ...d, accepted: [...d.accepted, ""] } : d))} className="mt-2 text-sm font-semibold text-accent"><i className="bx bx-plus" /> Ajouter une variante</button>
+              </div>
+            )}
+
+            {qDraft.kind === KIND_ASSOC && (
+              <div>
+                <label className="label">Paires à relier (gauche → droite)</label>
+                <div className="space-y-2">
+                  {qDraft.pairs.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input className="input flex-1" value={p.left} placeholder="Élément" onChange={(e) => setQDraft((d) => d ? { ...d, pairs: d.pairs.map((x, k) => k === i ? { ...x, left: e.target.value } : x) } : d)} />
+                      <i className="bx bx-right-arrow-alt text-muted" />
+                      <input className="input flex-1" value={p.right} placeholder="Correspond à" onChange={(e) => setQDraft((d) => d ? { ...d, pairs: d.pairs.map((x, k) => k === i ? { ...x, right: e.target.value } : x) } : d)} />
+                      <button onClick={() => setQDraft((d) => (d ? { ...d, pairs: d.pairs.filter((_, k) => k !== i) } : d))} className="btn-ghost text-red-500"><i className="bx bx-x" /></button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setQDraft((d) => (d ? { ...d, pairs: [...d.pairs, { left: "", right: "" }] } : d))} className="mt-2 text-sm font-semibold text-accent"><i className="bx bx-plus" /> Ajouter une paire</button>
+              </div>
+            )}
+
+            {qDraft.kind === KIND_ORDER && (
+              <div>
+                <label className="label">Éléments dans le bon ordre (l&apos;apprenant devra les remettre en ordre)</label>
+                <div className="space-y-2">
+                  {qDraft.items.map((it, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">{i + 1}</span>
+                      <input className="input flex-1" value={it} placeholder={`Élément ${i + 1}`} onChange={(e) => setQDraft((d) => d ? { ...d, items: d.items.map((x, k) => k === i ? e.target.value : x) } : d)} />
+                      <button disabled={i === 0} onClick={() => setQDraft((d) => { if (!d || i === 0) return d; const a = [...d.items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; return { ...d, items: a }; })} className="btn-ghost text-xs disabled:opacity-30" title="Monter"><i className="bx bx-up-arrow-alt" /></button>
+                      <button disabled={i === qDraft.items.length - 1} onClick={() => setQDraft((d) => { if (!d || i === d.items.length - 1) return d; const a = [...d.items]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; return { ...d, items: a }; })} className="btn-ghost text-xs disabled:opacity-30" title="Descendre"><i className="bx bx-down-arrow-alt" /></button>
+                      <button onClick={() => setQDraft((d) => (d ? { ...d, items: d.items.filter((_, k) => k !== i) } : d))} className="btn-ghost text-red-500"><i className="bx bx-x" /></button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setQDraft((d) => (d ? { ...d, items: [...d.items, ""] } : d))} className="mt-2 text-sm font-semibold text-accent"><i className="bx bx-plus" /> Ajouter un élément</button>
+              </div>
+            )}
+
             {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
         )}

@@ -18,6 +18,12 @@
   body {
     @apply bg-white font-sans text-ink antialiased;
     line-height: 1.65;
+    /* Confort « app installée » : pas de flash gris au tap, pas de rebond
+       élastique du body, texte non redimensionné en rotation sur iOS. */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading text-brand-deep;
@@ -65,12 +71,22 @@
   }
   .btn-brand { @apply btn bg-brand text-white hover:bg-brand-dark; }
   .btn-accent { @apply btn bg-accent text-white hover:bg-accent-dark; }
+  /* Bouton discret (bordé, fond blanc) : actions secondaires (« Recommencer »,
+     boutons d'agenda…). Sans cette règle, `.btn-ghost` rendait un bouton nu. */
+  .btn-ghost {
+    @apply btn border border-line bg-white text-brand hover:border-brand hover:bg-brand-soft;
+  }
   .btn-outline-brand { @apply btn border-2 border-brand text-brand hover:bg-brand hover:text-white; }
   .btn-outline-light { @apply btn border-2 border-white/70 text-white hover:bg-white hover:text-brand-deep; }
   /* Carte « filet net » : bordure 1px franche + ombre minimale. La structure
      vient du trait, pas du flou — registre architectural/institutionnel. */
   .card-soft {
     @apply rounded-lg border border-line bg-white shadow-hbc-sm transition-all duration-300 ease-hbc;
+  }
+  /* Alias historique : `.card` était utilisé (ex. blocs de séance de l'espace
+     apprenant) sans jamais avoir été défini — les cartes s'affichaient nues. */
+  .card {
+    @apply card-soft;
   }
   /* Variante signature : filet d'accent en tête de carte (cartes clés). */
   .card-accent-top {
@@ -85,6 +101,16 @@
 @layer utilities {
   .text-balance { text-wrap: balance; }
   .min-h-screen-dvh { min-height: 100dvh; }
+  /* Safe-areas (encoche, barre d'accueil) : indispensables en PWA installée où
+     le contenu passe sous les bords de l'écran (viewport-fit=cover). */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* Décalage d'un élément collant en bas d'écran pour dégager la barre d'accueil. */
+  .bottom-safe { bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
   /* masque de vague appliqué en bas d'une section */
   .mask-wave-bottom {
     -webkit-mask-image: linear-gradient(to bottom, black 88%, transparent 100%);

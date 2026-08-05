@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HBC-RH — Audit e2e des parcours (par profil)</title>
+<style>
+  :root{
+    --brand:#3C5EA5; --brand-dark:#2D467B; --brand-deep:#1C2F57; --brand-soft:#EEF2FA;
+    --accent:#EC7123; --accent-soft:#FCECDD; --ink:#1F2733; --muted:#586274; --line:#DCE2EC;
+    --paper:#F6F8FC; --white:#fff;
+    --ok:#16794f; --ok-soft:#e4f5ec; --warn:#a4610a; --warn-soft:#fdefdc; --info:#2b4a86; --info-soft:#e8effb;
+    --radius:14px; --shadow:0 1px 2px rgba(28,47,87,.06),0 8px 24px rgba(28,47,87,.08);
+    --maxw:1500px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --brand:#7ea0e0; --brand-dark:#9db8ec; --brand-deep:#c9d8f4; --brand-soft:#1a2440;
+      --accent:#f2894a; --accent-soft:#3a2410; --ink:#e8edf6; --muted:#a3adc0; --line:#2a3550;
+      --paper:#0e1526; --white:#141d31;
+      --ok:#6dd1a3; --ok-soft:#12301f; --warn:#f0b874; --warn-soft:#33230d; --info:#93b2ee; --info-soft:#15203a;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --brand:#7ea0e0; --brand-dark:#9db8ec; --brand-deep:#c9d8f4; --brand-soft:#1a2440;
+    --accent:#f2894a; --accent-soft:#3a2410; --ink:#e8edf6; --muted:#a3adc0; --line:#2a3550;
+    --paper:#0e1526; --white:#141d31;
+    --ok:#6dd1a3; --ok-soft:#12301f; --warn:#f0b874; --warn-soft:#33230d; --info:#93b2ee; --info-soft:#15203a;
+  }
+  :root[data-theme="light"]{
+    --brand:#3C5EA5; --brand-dark:#2D467B; --brand-deep:#1C2F57; --brand-soft:#EEF2FA;
+    --accent:#EC7123; --accent-soft:#FCECDD; --ink:#1F2733; --muted:#586274; --line:#DCE2EC;
+    --paper:#F6F8FC; --white:#fff;
+    --ok:#16794f; --ok-soft:#e4f5ec; --warn:#a4610a; --warn-soft:#fdefdc; --info:#2b4a86; --info-soft:#e8effb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{font-family:"Poppins",system-ui,sans-serif;line-height:1.2;margin:0}
+  a{color:var(--brand)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,3vw,40px)}
+
+  /* Cover */
+  .cover{background:linear-gradient(135deg,var(--brand-deep),var(--brand-dark) 60%,var(--brand));
+    color:#fff;padding:56px 0 48px;position:relative;overflow:hidden}
+  .cover::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    background:radial-gradient(circle,rgba(236,113,35,.35),transparent 65%)}
+  .cover .wrap{position:relative;z-index:1}
+  .brandmark{display:flex;align-items:center;gap:12px;font-family:"Poppins";font-weight:700;letter-spacing:.3px}
+  .brandmark .dot{width:34px;height:34px;border-radius:9px;background:#fff;color:var(--brand-deep);
+    display:grid;place-items:center;font-size:15px}
+  .eyebrow{color:var(--accent);font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:12px;margin:26px 0 10px}
+  .cover h1{font-size:clamp(28px,4.4vw,46px);max-width:20ch}
+  .cover p.lead{color:#dbe4f5;max-width:70ch;margin:14px 0 0;font-size:clamp(15px,1.4vw,18px)}
+  .metastrip{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .chip{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;
+    padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;backdrop-filter:blur(3px)}
+  .chip b{color:#fff}
+
+  /* Sections */
+  section{padding:44px 0}
+  .sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .sec-head h2{font-size:clamp(22px,2.6vw,30px);color:var(--brand-deep)}
+  .sec-head .n{font-family:"Poppins";font-weight:700;color:var(--accent);font-size:15px}
+  .sec-sub{color:var(--muted);max-width:80ch;margin:2px 0 26px}
+  .rule{height:1px;background:var(--line);border:0;margin:0}
+
+  /* Verdict cards */
+  .grid{display:grid;gap:18px}
+  .verdict{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .vcard{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow)}
+  .vcard .k{font-family:"Poppins";font-weight:700;font-size:30px;color:var(--brand-deep)}
+  .vcard .l{color:var(--muted);font-size:13px;margin-top:2px}
+  .vcard .l b{color:var(--ink)}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .b-ok{background:var(--ok-soft);color:var(--ok)}
+  .b-warn{background:var(--warn-soft);color:var(--warn)}
+  .b-info{background:var(--info-soft);color:var(--info)}
+  .badge .d{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+  /* Flow */
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px}
+  .step{flex:1 1 150px;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px;
+    box-shadow:var(--shadow);position:relative;min-width:150px}
+  .step .st{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .step h4{font-size:15px;margin:6px 0 4px;color:var(--brand-deep)}
+  .step p{margin:0;font-size:12.5px;color:var(--muted)}
+  .step .arrow{position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:var(--line);font-size:20px;z-index:2}
+  @media(max-width:760px){.step .arrow{display:none}}
+
+  /* Screen cards */
+  .screens{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+  .scard{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    box-shadow:var(--shadow);display:flex;flex-direction:column}
+  .scard .shot{background:var(--brand-soft);border-bottom:1px solid var(--line);position:relative;
+    height:230px;overflow:hidden}
+  .scard.tall .shot{height:300px}
+  .scard .shot img{width:100%;display:block}
+  .scard .shot::after{content:"";position:absolute;inset:auto 0 0 0;height:46px;
+    background:linear-gradient(transparent,rgba(255,255,255,.0))}
+  .scard .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .scard .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .scard h4{font-size:15.5px;color:var(--brand-deep)}
+  .scard .path{font-size:11.5px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .scard ul{margin:2px 0 0;padding-left:16px;color:var(--muted);font-size:13px}
+  .scard ul li{margin:2px 0}
+  .scard .foot{margin-top:auto;padding-top:8px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted)}
+  .scard .foot.warn{color:var(--warn)}
+  .device{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+
+  /* Findings table */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--white);box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--brand-soft);color:var(--brand-deep);font-family:"Poppins";font-weight:600;font-size:12.5px;
+    letter-spacing:.02em;position:sticky;top:0}
+  tr:last-child td{border-bottom:0}
+  td .sev{font-weight:700}
+
+  .note{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+    border-radius:12px;padding:14px 16px;color:var(--ink);font-size:13.5px}
+  .note b{color:var(--accent)}
+
+  footer{padding:34px 0 60px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);margin-top:20px}
+
+  .toggle{position:fixed;right:16px;bottom:16px;z-index:50;background:var(--white);border:1px solid var(--line);
+    color:var(--ink);border-radius:999px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow)}
+
+  @media print{
+    .toggle{display:none}
+    @page{size:A4 landscape;margin:12mm}
+    body{background:#fff}
+    .scard,.vcard,.step,.tablewrap{break-inside:avoid}
+    .cover{background:var(--brand-deep) !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark';r.setAttribute('data-theme',d?'light':'dark')})()">◐ Thème</button>
+
+<header class="cover">
+  <div class="wrap">
+    <div class="brandmark"><span class="dot">HB</span> Human Brain Corporation — RH</div>
+    <div class="eyebrow">Audit end-to-end · par profil</div>
+    <h1>Parcours applicatifs HBC-RH : ce que le système offre, écran par écran</h1>
+    <p class="lead">Revue en direct de la pile découplée (API Django + vitrine &amp; dashboard Next.js), sur données de développement.
+       Chaque écran est capturé sur l'environnement réel, avec son statut technique (code HTTP, erreurs console) et les cas d'usage couverts, profil par profil.</p>
+    <div class="metastrip">
+      <span class="chip">📅 <b>5 août 2026</b></span>
+      <span class="chip">🌿 branche <b>refonte/parcours-publics</b></span>
+      <span class="chip">🧪 base <b>SQLite dev</b> (prod = PostgreSQL)</span>
+      <span class="chip">🖥️ API :8011 · vitrine :4400 · dashboard :3007</span>
+      <span class="chip">📸 <b>51</b> captures live</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<footer class="wrap">
+  <p><b>Portée &amp; limites.</b> Audit visuel &amp; fonctionnel sur environnement de dev (base SQLite, médias non montés). Il ne remplace pas un test du <b>paiement réel Tara</b> (fonds réels, non déclenché) ni une validation de la bascule prod. Les captures reflètent l'état du <b>5 août 2026</b> sur la branche <code>refonte/parcours-publics</code>.</p>
+</footer>
+
+<script>
+/* ---------- Données de l'audit ---------- */
+const B = { ok:'b-ok', warn:'b-warn', info:'b-info' };
+function badge(kind,txt){return `<span class="badge ${B[kind]}"><span class="d"></span>${txt}</span>`}
+
+const SECTIONS = [
+  {
+    kind:'verdict'
+  },
+  {
+    kind:'flow'
+  },
+  {
+    n:'Profil 01', title:'Visiteur public (vitrine)',
+    sub:"Parcours d'acquisition : découvrir le cabinet, explorer le catalogue de formations, lire le blog, postuler à une offre, et démarrer une inscription (panier ou directe).",
+    screens:[
+      {img:'pub-accueil-desktop', label:'Accueil vitrine', path:'/', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Hero + accroche + CTA rendez-vous','4 pôles d\'expertise','Galerie « en action » (vraies photos)','Sections « pourquoi nous » + CTA'],
+        foot:['ok','Médias servis (runserver ne sert /media qu\'en DEBUG=True)']},
+      {img:'pub-accueil-mobile', label:'Accueil — mobile', path:'/', status:['ok','200'], device:'mobile',
+        uc:['Rendu responsive PWA','Empilement hero + stats','Menu burger']},
+      {img:'pub-formations-desktop', label:'Catalogue formations', path:'/formations', status:['ok','200'], device:'desktop',
+        uc:['Liste des formations publiées','Filtres / recherche','Accès fiche détail'],
+        foot:['warn','Catalogue pollué par des données de test E2E (dev)']},
+      {img:'pub-formation-desktop', label:'Formation — détail + inscription', path:'/formations/:id', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Titre, description, prix (FCFA)','Formulaire apprenant (« c\'est pour moi »)','Ajouter au panier OU inscription directe','Partage réseaux']},
+      {img:'pub-formation-mobile', label:'Formation — mobile', path:'/formations/:id', status:['ok','200'], device:'mobile',
+        uc:['Fiche + formulaire empilés','CTA panier pleine largeur']},
+      {img:'pub-panier-desktop', label:'Panier', path:'/panier', status:['ok','200'], device:'desktop',
+        uc:['Récapitulatif des inscriptions','Total à payer','Passage au checkout']},
+      {img:'pub-panier-mobile', label:'Panier — mobile', path:'/panier', status:['ok','200'], device:'mobile',
+        uc:['Récap compact','Checkout tactile']},
+      {img:'pub-blog-desktop', label:'Blog — liste', path:'/blog', status:['ok','200'], device:'desktop',
+        uc:['Articles publiés','Vignettes + extraits']},
+      {img:'pub-article-desktop', label:'Blog — article', path:'/blog/:slug', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Contenu riche','SEO / partage']},
+      {img:'pub-carrieres-desktop', label:'Carrières — offres', path:'/carrieres', status:['ok','200'], device:'desktop',
+        uc:['Offres d\'emploi publiées','Accès fiche offre']},
+      {img:'pub-offre-desktop', label:'Offre — détail + candidature', path:'/carrieres/:slug', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Descriptif du poste','Formulaire de candidature']},
+      {img:'pub-ressources-desktop', label:'Ressources', path:'/ressources', status:['ok','200'], device:'desktop',
+        uc:['Documents téléchargeables']},
+      {img:'pub-apropos-desktop', label:'Page CMS (À propos)', path:'/:slug', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Pages éditoriales pilotées par le CMS']},
+    ]
+  },
+  {
+    n:'Profil 02', title:'Apprenant (espace personnel)',
+    sub:"Accès par lien magique signé (sans mot de passe). Suivi des formations, consommation des séances, passage des quiz (6 types), progression et gestion du compte.",
+    screens:[
+      {img:'app-espace-desktop', label:'Espace apprenant', path:'/mon-espace/:token', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Hero + stats (formations, % global)','Liste des formations + progression','Séances (théorie, docs, marquage terminé)','Quiz : les 6 types rendus (QCM image, V/F, texte, numérique, association, ordonnancement)','Sommaire + « ma progression »','Abonnement agenda (Google / Apple / lien)'],
+        foot:['ok','CORS 4400 OK en DEBUG · quiz & images fonctionnels']},
+      {img:'app-espace-mobile', label:'Espace — mobile (PWA)', path:'/mon-espace/:token', status:['ok','200'], device:'mobile', tall:true,
+        uc:['Sélecteur de formation mobile','Bouton « valider » collant','Pleine largeur, safe-areas']},
+      {img:'app-compte-desktop', label:'Mon compte', path:'/mon-espace/:token/compte', status:['ok','200'], device:'desktop',
+        uc:['Définir un mot de passe','Bascule vers login classique']},
+    ]
+  },
+  {
+    n:'Profil 03', title:'Administrateur (dashboard complet)',
+    sub:"Back-office complet : CMS du site, catalogue &amp; contenu pédagogique, inscriptions, paiements, suivi, RH/recrutement, messagerie, agenda, audit et monitoring.",
+    screens:[
+      {img:'adm-accueil', label:'Pages du site (CMS)', path:'/', status:['ok','200'], device:'desktop',
+        uc:['Gérer pages, ordre, visibilité, menu','Éditer / créer / supprimer une page'],
+        foot:['info','La racine du dashboard atterrit sur la gestion des pages']},
+      {img:'adm-formations', label:'Formations', path:'/formations', status:['ok','200'], device:'desktop',
+        uc:['Catalogue back-office','Créer / éditer une formation']},
+      {img:'adm-formation-contenu', label:'Formation — contenu pédagogique', path:'/formations/:id/contenu', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Thèmes / séquences / activités','Éditer séances, docs, quiz (import fichier)'],
+        foot:['ok','0 requête en échec sur un thème valide']},
+      {img:'adm-inscriptions', label:'Inscriptions & paniers', path:'/inscriptions', status:['ok','200'], device:'desktop',
+        uc:['Suivi des inscriptions','Paniers / commandes']},
+      {img:'adm-paiements', label:'Paiements', path:'/paiements', status:['ok','200'], device:'desktop',
+        uc:['KPIs (encaissé, réussis, en attente)','Table transactions (méthode, tranche, statut)','Filtre par statut']},
+      {img:'adm-suivi', label:'Suivi apprenants', path:'/suivi', status:['ok','200'], device:'desktop',
+        uc:['Progression par formation','Scores de quiz par apprenant']},
+      {img:'adm-publications', label:'Publications', path:'/publications', status:['ok','200'], device:'desktop',
+        uc:['Gestion des publications / contenus']},
+      {img:'adm-articles', label:'Articles (blog)', path:'/articles', status:['ok','200'], device:'desktop',
+        uc:['Rédaction / édition des articles']},
+      {img:'adm-media', label:'Médiathèque', path:'/media', status:['ok','200'], device:'desktop',
+        uc:['Bibliothèque de médias','Upload / réutilisation']},
+      {img:'adm-rh', label:'RH & Recrutement', path:'/rh', status:['ok','200'], device:'desktop',
+        uc:['Vue RH / recrutement côté admin']},
+      {img:'adm-recrutements', label:'Mes recrutements', path:'/mes-recrutements', status:['ok','redirigé'], device:'desktop',
+        uc:['Espace recruteur (scopé au rôle recruteur)'],
+        foot:['ok','Corrigé : l\'admin non-recruteur est redirigé vers son accueil (plus d\'erreur brute)']},
+      {img:'adm-messagerie', label:'Messagerie', path:'/messagerie', status:['ok','200'], device:'desktop',
+        uc:['Fils de messages / contacts']},
+      {img:'adm-agenda', label:'Agenda & événements', path:'/agenda', status:['ok','200'], device:'desktop',
+        uc:['Calendrier des événements','Créer un événement / rendez-vous']},
+      {img:'adm-journal', label:'Journal d\'audit', path:'/journal', status:['ok','200'], device:'desktop',
+        uc:['Traçabilité des actions (audit)']},
+      {img:'adm-monitoring', label:'Monitoring', path:'/monitoring', status:['ok','200'], device:'desktop',
+        uc:['Supervision technique / métriques']},
+      {img:'adm-settings', label:'Réglages', path:'/settings', status:['ok','200'], device:'desktop',
+        uc:['Paramètres du site / de l\'espace']},
+    ]
+  },
+  {
+    n:'Profil 04', title:'Formateur (périmètre restreint)',
+    sub:"Auteur limité : le menu est correctement réduit à 3 modules (Agenda, Formations, Suivi apprenants). Le backend refuse (403) tout accès hors-périmètre — enforcement vérifié.",
+    intro:['ok','Menu scopé à 3 modules · backend refuse le hors-périmètre (403)'],
+    screens:[
+      {img:'fmt-accueil', label:'Atterrissage = Agenda', path:'/', status:['ok','200'], device:'desktop', tall:true,
+        uc:['Menu réduit : Agenda · Formations · Suivi','Badge « Formateur » (Fatou Formatrice)','Calendrier + compteurs événements'],
+        foot:['ok','Périmètre appliqué dès le menu latéral']},
+      {img:'fmt-formations', label:'Formations (affectées)', path:'/formations', status:['ok','200'], device:'desktop',
+        uc:['Uniquement les formations affectées (Theme.instructors)','Édition de son contenu']},
+      {img:'fmt-suivi', label:'Suivi apprenants (scopé)', path:'/suivi', status:['ok','200'], device:'desktop',
+        uc:['Progression / scores de SES apprenants']},
+    ]
+  },
+  {
+    kind:'findings'
+  }
+];
+
+const FINDINGS = [
+  ['ok','Parcours public complet','10 écrans desktop + 4 mobile, tous en 200, 0 erreur console. Accueil, catalogue, fiche formation + inscription, panier, blog, carrières, ressources, CMS.','—'],
+  ['ok','Espace apprenant complet','Lien magique → hero, formations, séances, progression, agenda, compte. Les 6 types de quiz s\'affichent et sont scorables.','—'],
+  ['ok','Dashboard admin complet','17 modules atteignables (CMS, formations, inscriptions, paiements, suivi, RH, messagerie, agenda, audit, monitoring, réglages).','—'],
+  ['ok','Périmètre formateur appliqué','Menu réduit à 3 modules ; le backend renvoie 403 sur le hors-périmètre. Isolation effective.','—'],
+  ['ok','« Médias 404 » ✔ artefact','Faux positif de la 1re capture (API sans DEBUG) : runserver ne sert /media qu\'en DEBUG=True. En mode dev correct, la galerie affiche de vraies photos. Un seul asset orphelin subsiste (SLIDE1_copy.png).','En prod, /media servi par nginx — RAS'],
+  ['ok','Garde de périmètre unifiée ✔ corrigé','Deep-links hors-module (formateur → /paiements, /rh… ; admin non-recruteur → /mes-recrutements) : plus d\'état d\'erreur brut, redirection vers l\'accueil du profil. Vérifié 6/6 en live (commit 6ae1900).','Fait'],
+  ['ok','« 404 contenu formation » ✔ non-bug','Artefact de test : id de publication publique utilisé au lieu d\'un id de Theme. Sur un thème valide : 0 requête en échec.','Aucune action'],
+  ['info','Paiement réel non testé','Le bouton « Payer » déclenche Tara (fonds réels) — non déclenché. La logique de checkout est couverte par tests unitaires (12/12).','Test e2e paiement en sandbox dédié'],
+  ['info','Données de dev bruitées','Catalogue pollué par des artefacts E2E (« B1 585713 », « Publication E2E Formateur »).','Nettoyer le jeu de données de démo'],
+  ['info','CORS dev','L\'espace apprenant sur :4400 nécessite DEBUG=True (regex localhost). En prod, origine réelle configurée.','Config d\'environnement — RAS pour la prod'],
+];
+
+/* ---------- Rendu ---------- */
+function screenCard(s){
+  const [k,txt]=s.status;
+  const foot = s.foot ? `<div class="foot ${s.foot[0]==='warn'?'warn':''}">${s.foot[0]==='ok'?'✅ ':s.foot[0]==='warn'?'⚠️ ':'ℹ️ '}${s.foot[1]}</div>` : '';
+  return `<article class="scard ${s.tall?'tall':''}">
+    <div class="shot"><img loading="lazy" src="screens/${s.img}.png" alt="${s.label}"></div>
+    <div class="body">
+      <div class="top"><h4>${s.label}</h4>${badge(k,txt)}</div>
+      <div class="path">${s.path} <span class="device">${s.device}</span></div>
+      <ul>${s.uc.map(u=>`<li>${u}</li>`).join('')}</ul>
+      ${foot}
+    </div>
+  </article>`;
+}
+
+function verdictBlock(){
+  return `<section>
+    <div class="sec-head"><span class="n">Synthèse</span><h2>Verdict : socle applicatif solide, quelques finitions</h2></div>
+    <p class="sec-sub">Les quatre profils fonctionnent de bout en bout sur la pile découplée. Trois constats relevés en revue ont été levés séance tenante (garde de périmètre corrigée, faux 404, faux « médias »). Les réserves restantes tiennent au contexte : paiement réel non testable ici (fonds réels) et bascule prod en cours.</p>
+    <div class="grid verdict">
+      <div class="vcard"><div class="k" style="color:var(--ok)">4/4</div><div class="l"><b>Profils</b> opérationnels (public, apprenant, admin, formateur)</div></div>
+      <div class="vcard"><div class="k">51</div><div class="l"><b>Écrans</b> capturés en direct sur l\'environnement réel</div></div>
+      <div class="vcard"><div class="k" style="color:var(--ok)">100%</div><div class="l">Écrans <b>dans le périmètre</b> répondant en HTTP 200</div></div>
+      <div class="vcard"><div class="k" style="color:var(--ok)">3</div><div class="l"><b>Constats levés</b> pendant la revue (garde périmètre, faux 404, faux « médias ») &nbsp;·&nbsp; reste 3 notes ℹ️</div></div>
+    </div>
+    <div style="margin-top:18px" class="note"><b>À retenir :</b> l\'application n\'est pas « terminée » au sens produit (paiement réel non validé e2e, bascule prod en cours, quelques modules à polir) — mais les parcours cœur, eux, tiennent la route de bout en bout sur les 4 profils.</div>
+  </section>`;
+}
+
+function flowBlock(){
+  const steps=[
+    ['Découverte','Vitrine','Accueil, expertises, blog, carrières'],
+    ['Choix','Catalogue','Formations + fiche détail + prix'],
+    ['Inscription','Panier / direct','Formulaire apprenant → panier'],
+    ['Paiement','Checkout','Tara mobile money (réel) — testé unitaire'],
+    ['Accès','Lien magique','Espace apprenant sans mot de passe'],
+    ['Apprentissage','Séances + quiz','6 types de quiz, progression'],
+    ['Pilotage','Dashboard','Inscriptions, paiements, suivi, contenu'],
+  ];
+  return `<section>
+    <div class="sec-head"><span class="n">Flow métier</span><h2>Le parcours complet, du visiteur au pilotage</h2></div>
+    <p class="sec-sub">Chaîne de valeur end-to-end reliant les quatre profils : acquisition → inscription → paiement → apprentissage → administration.</p>
+    <div class="flow">
+      ${steps.map((s,i)=>`<div class="step"><div class="st">${s[0]}</div><h4>${s[1]}</h4><p>${s[2]}</p>${i<steps.length-1?'<div class="arrow">→</div>':''}</div>`).join('')}
+    </div>
+  </section>`;
+}
+
+function findingsBlock(){
+  const sevBadge={ok:badge('ok','Conforme'),warn:badge('warn','À corriger'),info:badge('info','Note')};
+  return `<section>
+    <div class="sec-head"><span class="n">Synthèse</span><h2>Constats &amp; recommandations</h2></div>
+    <p class="sec-sub">Consolidé des statuts HTTP, erreurs console et observations visuelles relevés durant la revue en direct.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th style="width:120px">Statut</th><th style="width:230px">Constat</th><th>Détail</th><th style="width:230px">Recommandation</th></tr></thead>
+      <tbody>
+        ${FINDINGS.map(f=>`<tr><td>${sevBadge[f[0]]}</td><td class="sev">${f[1]}</td><td>${f[2]}</td><td>${f[3]}</td></tr>`).join('')}
+      </tbody>
+    </table></div>
+  </section>`;
+}
+
+function profileBlock(sec){
+  return `<section>
+    <hr class="rule" style="margin-bottom:34px">
+    <div class="sec-head"><span class="n">${sec.n}</span><h2>${sec.title}</h2>${sec.intro?badge(sec.intro[0],sec.intro[1]):''}</div>
+    <p class="sec-sub">${sec.sub}</p>
+    <div class="grid screens">${sec.screens.map(screenCard).join('')}</div>
+  </section>`;
+}
+
+const app=document.getElementById('app');
+app.innerHTML = SECTIONS.map(sec=>{
+  if(sec.kind==='verdict') return verdictBlock();
+  if(sec.kind==='flow') return flowBlock();
+  if(sec.kind==='findings') return findingsBlock();
+  return profileBlock(sec);
+}).join('');
+</script>
+</body>
+</html>

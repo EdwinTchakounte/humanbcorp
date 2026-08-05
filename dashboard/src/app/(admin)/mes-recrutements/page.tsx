@@ -106,7 +106,7 @@ export default function MesRecrutementsPage() {
   );
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Mes recrutements"
         subtitle="Suivi de vos offres et des candidatures reçues."

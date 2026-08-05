@@ -139,7 +139,7 @@ export default function SuiviPage() {
   const totalLearners = formations.reduce((s, f) => s + f.learners_count, 0);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Suivi apprenants"
         subtitle={

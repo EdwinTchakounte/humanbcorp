@@ -128,7 +128,7 @@ export default function ApercuPage({ params }: { params: { id: string } }) {
   const seances = data?.theme?.seances ?? [];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <Link
         href={`/formations/${params.id}/contenu`}
         className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted transition hover:text-brand"

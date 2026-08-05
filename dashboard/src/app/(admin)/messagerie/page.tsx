@@ -42,7 +42,7 @@ export default function MessageriePage() {
     : [];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader title="Messagerie" subtitle="Conversations et messages de l'assistant." />
 
       {overview && (

@@ -171,6 +171,9 @@ class InputBox(models.Model):
 
 class InputQuestionBox(InputBox):
 	question = models.ForeignKey(Question, on_delete=models.CASCADE)
+	# Image de l'option : rend possible un quiz « à choix d'images » (grille
+	# d'images cliquables). Facultative — sans image, l'option reste textuelle.
+	image = models.ImageField(upload_to='img', null=True, blank=True)
 
 
 class CheckedResponseInputQuestion(models.Model):

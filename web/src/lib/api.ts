@@ -127,7 +127,39 @@ export function createInscription(payload: {
   return post<InscriptionResult & { detail: string }>(`/site/inscription/`, payload);
 }
 
-export function payInscription(token: string, payload: { phone: string; network: string }) {
+// --- Panier de session anonyme (vitrine) : checkout batch multi-formations / multi-enfants ---
+export interface CheckoutItem {
+  formation_id: number;
+  pour_moi?: boolean;
+  participant?: { first_name: string; last_name: string; email: string };
+}
+
+export interface CheckoutResult {
+  detail: string;
+  order_token?: string;
+  order_id: number;
+  amount: string;
+  nb_lignes: number;
+  ignores?: { email: string; formation?: string; raison: string }[];
+  paid: boolean;
+}
+
+export function checkoutPanier(payload: {
+  acheteur: { email: string; first_name: string; last_name: string };
+  adresse: {
+    ligne1?: string;
+    ligne2?: string;
+    ville?: string;
+    region?: string;
+    pays?: string;
+    telephone?: string;
+  };
+  items: CheckoutItem[];
+}) {
+  return post<CheckoutResult>(`/site/panier/checkout/`, payload);
+}
+
+export function payInscription(token: string, payload: { phone: string; network?: string }) {
   return post<{ detail: string; reference?: string; payment_url?: string | null }>(
     `/site/inscription/${token}/payer/`,
     payload
@@ -219,6 +251,8 @@ export interface LearnerFormation {
   image: string | null;
   has_content: boolean;
   progress: Progress;
+  // Du contenu a été ajouté/modifié depuis la dernière consultation → badge « MàJ ».
+  has_update?: boolean;
   // Session : dates et échéance d'accès (durée configurée sur l'offre).
   mode: number;
   date_debut: string | null;
@@ -237,15 +271,35 @@ export interface QuizOption {
   id: number;
   title: string;
   input_type: number; // 1=checkbox 2=radio
+  /** Image de l'option (quiz à choix d'images) ; `null` si option textuelle. */
+  image?: string | null;
+}
+export interface MatchLeft {
+  id: number;
+  text: string;
+}
+export interface OrderItem {
+  id: number;
+  text: string;
 }
 export interface QuizQuestion {
   id: number;
   index: number;
   title: string;
   description: string;
+  /** 1=QCM, 2=Vrai/Faux, 3=Texte, 4=Numérique, 5=Association, 6=Ordonnancement. */
+  kind?: number;
+  /** Illustration de l'énoncé ; `null` si aucune. */
+  image?: string | null;
   points: number;
   number: number;
   options: QuizOption[];
+  /** Association : colonne gauche (à relier). */
+  match_left?: MatchLeft[];
+  /** Association : colonne droite mélangée (choix). */
+  match_right?: string[];
+  /** Ordonnancement : éléments mélangés à remettre dans l'ordre. */
+  order_items?: OrderItem[];
 }
 export interface LearnerDoc {
   id: number;
@@ -274,6 +328,16 @@ export interface QuizResult {
   points_earned: number;
   correct_option_ids: number[];
   selected_option_ids: number[];
+  /** 1=QCM 2=Vrai/Faux 3=Texte libre 4=Numérique. */
+  kind?: number;
+  /** Texte/numérique : ce que l'apprenant a saisi. */
+  given_text?: string;
+  /** Texte/numérique : réponses acceptées (révélées après correction). */
+  correct_values?: string[];
+  /** Association : paires correctes (révélées après correction). */
+  correct_pairs?: { left: string; right: string }[];
+  /** Ordonnancement : ordre correct (révélé après correction). */
+  correct_order?: string[];
 }
 export interface SubmitQuizResponse {
   score: number;
@@ -358,7 +422,8 @@ export async function getMyFormation(token: string, publicationId: number): Prom
 export async function submitQuiz(
   token: string,
   activityId: number,
-  answers: Record<number, number[]>
+  // Valeur selon le type : ids (QCM/VF/ordre), texte (texte/num), map {leftId:right} (assoc).
+  answers: Record<number, unknown>
 ): Promise<SubmitQuizResponse | null> {
   try {
     const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/quiz/${activityId}/`, {

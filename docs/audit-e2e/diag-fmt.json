@@ -1,0 +1,262 @@
+[
+  {
+    "role": "formateur",
+    "id": "accueil",
+    "label": "Tableau de bord",
+    "path": "/",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "formations",
+    "label": "Formations",
+    "path": "/formations",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "formation-contenu",
+    "label": "Formation — contenu",
+    "path": "/formations/16/contenu",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "inscriptions",
+    "label": "Inscriptions",
+    "path": "/inscriptions",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "paiements",
+    "label": "Paiements",
+    "path": "/paiements",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "suivi",
+    "label": "Suivi apprenants",
+    "path": "/suivi",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "publications",
+    "label": "Publications",
+    "path": "/publications",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "articles",
+    "label": "Articles (blog)",
+    "path": "/articles",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "pages",
+    "label": "Pages du site",
+    "path": "/pages",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "media",
+    "label": "Médiathèque",
+    "path": "/media",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "rh",
+    "label": "RH",
+    "path": "/rh",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "recrutements",
+    "label": "Recrutements",
+    "path": "/mes-recrutements",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "messagerie",
+    "label": "Messagerie",
+    "path": "/messagerie",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "agenda",
+    "label": "Agenda",
+    "path": "/agenda",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "journal",
+    "label": "Journal (audit)",
+    "path": "/journal",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "monitoring",
+    "label": "Monitoring",
+    "path": "/monitoring",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  },
+  {
+    "role": "formateur",
+    "id": "settings",
+    "label": "Paramètres",
+    "path": "/settings",
+    "status": 200,
+    "redirected": false,
+    "title": "HBC-RH · Dashboard",
+    "errors": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "ok": true,
+    "err": ""
+  }
+]

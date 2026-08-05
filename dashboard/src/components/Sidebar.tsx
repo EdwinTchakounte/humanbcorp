@@ -15,7 +15,7 @@ const CMS_LINKS = [
   { href: "/settings", label: "Réglages", icon: "bx-cog" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
   const { logout, profile } = useAuth();
   const modules = profile?.modules ?? [];
@@ -26,11 +26,31 @@ export default function Sidebar() {
   const active = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col overflow-hidden border-r border-line bg-white">
+    <>
+      {/* Voile mobile — ferme le tiroir au clic hors menu (masqué en desktop). */}
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity lg:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden={!open}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-60 shrink-0 flex-col overflow-hidden border-r border-line bg-white transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-line px-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="HBC-RH" className="h-8 w-auto" />
         <span className="font-heading text-sm font-semibold text-brand-deep">Dashboard</span>
+        <button
+          onClick={onClose}
+          aria-label="Fermer le menu"
+          className="ml-auto rounded-lg p-1.5 text-muted hover:bg-brand-soft/60 lg:hidden"
+        >
+          <i className="bx bx-x text-xl" />
+        </button>
       </div>
 
       <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
@@ -42,6 +62,7 @@ export default function Sidebar() {
               <Link
                 key={l.href}
                 href={l.href}
+                onClick={onClose}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                   active(l.href) ? "bg-brand-soft text-brand" : "text-ink hover:bg-brand-soft/60"
                 }`}
@@ -60,6 +81,7 @@ export default function Sidebar() {
               <Link
                 key={m.key}
                 href={m.path || "/"}
+                onClick={onClose}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                   active(m.path || "") ? "bg-brand-soft text-brand" : "text-ink hover:bg-brand-soft/60"
                 }`}
@@ -113,5 +135,6 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

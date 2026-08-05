@@ -159,7 +159,7 @@ export default function InscriptionsPage() {
     : [];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Inscriptions & Paniers"
         subtitle="Inscriptions des participants et commandes."

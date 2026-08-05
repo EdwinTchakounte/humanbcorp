@@ -8,9 +8,14 @@ export const metadata: Metadata = {
 
 export default function MonEspacePage({ params }: { params: { token: string } }) {
   return (
-    <section className="py-14 md:py-20">
-      <div className="container-hbc max-w-4xl">
-        <LearnerSpace token={params.token} />
+    <section className="py-10 md:py-14">
+      {/* Espace client vraiment pleine largeur : plus de marges latérales, juste
+          un filet minimal pour ne pas coller au bord (et `px-safe` pour réserver
+          l'encoche en paysage sur PWA installée). */}
+      <div className="px-safe">
+        <div className="w-full px-2 sm:px-3">
+          <LearnerSpace token={params.token} />
+        </div>
       </div>
     </section>
   );

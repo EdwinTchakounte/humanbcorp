@@ -208,7 +208,7 @@ export default function ContenuPage({ params }: { params: { id: string } }) {
   if (loading) return <Loading />;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <Link href="/formations" className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-brand">
         <i className="bx bx-left-arrow-alt" /> Formations
       </Link>

@@ -59,7 +59,7 @@ export default function SettingsPage() {
   if (!s) return <div className="p-8 text-muted">Chargement…</div>;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <h1 className="mb-6 text-2xl">Réglages du site</h1>
       <div className="card max-w-3xl space-y-5 p-6">
         <div className="grid gap-3 sm:grid-cols-2">

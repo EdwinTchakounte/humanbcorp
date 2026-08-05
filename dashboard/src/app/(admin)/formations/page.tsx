@@ -232,7 +232,7 @@ export default function FormationsPage() {
     : [];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl">Formations</h1>

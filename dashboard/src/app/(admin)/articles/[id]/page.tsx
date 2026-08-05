@@ -72,7 +72,7 @@ export default function ArticleEditor({ params }: { params: { id: string } }) {
   if (!a) return <div className="p-8 text-muted">Chargement…</div>;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <div className="mb-6 flex items-center gap-3">
         <Link href="/articles" className="btn-ghost">
           <i className="bx bx-arrow-back" />

@@ -44,7 +44,7 @@ export default function MonitoringPage() {
   const meta = data ? STATUT_META[data.statut] ?? STATUT_META.attention : null;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="Monitoring"
         subtitle="Santé technique de la plateforme et activité en temps quasi réel."

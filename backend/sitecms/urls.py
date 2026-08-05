@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from . import public_catalog
 from . import learner
 from . import panier
+from . import checkout
 from .api import (
     ArticleDetailView,
     ArticleListView,
@@ -105,6 +106,8 @@ urlpatterns = [
     path("site/inscription/", public_catalog.inscription_create, name="site-inscription"),
     path("site/inscription/<str:token>/", public_catalog.inscription_status, name="site-inscription-status"),
     path("site/inscription/<str:token>/payer/", public_catalog.inscription_pay, name="site-inscription-pay"),
+    # Checkout batch d'un panier de session anonyme (parent → plusieurs enfants).
+    path("site/panier/checkout/", checkout.panier_checkout, name="site-panier-checkout"),
     path("site/documents/", public_catalog.documents_list, name="site-documents"),
     # Espace apprenant (accès par lien magique signé)
     path("site/mon-espace/<str:token>/", learner.my_space, name="site-mon-espace"),

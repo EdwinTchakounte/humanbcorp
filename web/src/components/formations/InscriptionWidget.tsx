@@ -8,6 +8,7 @@ import {
   type PublicFormation,
   type Lang,
 } from "@/lib/api";
+import { useCart } from "@/lib/cart";
 
 const L = {
   fr: {
@@ -34,6 +35,17 @@ const L = {
     doneText: "Un email de confirmation vous a été envoyé. Notre équipe vous recontacte pour la suite.",
     errRegister: "Échec de l'inscription.",
     errPay: "Échec de l'initiation du paiement.",
+    addToCart: "Ajouter au panier",
+    added: "Ajouté au panier ✓",
+    forWhom: "Pour qui ?",
+    forMe: "C’est pour moi",
+    learnerFirst: "Prénom de l’apprenant",
+    learnerLast: "Nom de l’apprenant",
+    learnerEmail: "E-mail de l’apprenant",
+    sharedEmailHint:
+      "Pour plusieurs enfants sous une même adresse, réutilisez le même e-mail : chacun recevra son propre accès.",
+    directLink: "Ou s’inscrire directement (1 personne)",
+    backToCart: "← Ajouter au panier",
   },
   en: {
     free: "Free",
@@ -59,6 +71,17 @@ const L = {
     doneText: "A confirmation email has been sent. Our team will get back to you.",
     errRegister: "Registration failed.",
     errPay: "Payment initiation failed.",
+    addToCart: "Add to cart",
+    added: "Added to cart ✓",
+    forWhom: "For whom?",
+    forMe: "It’s for me",
+    learnerFirst: "Learner’s first name",
+    learnerLast: "Learner’s last name",
+    learnerEmail: "Learner’s email",
+    sharedEmailHint:
+      "For several children under one address, reuse the same email: each gets their own access.",
+    directLink: "Or register directly (1 person)",
+    backToCart: "← Add to cart",
   },
 } as const;
 
@@ -90,9 +113,20 @@ export default function InscriptionWidget({
   lang?: Lang;
 }) {
   const t = L[lang];
+  const { addLine } = useCart();
+  // Deux parcours coexistent : panier multi-personnes (par défaut) et
+  // inscription directe (1 personne, secondaire).
+  const [mode, setMode] = useState<"cart" | "direct">("cart");
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+
+  // Ajout au panier
+  const [cForMe, setCForMe] = useState(false);
+  const [cFirst, setCFirst] = useState("");
+  const [cLast, setCLast] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const [added, setAdded] = useState(false);
 
   // identité invité
   const [firstName, setFirstName] = useState("");
@@ -102,10 +136,31 @@ export default function InscriptionWidget({
   // paiement
   const [token, setToken] = useState("");
   const [phone, setPhone] = useState("");
-  const [network, setNetwork] = useState("MTN");
   const [payMsg, setPayMsg] = useState("");
 
   const free = Number(String(formation.price).replace(/\s/g, "").replace(",", ".")) === 0;
+  // Prix masqué (« sur demande ») : impossible d'ajouter au panier — on ne
+  // laisse alors que l'inscription directe (prise en charge au cas par cas).
+  const priceMasked = formation.price == null;
+
+  function onAddToCart(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    addLine({
+      formationId: formation.id,
+      title: formation.title,
+      price: String(formation.price ?? "0"),
+      forMe: cForMe,
+      first_name: cForMe ? "" : cFirst,
+      last_name: cForMe ? "" : cLast,
+      email: cForMe ? "" : cEmail.trim().toLowerCase(),
+    });
+    setAdded(true);
+    setCFirst("");
+    setCLast("");
+    setCEmail("");
+    setCForMe(false);
+    setTimeout(() => setAdded(false), 2500);
+  }
 
   async function onInscrire(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -130,7 +185,7 @@ export default function InscriptionWidget({
     e.preventDefault();
     setBusy(true);
     setErr("");
-    const res = await payInscription(token, { phone, network });
+    const res = await payInscription(token, { phone });
     setBusy(false);
     if (!res.ok) {
       setErr(res.data?.detail || t.errPay);
@@ -189,8 +244,79 @@ export default function InscriptionWidget({
           <i className="bx bx-lock-alt" />{" "}
           {lang === "en" ? "This session is full." : "Cette session est complète."}
         </p>
+      ) : mode === "cart" && !priceMasked ? (
+      <>
+        <form onSubmit={onAddToCart} className="grid gap-4 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line/70 bg-brand-soft/20 px-3 py-2.5 text-sm font-medium text-ink sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={cForMe}
+              onChange={(e) => setCForMe(e.target.checked)}
+              className="h-4 w-4 accent-[color:var(--accent,#e2725b)]"
+            />
+            {t.forMe}
+          </label>
+          {!cForMe && (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  {t.learnerFirst} <span className="text-accent">*</span>
+                </label>
+                <input value={cFirst} onChange={(e) => setCFirst(e.target.value)} required className="hbc-input" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  {t.learnerLast}
+                </label>
+                <input value={cLast} onChange={(e) => setCLast(e.target.value)} className="hbc-input" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  {t.learnerEmail} <span className="text-accent">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={cEmail}
+                  onChange={(e) => setCEmail(e.target.value)}
+                  required
+                  className="hbc-input"
+                  placeholder="apprenant@exemple.com"
+                />
+                <p className="mt-1.5 text-xs text-muted">{t.sharedEmailHint}</p>
+              </div>
+            </>
+          )}
+          <button type="submit" className="btn-accent sm:col-span-2">
+            <i className="bx bx-cart-add" aria-hidden /> {t.addToCart}
+          </button>
+        </form>
+        {added && (
+          <p className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-700">
+            <i className="bx bx-check-circle text-lg" /> {t.added}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setMode("direct");
+            setStep("form");
+          }}
+          className="mt-4 block w-full text-center text-sm font-medium text-muted underline-offset-2 transition-colors hover:text-accent hover:underline"
+        >
+          {t.directLink}
+        </button>
+      </>
       ) : (
       <>
+      {!priceMasked && (
+        <button
+          type="button"
+          onClick={() => setMode("cart")}
+          className="mb-3 text-sm font-medium text-muted transition-colors hover:text-accent"
+        >
+          {t.backToCart}
+        </button>
+      )}
       {step === "form" && (
         <form onSubmit={onInscrire} className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -236,13 +362,6 @@ export default function InscriptionWidget({
               className="hbc-input"
               placeholder="6XXXXXXXX"
             />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">{t.network}</label>
-            <select value={network} onChange={(e) => setNetwork(e.target.value)} className="hbc-input">
-              <option value="MTN">MTN Mobile Money</option>
-              <option value="ORANGE">Orange Money</option>
-            </select>
           </div>
           <button type="submit" disabled={busy} className="btn-accent">
             {busy ? t.initiating : `${t.pay} ${fmtPrice(formation.price, t.free, t.onRequest)}`}

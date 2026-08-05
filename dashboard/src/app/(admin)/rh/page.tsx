@@ -289,7 +289,7 @@ export default function RhPage() {
   );
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <PageHeader
         title="RH & Recrutement"
         subtitle="Offres d'emploi et pipeline de candidatures."

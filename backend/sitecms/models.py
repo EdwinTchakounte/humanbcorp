@@ -269,3 +269,61 @@ class Article(Abstract):
         if not self.slug:
             self.slug = slugify(self.title)[:160]
         super().save(*args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Adresse de l'acheteur au checkout vitrine (panier de session)
+# ---------------------------------------------------------------------------
+class AdresseCommande(models.Model):
+    """Adresse de contact/facturation saisie par l'acheteur au moment du checkout.
+
+    Le panier vitrine est un panier de **session anonyme** : l'acheteur n'est
+    identifié qu'au checkout (par son e-mail → compte invité). On fige alors son
+    adresse sur la commande, comme `Order.total_amount` fige le prix. On ne s'en
+    sert PAS pour l'autocomplétion (celle-ci reste locale au navigateur, pour ne
+    pas exposer l'adresse de quiconque tape une adresse e-mail) — c'est une trace
+    de facturation/contact rattachée à la commande.
+    """
+
+    order = models.OneToOneField(
+        "bucket.Order", on_delete=models.CASCADE, related_name="adresse_checkout"
+    )
+    # Recopié de l'acheteur pour retrouver l'historique même si le compte évolue.
+    buyer_email = models.EmailField(db_index=True)
+    nom_complet = models.CharField(max_length=200, blank=True)
+    telephone = models.CharField(max_length=30, blank=True)
+    ligne1 = models.CharField(max_length=255, blank=True)
+    ligne2 = models.CharField(max_length=255, blank=True)
+    ville = models.CharField(max_length=120, blank=True)
+    region = models.CharField(max_length=120, blank=True)
+    pays = models.CharField(max_length=120, blank=True, default="Cameroun")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Adresse commande #{self.order_id} — {self.buyer_email}"
+
+
+# ---------------------------------------------------------------------------
+# Dernière consultation d'une formation par un apprenant (badges « mis à jour »)
+# ---------------------------------------------------------------------------
+class FormationSeen(models.Model):
+    """Mémorise quand un apprenant a consulté le contenu d'une formation.
+
+    Comparé à `Theme.content_updated_at`, permet d'afficher un badge « mis à
+    jour » dans l'espace apprenant tant que du contenu est plus récent que sa
+    dernière visite. Un enregistrement par (apprenant, publication).
+    """
+
+    member = models.ForeignKey(
+        "auth.User", on_delete=models.CASCADE, related_name="formations_vues"
+    )
+    publication = models.ForeignKey(
+        "contents.Publication", on_delete=models.CASCADE, related_name="vues_apprenants"
+    )
+    seen_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = ("member", "publication")
+
+    def __str__(self):
+        return f"{self.member_id} a vu pub #{self.publication_id} @ {self.seen_at:%Y-%m-%d %H:%M}"

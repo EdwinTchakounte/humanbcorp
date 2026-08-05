@@ -59,7 +59,7 @@ export default function PaiementsPage() {
     : [];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-6">
       <header className="mb-6">
         <h1 className="text-2xl">Paiements</h1>
         <p className="text-sm text-muted">Suivi des transactions.</p>

@@ -118,7 +118,7 @@ export default function HeroCarousel({
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.05 }}
-              className="mt-5 text-balance text-4xl leading-[1.08] text-white drop-shadow-sm md:text-6xl"
+              className="mt-5 text-balance text-display text-white drop-shadow-sm"
             >
               <AccentTitle title={title} accent={accentWord} />
             </motion.h1>
@@ -127,7 +127,7 @@ export default function HeroCarousel({
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.12 }}
-                className="mt-5 max-w-xl text-lg text-white/90"
+                className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-white/90 md:text-xl"
               >
                 {subtitle}
               </motion.p>

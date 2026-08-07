@@ -6,8 +6,6 @@ import { usePathname } from "next/navigation";
 import type { NavItem, SiteSettings } from "@/lib/types";
 import CartButton from "@/components/cart/CartButton";
 
-const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
-
 const T = {
   fr: { login: "Connexion", other: "EN" },
   en: { login: "Login", other: "FR" },
@@ -53,11 +51,21 @@ export default function Header({
   lang?: "fr" | "en";
 }) {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const t = T[lang];
   const prefix = lang === "en" ? "/en" : "";
 
   useEffect(() => setOpen(false), [pathname]);
+
+  // État « défilé » : l'en-tête se resserre et gagne en profondeur dès qu'on
+  // quitte le haut de page (finition premium, verre dépoli plus marqué).
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const bySlug = (slug: string) => nav.find((n) => n.slug === slug);
   const href = (slug: string) => (slug === "accueil" ? prefix || "/" : `${prefix}/${slug}`);
@@ -72,8 +80,16 @@ export default function Header({
     lang === "en" ? pathname.replace(/^\/en/, "") || "/" : pathname === "/" ? "/en" : `/en${pathname}`;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-white/95 shadow-hbc-sm backdrop-blur-md">
-      <div className="container-hbc flex h-[70px] items-center justify-between">
+    <header
+      className={`sticky top-0 z-50 glass transition-all duration-300 ease-hbc ${
+        scrolled ? "border-b border-hairline shadow-hbc" : "border-b border-transparent"
+      }`}
+    >
+      <div
+        className={`container-hbc flex items-center justify-between transition-all duration-300 ease-hbc ${
+          scrolled ? "h-[60px]" : "h-[74px]"
+        }`}
+      >
         <Link href={prefix || "/"} className="group flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -98,9 +114,8 @@ export default function Header({
                 <Link
                   key={g.fr}
                   href={href(g.slug)}
-                  className={`rounded-lg px-3 py-2 font-heading text-sm font-medium transition-colors ${
-                    isActive(g.slug) ? "text-accent" : "text-brand-deep hover:text-accent"
-                  }`}
+                  data-active={isActive(g.slug)}
+                  className="nav-link"
                 >
                   {label(g)}
                 </Link>
@@ -109,7 +124,7 @@ export default function Header({
             if (children.length === 0 && !g.extra?.length) return null;
             return (
               <div key={g.fr} className="group relative">
-                <button className="flex items-center gap-1 rounded-lg px-3 py-2 font-heading text-sm font-medium text-brand-deep transition-colors group-hover:text-accent">
+                <button className="nav-link flex items-center gap-1 group-hover:text-accent">
                   {label(g)}
                   <i className="bx bx-chevron-down text-base transition-transform group-hover:rotate-180" />
                 </button>
@@ -147,9 +162,9 @@ export default function Header({
             {t.other}
           </Link>
           <CartButton label={lang === "en" ? "Cart" : "Panier"} />
-          <a href={DASHBOARD_URL} className="btn-brand ml-1 !px-5 !py-2 text-xs">
+          <Link href="/connexion" className="btn-brand ml-1 !px-5 !py-2 text-xs">
             <i className="bx bx-user" aria-hidden /> {t.login}
-          </a>
+          </Link>
         </nav>
 
         {/* Actions mobile */}
@@ -219,9 +234,9 @@ export default function Header({
               </div>
             );
           })}
-          <a href={DASHBOARD_URL} className="btn-brand mt-2">
+          <Link href="/connexion" className="btn-brand mt-2">
             <i className="bx bx-user" aria-hidden /> {t.login}
-          </a>
+          </Link>
         </nav>
       </div>
     </header>

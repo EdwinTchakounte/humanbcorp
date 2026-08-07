@@ -16,8 +16,11 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-white font-sans text-ink antialiased;
+    @apply bg-canvas font-sans text-ink antialiased;
     line-height: 1.65;
+    /* Rendu typographique soigné : ligatures + crénage, texte net (haut de gamme). */
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
     /* Confort « app installée » : pas de flash gris au tap, pas de rebond
        élastique du body, texte non redimensionné en rotation sur iOS. */
     -webkit-tap-highlight-color: transparent;
@@ -27,16 +30,45 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading text-brand-deep;
-    letter-spacing: -0.022em;
+    letter-spacing: -0.024em;
     text-wrap: balance;
   }
   h1, h2 {
     font-weight: 800;
-    line-height: 1.06;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
   }
   h3 {
     font-weight: 700;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.018em;
+  }
+  /* Nombres alignés (stats, prix, compteurs) : rendu tabulaire soigné. */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  /* Sélection aux couleurs de la marque (détail premium). */
+  ::selection {
+    background: rgba(60, 94, 165, 0.16);
+    color: var(--brand-deep);
+  }
+  /* Anneau de focus clavier discret et cohérent (accessibilité + finition). */
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+  /* Barre de défilement fine et discrète (desktop). */
+  @media (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #c3ccdb transparent;
+    }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-thumb {
+      background: #c3ccdb;
+      border: 3px solid transparent;
+      border-radius: 9999px;
+      background-clip: padding-box;
+    }
+    *::-webkit-scrollbar-thumb:hover { background: #a8b4c8; background-clip: padding-box; }
   }
 }
 
@@ -65,23 +97,25 @@
   }
   .btn {
     /* Boutons rectangulaires à coins juste adoucis (fini les pilules) : registre
-       institutionnel, plus assis et sérieux. */
+       institutionnel, plus assis et sérieux. Transition complète pour animer
+       aussi l'ombre (lévitation premium au survol). */
     @apply inline-flex items-center justify-center gap-2 rounded-md px-7 py-3 font-heading text-sm font-semibold
-      transition-transform duration-300 ease-hbc hover:-translate-y-0.5;
+      transition-all duration-300 ease-hbc hover:-translate-y-0.5 active:translate-y-0;
   }
-  .btn-brand { @apply btn bg-brand text-white hover:bg-brand-dark; }
-  .btn-accent { @apply btn bg-accent text-white hover:bg-accent-dark; }
+  .btn-brand { @apply btn bg-brand text-white shadow-hbc-sm hover:bg-brand-dark hover:shadow-hbc-glow-brand; }
+  .btn-accent { @apply btn bg-accent text-white shadow-hbc-sm hover:bg-accent-dark hover:shadow-hbc-glow; }
   /* Bouton discret (bordé, fond blanc) : actions secondaires (« Recommencer »,
      boutons d'agenda…). Sans cette règle, `.btn-ghost` rendait un bouton nu. */
   .btn-ghost {
-    @apply btn border border-line bg-white text-brand hover:border-brand hover:bg-brand-soft;
+    @apply btn border border-line bg-white text-brand hover:border-brand hover:bg-brand-soft hover:shadow-hbc-sm;
   }
-  .btn-outline-brand { @apply btn border-2 border-brand text-brand hover:bg-brand hover:text-white; }
+  .btn-outline-brand { @apply btn border-2 border-brand text-brand hover:bg-brand hover:text-white hover:shadow-hbc-glow-brand; }
   .btn-outline-light { @apply btn border-2 border-white/70 text-white hover:bg-white hover:text-brand-deep; }
-  /* Carte « filet net » : bordure 1px franche + ombre minimale. La structure
-     vient du trait, pas du flou — registre architectural/institutionnel. */
+  /* Carte raffinée : filet fin + ombre douce en couches au repos, montée en
+     profondeur au survol (sans décaler la mise en page — pas de saut). */
   .card-soft {
-    @apply rounded-lg border border-line bg-white shadow-hbc-sm transition-all duration-300 ease-hbc;
+    @apply rounded-lg border border-hairline bg-white shadow-hbc-card transition-all duration-300 ease-hbc
+      hover:border-line hover:shadow-hbc-hover;
   }
   /* Alias historique : `.card` était utilisé (ex. blocs de séance de l'espace
      apprenant) sans jamais avoir été défini — les cartes s'affichaient nues. */
@@ -92,10 +126,35 @@
   .card-accent-top {
     @apply card-soft border-t-2 border-t-accent;
   }
+  /* Opt-in : lévitation franche pour les cartes cliquables (vignettes, offres). */
+  .hover-lift {
+    @apply transition-all duration-300 ease-hbc hover:-translate-y-1 hover:shadow-hbc-hover;
+  }
   .hbc-input {
     @apply w-full rounded-md border border-line bg-white px-4 py-3 text-ink outline-none
       transition focus:border-brand focus:ring-4 focus:ring-brand/15;
   }
+  /* Lien de navigation avec soulignement animé (croît depuis la gauche au survol
+     et à l'état actif) — micro-interaction premium, appliquée sans réécrire le menu. */
+  .nav-link {
+    @apply relative rounded-lg px-3 py-2 font-heading text-sm font-medium text-brand-deep transition-colors;
+  }
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.25rem;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .nav-link:hover { @apply text-accent; }
+  .nav-link:hover::after,
+  .nav-link[data-active="true"]::after { transform: scaleX(1); }
+  .nav-link[data-active="true"] { @apply text-accent; }
 }
 
 @layer utilities {
@@ -115,5 +174,42 @@
   .mask-wave-bottom {
     -webkit-mask-image: linear-gradient(to bottom, black 88%, transparent 100%);
     mask-image: linear-gradient(to bottom, black 88%, transparent 100%);
+  }
+  /* Texte en dégradé marque → accent : mots-clés, chiffres de stats (signature). */
+  .text-gradient {
+    background: linear-gradient(100deg, var(--brand) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* Surface en verre dépoli : en-tête, badges sur image (profondeur premium). */
+  .glass {
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    backdrop-filter: saturate(180%) blur(14px);
+  }
+  .glass-dark {
+    background: rgba(20, 33, 64, 0.42);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    backdrop-filter: saturate(160%) blur(12px);
+  }
+  /* Filet horizontal qui s'estompe aux extrémités (séparateur élégant). */
+  .divider-fade {
+    height: 1px;
+    border: 0;
+    background: linear-gradient(90deg, transparent, var(--tw-color-line, #dce2ec), transparent);
+  }
+  /* Révélation douce à l'entrée (utilisée par les blocs animés côté client). */
+  @keyframes hbc-fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-up {
+    animation: hbc-fade-up 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up { animation: none; }
+    * { scroll-behavior: auto !important; }
   }
 }

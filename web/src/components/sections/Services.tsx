@@ -11,8 +11,8 @@ import SectionIntro from "@/components/ui/SectionIntro";
 /** Carte avec image en haut (blog, équipe, offres). */
 function ImageCard({ c }: { c: Card }) {
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line/70 bg-white shadow-hbc-sm transition-all duration-300 ease-hbc hover:-translate-y-1.5 hover:shadow-hbc">
-      <div className="aspect-[16/10] overflow-hidden">
+    <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-hairline bg-white shadow-hbc-card transition-all duration-300 ease-hbc hover:-translate-y-1.5 hover:border-line hover:shadow-hbc-hover">
+      <div className="relative aspect-[16/10] overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={c.image!.url!}
@@ -20,13 +20,16 @@ function ImageCard({ c }: { c: Card }) {
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-500 ease-hbc group-hover:scale-105"
         />
+        {/* Voile bas subtil pour asseoir l'image et l'unifier avec la carte. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-deep/25 via-transparent to-transparent opacity-60 transition-opacity duration-500 group-hover:opacity-90" />
       </div>
       <div className="flex flex-1 flex-col p-6">
         {c.title && <h3 className="text-lg text-brand-deep">{c.title}</h3>}
         {c.text && <p className="mt-2 flex-1 text-sm text-muted">{c.text}</p>}
         {c.link && (
-          <CmsLink href={c.link} className="mt-4 inline-flex items-center gap-1 font-heading text-sm font-semibold text-accent">
-            {c.link_label || "En savoir plus"} <i className="bx bx-right-arrow-alt" />
+          <CmsLink href={c.link} className="mt-4 inline-flex items-center gap-1.5 font-heading text-sm font-semibold text-accent">
+            {c.link_label || "En savoir plus"}
+            <i className="bx bx-right-arrow-alt transition-transform duration-300 ease-hbc group-hover:translate-x-1" />
           </CmsLink>
         )}
       </div>
@@ -37,8 +40,8 @@ function ImageCard({ c }: { c: Card }) {
 /** Carte avec cercle d'icône en débord (services / atouts). */
 function IconCard({ c }: { c: Card }) {
   return (
-    <div className="group relative h-full rounded-2xl border border-line/70 bg-white px-6 pb-8 pt-14 text-center shadow-hbc-sm transition-all duration-300 ease-hbc hover:-translate-y-2 hover:shadow-hbc">
-      <span className="absolute -top-9 left-1/2 flex h-[72px] w-[72px] -translate-x-1/2 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-brand to-brand-dark text-3xl text-white shadow-hbc transition-all duration-300 ease-hbc group-hover:from-accent group-hover:to-accent-dark">
+    <div className="group relative h-full rounded-2xl border border-hairline bg-white px-6 pb-8 pt-14 text-center shadow-hbc-card transition-all duration-300 ease-hbc hover:-translate-y-2 hover:border-line hover:shadow-hbc-hover">
+      <span className="absolute -top-9 left-1/2 flex h-[72px] w-[72px] -translate-x-1/2 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-brand to-brand-dark text-3xl text-white shadow-hbc transition-all duration-300 ease-hbc group-hover:-translate-y-0.5 group-hover:from-accent group-hover:to-accent-dark group-hover:shadow-hbc-glow">
         <Icon name={c.icon || "bx-check"} />
       </span>
       <h3 className="text-lg text-brand-deep">{c.title}</h3>

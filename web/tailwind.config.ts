@@ -23,15 +23,26 @@ const config: Config = {
           dark: "#C8601D",
           soft: "#FCECDD",
         },
-        ink: "#1F2733",
-        muted: "#586274",
+        ink: "#1A2230",
+        muted: "#5A6577",
         line: "#DCE2EC",
-        // Fond « papier » pour alterner discrètement les sections (institutionnel).
-        paper: "#F6F8FC",
+        // Filet plus fin/discret pour les séparations secondaires (raffinement).
+        hairline: "#E7EBF2",
+        // Fond « papier » chaud pour alterner discrètement les sections : neutre
+        // légèrement chaud (haut de gamme) qui réchauffe le bleu institutionnel.
+        paper: "#F6F5F2",
+        // Canvas : blanc cassé chaud, base du body (évite le blanc clinique #fff).
+        canvas: "#FCFBFA",
       },
       fontFamily: {
         heading: ["var(--font-poppins)", "system-ui", "sans-serif"],
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+      },
+      // Échelle d'affichage fluide (clamp) pour les titres héros : impact premium
+      // sans casse à petits écrans. Tracking resserré, graisse forte.
+      fontSize: {
+        display: ["clamp(2.5rem, 5.2vw, 4.25rem)", { lineHeight: "1.04", letterSpacing: "-0.032em", fontWeight: "800" }],
+        "display-lg": ["clamp(3rem, 6.5vw, 5.25rem)", { lineHeight: "1.02", letterSpacing: "-0.035em", fontWeight: "800" }],
       },
       // Échelle de rayons resserrée : rendu plus institutionnel, net et
       // structuré (on garde une légère douceur, sans angles vifs bruts).
@@ -46,12 +57,18 @@ const config: Config = {
         "3xl": "14px",
         full: "9999px",
       },
-      // Ombres resserrées : on privilégie les filets (bordures 1px) à la
-      // profondeur floue. Rendu architectural, net, institutionnel.
+      // Ombres douces en COUCHES : profondeur premium (proche + diffuse) au lieu
+      // d'un flou plat unique. On garde une base légère fidèle à l'ADN net.
       boxShadow: {
-        "hbc-sm": "0 1px 2px rgba(28,50,94,.05)",
-        hbc: "0 6px 20px rgba(28,50,94,.07)",
-        "hbc-lg": "0 18px 44px rgba(28,50,94,.12)",
+        "hbc-sm": "0 1px 2px rgba(26,34,48,.05), 0 1px 1px rgba(26,34,48,.03)",
+        hbc: "0 2px 4px -1px rgba(26,34,48,.05), 0 12px 24px -6px rgba(28,50,94,.10)",
+        "hbc-lg": "0 8px 12px -4px rgba(28,50,94,.08), 0 30px 60px -12px rgba(28,50,94,.18)",
+        // Carte au repos (subtile) et lévitation au survol.
+        "hbc-card": "0 1px 3px rgba(26,34,48,.04), 0 10px 30px -12px rgba(28,50,94,.12)",
+        "hbc-hover": "0 10px 20px -6px rgba(28,50,94,.10), 0 30px 50px -14px rgba(28,50,94,.20)",
+        // Halo coloré sous les CTA au survol (accent chaleureux).
+        "hbc-glow": "0 10px 30px -8px rgba(236,113,35,.45)",
+        "hbc-glow-brand": "0 10px 30px -8px rgba(60,94,165,.40)",
       },
       transitionTimingFunction: {
         hbc: "cubic-bezier(.22,.61,.36,1)",

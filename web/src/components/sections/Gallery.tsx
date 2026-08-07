@@ -21,7 +21,7 @@ export default function Gallery({ section }: { section: Section }) {
             <Reveal
               key={c.id}
               delay={0.04 * (i % 8)}
-              className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-brand-soft shadow-hbc-sm ring-1 ring-line/60"
+              className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-brand-soft shadow-hbc-card ring-1 ring-hairline transition-all duration-300 ease-hbc hover:-translate-y-1 hover:shadow-hbc-hover"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

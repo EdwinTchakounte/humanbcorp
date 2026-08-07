@@ -53,7 +53,7 @@ export default async function FormationsList({ lang }: { lang: Lang }) {
               <Link
                 key={f.id}
                 href={`${base}/formations/${f.id}`}
-                className="group flex flex-col overflow-hidden rounded-lg border border-line bg-white shadow-hbc-sm transition-all duration-300 ease-hbc hover:-translate-y-1 hover:border-brand/40 hover:shadow-hbc"
+                className="group flex flex-col overflow-hidden rounded-lg border border-hairline bg-white shadow-hbc-card transition-all duration-300 ease-hbc hover:-translate-y-1 hover:border-brand/40 hover:shadow-hbc-hover"
               >
                 <div className="relative aspect-[16/10] overflow-hidden bg-brand-soft">
                   {f.image_url ? (

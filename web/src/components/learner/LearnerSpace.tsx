@@ -6,6 +6,7 @@ import {
   getMyFormation,
   submitQuiz,
   markActivity,
+  type LearnerSession,
   type MySpace,
   type MyFormation,
   type LearnerActivity,
@@ -178,11 +179,11 @@ function DocRow({ d }: { d: LearnerDoc }) {
 
 function QuizBlock({
   activity,
-  token,
+  session,
   onComplete,
 }: {
   activity: LearnerActivity;
-  token: string;
+  session: LearnerSession;
   onComplete: OnComplete;
 }) {
   const [answers, setAnswers] = useState<Record<number, number[]>>({});
@@ -236,7 +237,7 @@ function QuizBlock({
       }
     }
     setBusy(true);
-    const res = await submitQuiz(token, activity.id, payload);
+    const res = await submitQuiz(session, activity.id, payload);
     setBusy(false);
     if (res) {
       setResult(res);
@@ -549,13 +550,13 @@ function QuizBlock({
   );
 }
 
-function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: string; onComplete: OnComplete }) {
+function ActivityBlock({ a, session, onComplete }: { a: LearnerActivity; session: LearnerSession; onComplete: OnComplete }) {
   const isQuiz = a.questions.length > 0;
   const [marking, setMarking] = useState(false);
 
   async function toggleDone() {
     setMarking(true);
-    const ok = await markActivity(token, a.id, !a.completed);
+    const ok = await markActivity(session, a.id, !a.completed);
     setMarking(false);
     if (ok) onComplete(a.id, !a.completed);
   }
@@ -594,7 +595,7 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
       )}
 
       {/* Quiz interactif + notation */}
-      {isQuiz && <QuizBlock activity={a} token={token} onComplete={onComplete} />}
+      {isQuiz && <QuizBlock activity={a} session={session} onComplete={onComplete} />}
 
       {/* Marquer comme terminé (activités non-quiz : le quiz s'auto-complète) */}
       {!isQuiz && (
@@ -613,7 +614,7 @@ function ActivityBlock({ a, token, onComplete }: { a: LearnerActivity; token: st
   );
 }
 
-function SeanceBlock({ s, token, onComplete }: { s: LearnerSeance; token: string; onComplete: OnComplete }) {
+function SeanceBlock({ s, session, onComplete }: { s: LearnerSeance; session: LearnerSession; onComplete: OnComplete }) {
   return (
     <div className="card rounded-2xl p-5 md:p-6">
       <div className="mb-4 flex items-center gap-3">
@@ -634,7 +635,7 @@ function SeanceBlock({ s, token, onComplete }: { s: LearnerSeance; token: string
       )}
       <div className="space-y-4">
         {s.activities.map((a) => (
-          <ActivityBlock key={a.id} a={a} token={token} onComplete={onComplete} />
+          <ActivityBlock key={a.id} a={a} session={session} onComplete={onComplete} />
         ))}
       </div>
     </div>
@@ -837,12 +838,12 @@ function ThemeNav({
  */
 function FormationContent({
   content,
-  token,
+  session,
   onComplete,
   accesFin,
 }: {
   content: MyFormation;
-  token: string;
+  session: LearnerSession;
   onComplete: OnComplete;
   accesFin: string | null;
 }) {
@@ -942,7 +943,7 @@ function FormationContent({
             <div className="space-y-4">
               {th.seances.map((s) => (
                 <div key={s.id} id={`se-${s.id}`} className="scroll-mt-24">
-                  <SeanceBlock s={s} token={token} onComplete={onComplete} />
+                  <SeanceBlock s={s} session={session} onComplete={onComplete} />
                 </div>
               ))}
             </div>
@@ -1087,7 +1088,13 @@ function MobileFormationSwitcher({
   );
 }
 
-export default function LearnerSpace({ token }: { token: string }) {
+export default function LearnerSpace({
+  session,
+  onLogout,
+}: {
+  session: LearnerSession;
+  onLogout?: () => void;
+}) {
   const [space, setSpace] = useState<MySpace | null>(null);
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState(false);
@@ -1096,14 +1103,18 @@ export default function LearnerSpace({ token }: { token: string }) {
   const [loadingContent, setLoadingContent] = useState(false);
   const [onglet, setOnglet] = useState<"formations" | "souscrire">("formations");
 
+  // Clé primitive stable pour les effets (l'objet `session` change d'identité à
+  // chaque rendu, mais son contenu — token magique ou JWT — non).
+  const sessionKey = session.kind === "magic" ? session.token : session.access;
+
   /** Après un achat, la liste des formations a changé : on la relit. */
   async function rechargerEspace() {
-    const s = await getMySpace(token);
+    const s = await getMySpace(session);
     if (s) setSpace(s);
   }
 
   useEffect(() => {
-    getMySpace(token)
+    getMySpace(session)
       .then((s) => {
         if (!s) {
           setInvalid(true);
@@ -1117,7 +1128,7 @@ export default function LearnerSpace({ token }: { token: string }) {
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [sessionKey]);
 
   // Sélectionne une formation et charge son contenu dans le panneau principal.
   // (Navigation type « sidebar » : re-cliquer sur l'active ne la referme pas.)
@@ -1126,7 +1137,7 @@ export default function LearnerSpace({ token }: { token: string }) {
     setOpenId(pubId);
     setContent(null);
     setLoadingContent(true);
-    const c = await getMyFormation(token, pubId);
+    const c = await getMyFormation(session, pubId);
     setContent(c);
     setLoadingContent(false);
   }
@@ -1184,10 +1195,19 @@ export default function LearnerSpace({ token }: { token: string }) {
         <span className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-4xl text-accent">
           <i className="bx bx-error-circle" />
         </span>
-        <h2 className="text-xl">Lien d’accès invalide ou expiré</h2>
+        <h2 className="text-xl">
+          {session.kind === "jwt" ? "Session expirée" : "Lien d’accès invalide ou expiré"}
+        </h2>
         <p className="mt-2 text-muted">
-          Vérifiez le lien reçu par e-mail, ou contactez-nous si le problème persiste.
+          {session.kind === "jwt"
+            ? "Votre session a expiré. Reconnectez-vous pour retrouver vos formations."
+            : "Vérifiez le lien reçu par e-mail, ou contactez-nous si le problème persiste."}
         </p>
+        {session.kind === "jwt" && (
+          <a href="/connexion" className="btn-brand mt-5 inline-flex text-sm">
+            <i className="bx bx-log-in" /> Se reconnecter
+          </a>
+        )}
       </div>
     );
 
@@ -1207,6 +1227,15 @@ export default function LearnerSpace({ token }: { token: string }) {
               Retrouvez ici le contenu de vos formations, et inscrivez-vous à de nouvelles.
             </p>
           </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="btn-ghost shrink-0 text-sm"
+              title="Se déconnecter"
+            >
+              <i className="bx bx-log-out" /> Se déconnecter
+            </button>
+          )}
           {space.formations.length > 0 && (
             <div className="flex w-full gap-3 sm:w-auto">
               <div className="flex-1 sm:flex-none">
@@ -1266,7 +1295,7 @@ export default function LearnerSpace({ token }: { token: string }) {
       </div>
 
       {onglet === "souscrire" ? (
-        <Souscrire token={token} onChangement={rechargerEspace} />
+        <Souscrire session={session} onChangement={rechargerEspace} />
       ) : (
         <>
       {space.formations.length === 0 ? (
@@ -1363,7 +1392,7 @@ export default function LearnerSpace({ token }: { token: string }) {
             ) : (
               <FormationContent
                 content={content}
-                token={token}
+                session={session}
                 onComplete={patchCompleted}
                 accesFin={space.formations.find((f) => f.publication_id === openId)?.acces_fin ?? null}
               />

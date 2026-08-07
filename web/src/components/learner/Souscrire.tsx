@@ -12,6 +12,7 @@ import {
   retirerDuPanier,
   type ApprenantSuivi,
   type CatalogueItem,
+  type LearnerSession,
   type Panier,
   type Participant,
 } from "@/lib/api";
@@ -227,7 +228,7 @@ function Paiement({ orderToken, montant, onPaye }: { orderToken: string; montant
   );
 }
 
-export default function Souscrire({ token, onChangement }: { token: string; onChangement?: () => void }) {
+export default function Souscrire({ session, onChangement }: { session: LearnerSession; onChangement?: () => void }) {
   const [catalogue, setCatalogue] = useState<CatalogueItem[]>([]);
   const [panier, setPanier] = useState<Panier | null>(null);
   const [suivis, setSuivis] = useState<ApprenantSuivi[]>([]);
@@ -239,15 +240,15 @@ export default function Souscrire({ token, onChangement }: { token: string; onCh
 
   const recharger = useCallback(async () => {
     const [c, p, s] = await Promise.all([
-      getCatalogueApprenant(token),
-      getPanier(token),
-      getMesApprenants(token),
+      getCatalogueApprenant(session),
+      getPanier(session),
+      getMesApprenants(session),
     ]);
     setCatalogue(c);
     setPanier(p);
     setSuivis(s);
     setLoading(false);
-  }, [token]);
+  }, [session]);
 
   useEffect(() => {
     recharger();
@@ -256,7 +257,7 @@ export default function Souscrire({ token, onChangement }: { token: string; onCh
   async function ajouter(f: CatalogueItem, participants: Participant[], pourMoi: boolean) {
     setBusy(true);
     setFlash("");
-    const r = await ajouterAuPanier(token, f.id, participants, pourMoi);
+    const r = await ajouterAuPanier(session, f.id, participants, pourMoi);
     setBusy(false);
     if (!r.ok) {
       setFlash(r.detail);
@@ -275,14 +276,14 @@ export default function Souscrire({ token, onChangement }: { token: string; onCh
   }
 
   async function retirer(inscriptionId: number) {
-    const r = await retirerDuPanier(token, inscriptionId);
+    const r = await retirerDuPanier(session, inscriptionId);
     if (r.ok) await recharger();
   }
 
   async function commander() {
     setBusy(true);
     setFlash("");
-    const r = await commanderPanier(token);
+    const r = await commanderPanier(session);
     setBusy(false);
     if (!r.ok || !r.data) {
       setFlash(r.detail);

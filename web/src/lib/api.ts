@@ -397,9 +397,91 @@ export interface MyFormation {
   themes: LearnerTheme[];
 }
 
-export async function getMySpace(token: string): Promise<MySpace | null> {
+// ---------------------------------------------------------------------------
+// Session apprenant : deux voies vers le MÊME contenu (cf. backend learner.py).
+//  - "magic" : lien signé reçu par e-mail (sans compte)  → /site/mon-espace/<token>/…
+//  - "jwt"   : compte activé (e-mail + mot de passe)      → /site/apprenant/…  (Bearer)
+// ---------------------------------------------------------------------------
+export type LearnerSession =
+  | { kind: "magic"; token: string }
+  | { kind: "jwt"; access: string };
+
+/** URL + en-têtes d'un endpoint espace apprenant, selon la voie d'accès. */
+function learnerReq(s: LearnerSession, suffix: string): { url: string; headers: Record<string, string> } {
+  if (s.kind === "jwt") {
+    // L'espace lui-même est à /site/apprenant/mon-espace/ ; les sous-ressources
+    // (formation, quiz, panier…) partagent le même suffixe que la voie magique.
+    const path = suffix === "" ? "mon-espace/" : suffix;
+    return { url: `${API}/api/v1/site/apprenant/${path}`, headers: { Authorization: `Bearer ${s.access}` } };
+  }
+  return { url: `${API}/api/v1/site/mon-espace/${s.token}/${suffix}`, headers: {} };
+}
+
+// ---------------------------------------------------------------------------
+// Connexion unifiée : /auth/token/ authentifie N'IMPORTE quel compte et renvoie
+// le `profile` (rôle + modules), qui décide de la redirection (staff → dashboard,
+// apprenant → son espace). Le JWT obtenu ouvre aussi les endpoints /site/apprenant/*.
+// ---------------------------------------------------------------------------
+export interface AuthModule {
+  key: string;
+  native: boolean;
+  path: string;
+}
+export interface AuthProfile {
+  id: number;
+  username: string;
+  full_name: string;
+  email: string;
+  is_admin: boolean;
+  is_teacher: boolean;
+  is_recruiter: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  groups: string[];
+  modules: AuthModule[];
+}
+export interface LoginResult {
+  access: string;
+  refresh: string;
+  profile: AuthProfile;
+}
+
+export async function login(
+  username: string,
+  password: string
+): Promise<{ ok: boolean; data: LoginResult | null; detail: string }> {
   try {
-    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/`, { cache: "no-store" });
+    const res = await fetch(`${API}/api/v1/auth/token/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { ok: false, data: null, detail: (data && data.detail) || "Identifiants invalides." };
+    }
+    return { ok: true, data: data as LoginResult, detail: "" };
+  } catch {
+    return { ok: false, data: null, detail: "Connexion impossible." };
+  }
+}
+
+/** Un profil avec des modules ou un statut staff = compte dashboard (pas un apprenant). */
+export function isStaffProfile(p: AuthProfile): boolean {
+  return (
+    p.is_staff ||
+    p.is_superuser ||
+    p.is_admin ||
+    p.is_teacher ||
+    p.is_recruiter ||
+    (p.modules?.length ?? 0) > 0
+  );
+}
+
+export async function getMySpace(session: LearnerSession): Promise<MySpace | null> {
+  try {
+    const { url, headers } = learnerReq(session, "");
+    const res = await fetch(url, { cache: "no-store", headers });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -407,11 +489,10 @@ export async function getMySpace(token: string): Promise<MySpace | null> {
   }
 }
 
-export async function getMyFormation(token: string, publicationId: number): Promise<MyFormation | null> {
+export async function getMyFormation(session: LearnerSession, publicationId: number): Promise<MyFormation | null> {
   try {
-    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/formation/${publicationId}/`, {
-      cache: "no-store",
-    });
+    const { url, headers } = learnerReq(session, `formation/${publicationId}/`);
+    const res = await fetch(url, { cache: "no-store", headers });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -420,15 +501,16 @@ export async function getMyFormation(token: string, publicationId: number): Prom
 }
 
 export async function submitQuiz(
-  token: string,
+  session: LearnerSession,
   activityId: number,
   // Valeur selon le type : ids (QCM/VF/ordre), texte (texte/num), map {leftId:right} (assoc).
   answers: Record<number, unknown>
 ): Promise<SubmitQuizResponse | null> {
   try {
-    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/quiz/${activityId}/`, {
+    const { url, headers } = learnerReq(session, `quiz/${activityId}/`);
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({ answers }),
     });
     if (!res.ok) return null;
@@ -438,11 +520,12 @@ export async function submitQuiz(
   }
 }
 
-export async function markActivity(token: string, activityId: number, done: boolean): Promise<boolean> {
+export async function markActivity(session: LearnerSession, activityId: number, done: boolean): Promise<boolean> {
   try {
-    const res = await fetch(`${API}/api/v1/site/mon-espace/${token}/activite/${activityId}/terminer/`, {
+    const { url, headers } = learnerReq(session, `activite/${activityId}/terminer/`);
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({ done }),
     });
     return res.ok;
@@ -492,14 +575,15 @@ export interface ApprenantSuivi {
   }[];
 }
 
-/** Base des routes panier pour l'apprenant identifié par son lien magique. */
-const espace = (token: string) => `${API}/api/v1/site/mon-espace/${token}`;
-
-async function panierPost<T>(url: string, body: unknown): Promise<{ ok: boolean; data: T | null; detail: string }> {
+async function panierPost<T>(
+  url: string,
+  headers: Record<string, string>,
+  body: unknown
+): Promise<{ ok: boolean; data: T | null; detail: string }> {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => null);
@@ -513,9 +597,10 @@ async function panierPost<T>(url: string, body: unknown): Promise<{ ok: boolean;
   }
 }
 
-export async function getCatalogueApprenant(token: string): Promise<CatalogueItem[]> {
+export async function getCatalogueApprenant(session: LearnerSession): Promise<CatalogueItem[]> {
   try {
-    const res = await fetch(`${espace(token)}/catalogue/`, { cache: "no-store" });
+    const { url, headers } = learnerReq(session, "catalogue/");
+    const res = await fetch(url, { cache: "no-store", headers });
     if (!res.ok) return [];
     return (await res.json()).formations ?? [];
   } catch {
@@ -523,9 +608,10 @@ export async function getCatalogueApprenant(token: string): Promise<CatalogueIte
   }
 }
 
-export async function getPanier(token: string): Promise<Panier | null> {
+export async function getPanier(session: LearnerSession): Promise<Panier | null> {
   try {
-    const res = await fetch(`${espace(token)}/panier/`, { cache: "no-store" });
+    const { url, headers } = learnerReq(session, "panier/");
+    const res = await fetch(url, { cache: "no-store", headers });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -535,20 +621,22 @@ export async function getPanier(token: string): Promise<Panier | null> {
 
 /** `pourMoi` est explicite : on peut s'inscrire soi-même ET inscrire des proches. */
 export async function ajouterAuPanier(
-  token: string,
+  session: LearnerSession,
   publicationId: number,
   participants: Participant[],
   pourMoi: boolean
 ) {
-  return panierPost<Panier>(`${espace(token)}/panier/ajouter/`, {
+  const { url, headers } = learnerReq(session, "panier/ajouter/");
+  return panierPost<Panier>(url, headers, {
     publication_id: publicationId,
     pour_moi: pourMoi,
     participants,
   });
 }
 
-export async function retirerDuPanier(token: string, inscriptionId: number) {
-  return panierPost<Panier>(`${espace(token)}/panier/retirer/`, { inscription_id: inscriptionId });
+export async function retirerDuPanier(session: LearnerSession, inscriptionId: number) {
+  const { url, headers } = learnerReq(session, "panier/retirer/");
+  return panierPost<Panier>(url, headers, { inscription_id: inscriptionId });
 }
 
 export interface CommandeCreee {
@@ -557,13 +645,15 @@ export interface CommandeCreee {
   amount: string;
   paid: boolean;
 }
-export async function commanderPanier(token: string) {
-  return panierPost<CommandeCreee>(`${espace(token)}/panier/commander/`, {});
+export async function commanderPanier(session: LearnerSession) {
+  const { url, headers } = learnerReq(session, "panier/commander/");
+  return panierPost<CommandeCreee>(url, headers, {});
 }
 
-export async function getMesApprenants(token: string): Promise<ApprenantSuivi[]> {
+export async function getMesApprenants(session: LearnerSession): Promise<ApprenantSuivi[]> {
   try {
-    const res = await fetch(`${espace(token)}/mes-apprenants/`, { cache: "no-store" });
+    const { url, headers } = learnerReq(session, "mes-apprenants/");
+    const res = await fetch(url, { cache: "no-store", headers });
     if (!res.ok) return [];
     return (await res.json()).apprenants ?? [];
   } catch {

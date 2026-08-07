@@ -14,7 +14,7 @@ export default function MonEspacePage({ params }: { params: { token: string } })
           l'encoche en paysage sur PWA installée). */}
       <div className="px-safe">
         <div className="w-full px-2 sm:px-3">
-          <LearnerSpace token={params.token} />
+          <LearnerSpace session={{ kind: "magic", token: params.token }} />
         </div>
       </div>
     </section>

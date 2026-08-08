@@ -1212,32 +1212,33 @@ export default function LearnerSpace({
     );
 
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
       {/* En-tête « dashboard » : avatar-initiale, salutation et statistiques
           synthétiques (nombre de formations + progression globale). */}
-      <header className="mb-8 overflow-hidden rounded-3xl border border-line/70 bg-gradient-to-br from-brand-soft via-white to-white p-5 shadow-hbc-sm md:p-7">
-        <div className="flex flex-wrap items-center gap-4 md:gap-6">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand font-heading text-2xl font-bold text-white shadow-hbc md:h-16 md:w-16">
+      <header className="mb-6 overflow-hidden rounded-2xl border border-line/70 bg-gradient-to-br from-brand-soft via-white to-white p-4 shadow-hbc-sm md:mb-8 md:rounded-3xl md:p-7">
+        <div className="flex flex-wrap items-center gap-3 md:gap-6">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand font-heading text-lg font-bold text-white shadow-hbc md:h-16 md:w-16 md:rounded-2xl md:text-2xl">
             {space.learner.name.trim().charAt(0).toUpperCase() || "?"}
           </span>
           <div className="min-w-0 flex-1">
             <p className="eyebrow">Mon espace</p>
-            <h1 className="mt-1 text-2xl md:text-3xl">Bonjour {space.learner.name} 👋</h1>
-            <p className="mt-1 text-sm text-muted">
+            <h1 className="mt-0.5 text-xl leading-tight md:mt-1 md:text-3xl">Bonjour {space.learner.name} 👋</h1>
+            <p className="mt-1 hidden text-sm text-muted sm:block">
               Retrouvez ici le contenu de vos formations, et inscrivez-vous à de nouvelles.
             </p>
           </div>
           {onLogout && (
             <button
               onClick={onLogout}
-              className="btn-ghost shrink-0 text-sm"
+              className="btn-ghost shrink-0 !px-3 !py-2 text-sm"
               title="Se déconnecter"
+              aria-label="Se déconnecter"
             >
-              <i className="bx bx-log-out" /> Se déconnecter
+              <i className="bx bx-log-out text-lg" /> <span className="hidden sm:inline">Se déconnecter</span>
             </button>
           )}
           {space.formations.length > 0 && (
-            <div className="flex w-full gap-3 sm:w-auto">
+            <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
               <div className="flex-1 sm:flex-none">
                 <HeroStat icon="bxs-graduation" value={space.formations.length} label="Formations" />
               </div>
@@ -1258,11 +1259,11 @@ export default function LearnerSpace({
 
       {/* Deux usages distincts — apprendre / s'inscrire — donc deux onglets.
           Les mêler noierait le catalogue commercial sous le contenu pédagogique. */}
-      <div className="mb-8 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
+      <div className="mb-6 hidden border-b border-line md:mb-8 md:flex md:gap-1" role="tablist">
         {(
           [
             ["formations", "Mes formations", "bx-book-open"],
-            ["souscrire", "S’inscrire à une formation", "bx-cart-add"],
+            ["souscrire", "S’inscrire", "bx-cart-add"],
           ] as const
         ).map(([id, label, icon]) => {
           const selected = onglet === id;
@@ -1272,7 +1273,7 @@ export default function LearnerSpace({
               role="tab"
               aria-selected={selected}
               onClick={() => setOnglet(id)}
-              className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 font-heading text-sm font-semibold transition ${
+              className={`-mb-px flex items-center justify-center gap-2 border-b-2 px-3 py-3 font-heading text-sm font-semibold transition md:justify-start md:px-4 ${
                 selected
                   ? "border-accent text-brand-deep"
                   : "border-transparent text-muted hover:text-brand"
@@ -1411,6 +1412,55 @@ export default function LearnerSpace({
       )}
         </>
       )}
+
+      {/* Barre de navigation basse — mobile uniquement (concept app, façon
+          OpenClassrooms). Remplace les onglets du haut sur petit écran. */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-hairline bg-white pb-safe shadow-[0_-2px_12px_rgba(28,50,94,.07)] md:hidden"
+        aria-label="Navigation espace apprenant"
+      >
+        {(
+          [
+            ["formations", "Formations", "bx-book-open"],
+            ["souscrire", "S’inscrire", "bx-cart-add"],
+          ] as const
+        ).map(([id, label, icon]) => {
+          const active = onglet === id;
+          return (
+            <button
+              key={id}
+              onClick={() => {
+                setOnglet(id);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              aria-current={active ? "page" : undefined}
+              className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${
+                active ? "text-accent" : "text-muted"
+              }`}
+            >
+              {active && <span className="absolute inset-x-7 top-0 h-0.5 rounded-full bg-accent" />}
+              <span className="relative">
+                <i className={`bx ${icon} text-2xl`} />
+                {id === "formations" && space.formations.length > 0 && (
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white">
+                    {space.formations.length}
+                  </span>
+                )}
+              </span>
+              {label}
+            </button>
+          );
+        })}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold text-muted transition-colors"
+          >
+            <i className="bx bx-log-out text-2xl" />
+            Compte
+          </button>
+        )}
+      </nav>
     </div>
   );
 }

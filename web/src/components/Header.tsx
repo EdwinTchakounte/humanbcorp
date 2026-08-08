@@ -89,13 +89,17 @@ export default function Header({
 
   return (
     <header
-      className={`sticky top-0 z-50 glass transition-all duration-300 ease-hbc ${
-        scrolled ? "border-b border-hairline shadow-hbc" : "border-b border-transparent"
+      className={`sticky top-0 z-50 border-b bg-white pt-safe transition-all duration-300 ease-hbc lg:bg-white/75 lg:backdrop-blur-md lg:backdrop-saturate-150 ${
+        scrolled
+          ? "border-hairline shadow-hbc-sm lg:shadow-hbc"
+          : "border-hairline shadow-hbc-sm lg:border-transparent lg:shadow-none"
       }`}
     >
+      {/* Mobile : bandeau solide, stable, de hauteur constante (concept app / PWA).
+          Desktop (lg) : verre dépoli + resserrement au défilement. */}
       <div
-        className={`container-hbc flex items-center justify-between transition-all duration-300 ease-hbc ${
-          scrolled ? "h-[60px]" : "h-[74px]"
+        className={`container-hbc flex h-[64px] items-center justify-between transition-all duration-300 ease-hbc ${
+          scrolled ? "lg:h-[60px]" : "lg:h-[74px]"
         }`}
       >
         <Link href={prefix || "/"} className="group flex items-center gap-3">

@@ -1,5 +1,5 @@
 import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import ConditionalFooter from "@/components/ConditionalFooter";
 import { getNav, getSettings, type Lang } from "@/lib/api";
 
 /** En-tête + pied de page localisés autour du contenu. */
@@ -15,7 +15,7 @@ export default async function ChromeLayout({
     <>
       <Header nav={nav} settings={settings} lang={lang} />
       <main>{children}</main>
-      <Footer nav={nav} settings={settings} lang={lang} />
+      <ConditionalFooter nav={nav} settings={settings} lang={lang} />
     </>
   );
 }

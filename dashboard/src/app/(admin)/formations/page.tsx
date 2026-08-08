@@ -233,7 +233,7 @@ export default function FormationsPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <header className="mb-6 flex items-start justify-between gap-4">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl">Formations</h1>
           <p className="text-sm text-muted">Catalogue des thèmes de formation (Cours & Examens).</p>
@@ -246,7 +246,7 @@ export default function FormationsPage() {
       </header>
 
       {overview && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           {tiles.map((s) => (
             <div key={s.label} className="card flex items-center gap-4 p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-2xl text-brand">
@@ -283,7 +283,7 @@ export default function FormationsPage() {
         <div className={refetching ? "pointer-events-none opacity-50 transition" : "transition"}>
           <div className="card divide-y divide-line">
             {pagedThemes.map((t) => (
-              <div key={t.id} className="flex items-center gap-4 px-5 py-3.5">
+              <div key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5">
                 {t.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={t.image_url} alt="" className="h-12 w-16 rounded-lg object-cover" />
@@ -311,21 +311,24 @@ export default function FormationsPage() {
                     )}
                   </div>
                 </div>
-                <Link href={`/formations/${t.id}/contenu`} className="btn-ghost shrink-0 text-xs" title="Éditer le contenu">
-                  <i className="bx bx-list-ul" /> Contenu
-                </Link>
-                {writable && (
-                  <>
-                    <button onClick={() => openEdit(t)} className="btn-ghost shrink-0 text-xs" title="Éditer">
-                      <i className="bx bx-edit" />
-                    </button>
-                    <button onClick={() => remove(t)} className="btn-ghost shrink-0 text-xs text-red-600" title="Supprimer">
-                      <i className="bx bx-trash" />
-                    </button>
-                    <Toggle checked={t.is_visible} onChange={() => toggle(t)} label={t.is_visible ? "Visible" : "Masqué"} />
-                  </>
-                )}
-                {!writable && <span className="text-xs text-muted">{t.is_visible ? "Visible" : "Masqué"}</span>}
+                {/* Actions : inline en desktop, repliées sur une 2e ligne en mobile. */}
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+                  <Link href={`/formations/${t.id}/contenu`} className="btn-ghost shrink-0 text-xs" title="Éditer le contenu">
+                    <i className="bx bx-list-ul" /> Contenu
+                  </Link>
+                  {writable && (
+                    <>
+                      <button onClick={() => openEdit(t)} className="btn-ghost shrink-0 text-xs" title="Éditer">
+                        <i className="bx bx-edit" />
+                      </button>
+                      <button onClick={() => remove(t)} className="btn-ghost shrink-0 text-xs text-red-600" title="Supprimer">
+                        <i className="bx bx-trash" />
+                      </button>
+                      <Toggle checked={t.is_visible} onChange={() => toggle(t)} label={t.is_visible ? "Visible" : "Masqué"} />
+                    </>
+                  )}
+                  {!writable && <span className="text-xs text-muted">{t.is_visible ? "Visible" : "Masqué"}</span>}
+                </div>
               </div>
             ))}
           </div>

@@ -65,7 +65,7 @@ export default function About({ section }: { section: Section }) {
           </Reveal>
           {section.body && (
             <Reveal delay={0.1}>
-              <p className="mt-5 text-justify text-lg leading-relaxed text-muted">{section.body}</p>
+              <p className="mt-5 text-left text-lg leading-relaxed text-muted md:text-justify">{section.body}</p>
             </Reveal>
           )}
 

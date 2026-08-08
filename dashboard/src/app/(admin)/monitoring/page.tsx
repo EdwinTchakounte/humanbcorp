@@ -79,7 +79,7 @@ export default function MonitoringPage() {
 
           {/* Services */}
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Services</h2>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <Service label="Base de données" up={data.services.database === "ok"} detail={data.services.database === "ok" ? "Répond" : "Injoignable"} />
             <Service
               label="Ordonnanceur (crons)"
@@ -94,7 +94,7 @@ export default function MonitoringPage() {
 
           {/* Paiements */}
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Paiements</h2>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <Tile icon="bx-check-shield" tone="ok" value={data.paiements.valides_24h} label="Validés · 24 h" />
             <Tile icon="bx-time" tone="neutral" value={data.paiements.en_attente} label="En attente" />
             <Tile icon="bx-error-circle" tone={data.paiements.bloques ? "crit" : "ok"} value={data.paiements.bloques} label={`Bloqués > ${data.paiements.seuil_minutes} min`} />

@@ -310,7 +310,7 @@ export default function RhPage() {
         <>
           {/* Vue d'ensemble : pipeline */}
           {overview && (
-            <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <Tile icon="bx-user-voice" label="Candidatures" value={overview.applications.total} accent />
               <Tile icon="bx-briefcase" label="Offres publiées" value={overview.offers.published} />
               <Tile icon="bx-chat" label="En entretien" value={pipeCount(overview, 4)} />
@@ -349,7 +349,7 @@ export default function RhPage() {
           {tab === "candidatures" ? (
             <>
               {/* Filtres */}
-              <div className="mb-4 grid gap-3 sm:grid-cols-3">
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <SelectField label="Offre" value={fOffer} onChange={(v) => onFilter({ offer: v })} options={offerOptions} />
                 <SelectField label="Statut" value={fStatus} onChange={(v) => onFilter({ status: v })} options={statusOptions} />
                 <div>
@@ -421,7 +421,7 @@ export default function RhPage() {
             ) : (
               <div className="card divide-y divide-line">
                 {offers.map((o) => (
-                  <div key={o.id} className="flex items-center gap-4 px-5 py-3.5">
+                  <div key={o.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium text-brand-deep">{o.title}</div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
@@ -432,13 +432,15 @@ export default function RhPage() {
                         {o.closing_date && <span>· clôture {formatDate(o.closing_date)}</span>}
                       </div>
                     </div>
-                    <Toggle checked={o.is_published} onChange={() => toggleOffer(o)} label={o.is_published ? "Publiée" : "Masquée"} />
-                    <button onClick={() => openOfferEdit(o)} className="btn-ghost" aria-label={`Éditer l'offre ${o.title}`}>
-                      <i className="bx bx-edit" /> Éditer
-                    </button>
-                    <button onClick={() => delOffer(o)} className="btn-danger" title="Supprimer" aria-label={`Supprimer l'offre ${o.title}`}>
-                      <i className="bx bx-trash" />
-                    </button>
+                    <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+                      <Toggle checked={o.is_published} onChange={() => toggleOffer(o)} label={o.is_published ? "Publiée" : "Masquée"} />
+                      <button onClick={() => openOfferEdit(o)} className="btn-ghost shrink-0" aria-label={`Éditer l'offre ${o.title}`}>
+                        <i className="bx bx-edit" /> Éditer
+                      </button>
+                      <button onClick={() => delOffer(o)} className="btn-danger shrink-0" title="Supprimer" aria-label={`Supprimer l'offre ${o.title}`}>
+                        <i className="bx bx-trash" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

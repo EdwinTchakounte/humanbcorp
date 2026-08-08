@@ -109,7 +109,7 @@ export default function JournalPage() {
       />
 
       {/* Filtres */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <SelectField
           label="Action"
           value={fAction}

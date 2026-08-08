@@ -58,6 +58,14 @@ export default function Header({
 
   useEffect(() => setOpen(false), [pathname]);
 
+  // Verrouille le défilement de la page tant que le tiroir mobile est ouvert.
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   // État « défilé » : l'en-tête se resserre et gagne en profondeur dès qu'on
   // quitte le haut de page (finition premium, verre dépoli plus marqué).
   useEffect(() => {
@@ -184,13 +192,36 @@ export default function Header({
         </div>
       </div>
 
-      {/* Drawer mobile */}
+      {/* Voile mobile — ferme au tap hors du panneau, flou léger (premium). */}
       <div
-        className={`overflow-hidden bg-white shadow-hbc transition-[max-height] duration-300 ease-hbc lg:hidden ${
-          open ? "max-h-[90vh]" : "max-h-0"
+        onClick={() => setOpen(false)}
+        className={`fixed inset-0 z-[60] bg-brand-deep/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
+        aria-hidden={!open}
+      />
+
+      {/* Drawer mobile — panneau glissant depuis la droite */}
+      <aside
+        className={`fixed inset-y-0 right-0 z-[70] flex h-[100dvh] w-[86%] max-w-sm flex-col bg-white shadow-hbc-lg transition-transform duration-300 ease-hbc lg:hidden ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+        aria-hidden={!open}
       >
-        <nav className="container-hbc flex flex-col gap-1 py-4">
+        <div className="flex h-[70px] shrink-0 items-center justify-between border-b border-hairline px-5">
+          <span className="font-heading text-base font-bold text-brand-deep">Menu</span>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Fermer le menu"
+            className="rounded-lg p-2 text-brand-deep transition-colors hover:bg-brand-soft"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
           {GROUPS.map((g) => {
             const children = (g.children || []).map(bySlug).filter(Boolean) as NavItem[];
             if (g.slug) {
@@ -198,8 +229,9 @@ export default function Header({
                 <Link
                   key={g.fr}
                   href={href(g.slug)}
-                  className={`rounded-lg px-3 py-3 font-heading font-medium ${
-                    isActive(g.slug) ? "bg-brand-soft text-accent" : "text-brand-deep hover:bg-brand-soft"
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center rounded-xl px-4 py-3 font-heading font-semibold transition-colors ${
+                    isActive(g.slug) ? "bg-brand-soft text-accent" : "text-brand-deep hover:bg-brand-soft/60"
                   }`}
                 >
                   {label(g)}
@@ -207,16 +239,20 @@ export default function Header({
               );
             }
             return (
-              <div key={g.fr} className="py-1">
-                <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted">{label(g)}</div>
+              <div key={g.fr} className="mt-1">
+                <div className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                  {label(g)}
+                </div>
                 {children.map((c) => (
                   <Link
                     key={c.slug}
                     href={href(c.slug)}
-                    className={`block rounded-lg px-5 py-2.5 font-heading text-sm ${
-                      isActive(c.slug) ? "text-accent" : "text-brand-deep hover:bg-brand-soft"
+                    onClick={() => setOpen(false)}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                      isActive(c.slug) ? "bg-brand-soft/70 text-accent" : "text-ink hover:bg-brand-soft/60"
                     }`}
                   >
+                    <i className="bx bx-chevron-right text-base text-muted" />
                     {c.nav_label}
                   </Link>
                 ))}
@@ -224,21 +260,26 @@ export default function Header({
                   <Link
                     key={x.href}
                     href={extraHref(x.href)}
-                    className={`block rounded-lg px-5 py-2.5 font-heading text-sm ${
-                      pathname === extraHref(x.href) ? "text-accent" : "text-brand-deep hover:bg-brand-soft"
+                    onClick={() => setOpen(false)}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                      pathname === extraHref(x.href) ? "bg-brand-soft/70 text-accent" : "text-ink hover:bg-brand-soft/60"
                     }`}
                   >
+                    <i className="bx bx-chevron-right text-base text-muted" />
                     {lang === "en" ? x.en : x.fr}
                   </Link>
                 ))}
               </div>
             );
           })}
-          <Link href="/connexion" className="btn-brand mt-2">
+        </nav>
+
+        <div className="shrink-0 border-t border-hairline px-4 py-4 pb-safe">
+          <Link href="/connexion" onClick={() => setOpen(false)} className="btn-brand w-full justify-center">
             <i className="bx bx-user" aria-hidden /> {t.login}
           </Link>
-        </nav>
-      </div>
+        </div>
+      </aside>
     </header>
   );
 }

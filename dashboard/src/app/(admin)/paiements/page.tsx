@@ -66,21 +66,21 @@ export default function PaiementsPage() {
       </header>
 
       {overview && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           {tiles.map((s) => (
             <div
               key={s.label}
-              className={`card flex items-center gap-4 p-5 ${s.accent ? "ring-1 ring-accent/30" : ""}`}
+              className={`card flex items-center gap-3 p-4 sm:gap-4 sm:p-5 ${s.accent ? "ring-1 ring-accent/30" : ""}`}
             >
               <div
-                className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl sm:h-12 sm:w-12 sm:text-2xl ${
                   s.accent ? "bg-accent/10 text-accent" : "bg-brand-soft text-brand"
                 }`}
               >
                 <i className={`bx ${s.icon}`} />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-xl font-bold text-brand-deep">{s.value}</div>
+                <div className="text-lg font-bold leading-tight text-brand-deep sm:text-xl">{s.value}</div>
                 <div className="text-xs text-muted">{s.label}</div>
               </div>
             </div>

@@ -187,12 +187,12 @@ export default function AgendaPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <header className="mb-6 flex items-center justify-between">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl">Agenda</h1>
           <p className="text-sm text-muted">Gérez vos événements et rendez-vous.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-line p-0.5">
             <button
               onClick={() => setView("calendar")}
@@ -223,7 +223,7 @@ export default function AgendaPage() {
         <p className="text-muted">Chargement…</p>
       ) : (
         <>
-          <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
             {[
               { label: "Événements", value: events.length, icon: "bx-calendar-event" },
               { label: "À venir", value: upcoming, icon: "bx-time-five" },

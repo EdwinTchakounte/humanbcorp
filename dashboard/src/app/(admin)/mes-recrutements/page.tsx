@@ -120,7 +120,7 @@ export default function MesRecrutementsPage() {
         <>
           {/* Vue d'ensemble : pipeline (restreint à vos offres) */}
           {overview && (
-            <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <Tile icon="bx-user-voice" label="Candidatures reçues" value={overview.applications.total} accent />
               <Tile icon="bx-briefcase" label="Offres publiées" value={overview.offers.published} />
               <Tile icon="bx-chat" label="En entretien" value={pipeCount(overview, 4)} />
@@ -169,7 +169,7 @@ export default function MesRecrutementsPage() {
           {tab === "candidatures" ? (
             <>
               {/* Filtres */}
-              <div className="mb-4 grid gap-3 sm:grid-cols-3">
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <SelectField label="Offre" value={fOffer} onChange={(v) => onFilter({ offer: v })} options={offerOptions} />
                 <SelectField label="Statut" value={fStatus} onChange={(v) => onFilter({ status: v })} options={statusOptions} />
                 <div>

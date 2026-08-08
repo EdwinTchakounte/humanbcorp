@@ -110,9 +110,9 @@ export default function PagesList() {
       ) : (
         <div className="card divide-y divide-line">
           {pages.map((p) => (
-            <div key={p.id} className="flex items-center gap-4 px-5 py-4">
-              <span className="w-8 text-center text-sm text-muted">{p.order}</span>
-              <div className="flex-1">
+            <div key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
+              <span className="w-6 shrink-0 text-center text-sm text-muted sm:w-8">{p.order}</span>
+              <div className="min-w-0 flex-1">
                 <Link href={`/pages/${p.id}`} className="font-heading font-semibold text-brand-deep hover:text-brand">
                   {p.title}
                 </Link>
@@ -121,13 +121,16 @@ export default function PagesList() {
               <span className="hidden text-xs text-muted sm:block">
                 {p.show_in_nav ? "Dans le menu" : "Hors menu"}
               </span>
-              <Toggle checked={p.is_active} onChange={() => toggle(p)} label={p.is_active ? "Visible" : "Masquée"} />
-              <Link href={`/pages/${p.id}`} className="btn-ghost">
-                <i className="bx bx-edit" /> Éditer
-              </Link>
-              <button onClick={() => del(p)} className="btn-danger" title="Supprimer" aria-label={`Supprimer la page ${p.title}`}>
-                <i className="bx bx-trash" />
-              </button>
+              {/* Actions : inline en desktop, repliées sur une 2e ligne alignée à droite en mobile. */}
+              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                <Toggle checked={p.is_active} onChange={() => toggle(p)} label={p.is_active ? "Visible" : "Masquée"} />
+                <Link href={`/pages/${p.id}`} className="btn-ghost">
+                  <i className="bx bx-edit" /> Éditer
+                </Link>
+                <button onClick={() => del(p)} className="btn-danger" title="Supprimer" aria-label={`Supprimer la page ${p.title}`}>
+                  <i className="bx bx-trash" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

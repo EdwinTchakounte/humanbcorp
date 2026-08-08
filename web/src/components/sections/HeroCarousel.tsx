@@ -108,7 +108,7 @@ export default function HeroCarousel({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-2 rounded-sm bg-white/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm"
+                className="inline-flex items-center gap-2 rounded-sm bg-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white backdrop-blur-sm sm:px-4 sm:text-xs sm:tracking-[0.14em]"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                 {eyebrow}
@@ -127,7 +127,7 @@ export default function HeroCarousel({
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.12 }}
-                className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-white/90 md:text-xl"
+                className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/90 sm:text-lg md:mt-5 md:text-xl"
               >
                 {subtitle}
               </motion.p>

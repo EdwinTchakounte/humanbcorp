@@ -40,3 +40,22 @@
   /* Barre de squelette pour le chargement (aucun saut de mise en page). */
   .skeleton { @apply animate-pulse rounded bg-brand-soft; }
 }
+
+/* ------------------------------------------------------------------ *
+ * Responsive mobile — filets de sécurité (dashboards consultés sur   *
+ * téléphone : apprenants, formateurs, admin). Évite tout débordement *
+ * horizontal de la page.                                             *
+ * ------------------------------------------------------------------ */
+@media (max-width: 767px) {
+  /* Toute table trop large défile horizontalement au lieu de couper. */
+  main table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* La page elle-même ne défile jamais latéralement. */
+  main {
+    overflow-x: hidden;
+  }
+}

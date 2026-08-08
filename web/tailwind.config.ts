@@ -41,8 +41,8 @@ const config: Config = {
       // Échelle d'affichage fluide (clamp) pour les titres héros : impact premium
       // sans casse à petits écrans. Tracking resserré, graisse forte.
       fontSize: {
-        display: ["clamp(2.5rem, 5.2vw, 4.25rem)", { lineHeight: "1.04", letterSpacing: "-0.032em", fontWeight: "800" }],
-        "display-lg": ["clamp(3rem, 6.5vw, 5.25rem)", { lineHeight: "1.02", letterSpacing: "-0.035em", fontWeight: "800" }],
+        display: ["clamp(2rem, 7vw, 4.25rem)", { lineHeight: "1.06", letterSpacing: "-0.03em", fontWeight: "800" }],
+        "display-lg": ["clamp(2.4rem, 8vw, 5.25rem)", { lineHeight: "1.03", letterSpacing: "-0.035em", fontWeight: "800" }],
       },
       // Échelle de rayons resserrée : rendu plus institutionnel, net et
       // structuré (on garde une légère douceur, sans angles vifs bruts).

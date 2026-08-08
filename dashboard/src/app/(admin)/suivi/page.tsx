@@ -157,7 +157,7 @@ export default function SuiviPage() {
         <p className="text-muted">Aucune formation à suivre pour l&apos;instant.</p>
       ) : (
         <>
-          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
             <div className="card flex items-center gap-4 p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-2xl text-brand"><i className="bx bx-book" /></div>
               <div><div className="text-2xl font-bold text-brand-deep">{formations.length}</div><div className="text-xs text-muted">Formation(s)</div></div>

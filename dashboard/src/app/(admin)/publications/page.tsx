@@ -238,7 +238,7 @@ export default function PublicationsPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <header className="mb-6 flex items-start justify-between gap-4">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl">Publications</h1>
           <p className="text-sm text-muted">Produits payants (formations), reliés à un thème pédagogique.</p>
@@ -251,7 +251,7 @@ export default function PublicationsPage() {
       </header>
 
       {overview && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           {tiles.map((s) => (
             <div key={s.label} className="card flex items-center gap-4 p-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-2xl text-brand">
@@ -288,7 +288,7 @@ export default function PublicationsPage() {
         <div className={refetching ? "pointer-events-none opacity-50 transition" : "transition"}>
           <div className="card divide-y divide-line">
             {pagedItems.map((p) => (
-              <div key={p.id} className="flex items-center gap-4 px-5 py-3.5">
+              <div key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:flex-nowrap sm:gap-4 sm:px-5">
                 {p.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={p.image_url} alt="" className="h-12 w-16 rounded-lg object-cover" />
@@ -308,20 +308,22 @@ export default function PublicationsPage() {
                     {p.children_count > 0 && <span><i className="bx bx-sitemap" /> {p.children_count} sous-publi.</span>}
                   </div>
                 </div>
-                <Badge tone={p.is_private ? "neutral" : "success"}>
-                  {p.is_private ? "Privé" : "Public"}
-                </Badge>
-                {writable && (
-                  <>
-                    <button onClick={() => openEdit(p)} className="btn-ghost shrink-0 text-xs" title="Éditer">
-                      <i className="bx bx-edit" />
-                    </button>
-                    <button onClick={() => remove(p)} className="btn-danger shrink-0 text-xs" title="Supprimer">
-                      <i className="bx bx-trash" />
-                    </button>
-                    <Toggle checked={!p.is_private} onChange={() => togglePrivacy(p)} label={p.is_private ? "Rendre public" : "Rendre privé"} />
-                  </>
-                )}
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+                  <Badge tone={p.is_private ? "neutral" : "success"}>
+                    {p.is_private ? "Privé" : "Public"}
+                  </Badge>
+                  {writable && (
+                    <>
+                      <button onClick={() => openEdit(p)} className="btn-ghost shrink-0 text-xs" title="Éditer">
+                        <i className="bx bx-edit" />
+                      </button>
+                      <button onClick={() => remove(p)} className="btn-danger shrink-0 text-xs" title="Supprimer">
+                        <i className="bx bx-trash" />
+                      </button>
+                      <Toggle checked={!p.is_private} onChange={() => togglePrivacy(p)} label={p.is_private ? "Rendre public" : "Rendre privé"} />
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>

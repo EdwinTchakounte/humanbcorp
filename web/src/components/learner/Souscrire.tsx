@@ -302,6 +302,15 @@ export default function Souscrire({ session, onChangement }: { session: LearnerS
   if (loading) return <p className="text-muted">Chargement du catalogue…</p>;
 
   const dispo = catalogue.filter((f) => !f.complete);
+  // Regroupement par catégorie (fallback « Autres formations ») pour une
+  // navigation claire du catalogue depuis l'espace apprenant.
+  const groupes = Array.from(
+    dispo.reduce((m, f) => {
+      const cle = f.categorie_name?.trim() || "Autres formations";
+      (m.get(cle) ?? m.set(cle, []).get(cle))!.push(f);
+      return m;
+    }, new Map<string, CatalogueItem[]>())
+  );
 
   return (
     <div className="space-y-8">
@@ -376,46 +385,68 @@ export default function Souscrire({ session, onChangement }: { session: LearnerS
         {dispo.length === 0 ? (
           <p className="text-muted">Aucune autre formation ouverte pour le moment.</p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {dispo.map((f) => (
-              <article key={f.id} className="card-soft p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <h4 className="font-heading font-semibold">{f.title}</h4>
-                  <span className="shrink-0 text-sm font-semibold text-accent">
-                    {f.price === null ? "Prix sur demande" : fmtPrix(f.price)}
-                  </span>
+          <div className="space-y-8">
+            {groupes.map(([categorie, items]) => (
+              <div key={categorie}>
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="eyebrow">{categorie}</span>
+                  <span className="text-xs font-medium text-muted">({items.length})</span>
                 </div>
-                {f.description && (
-                  <p className="mt-2 line-clamp-3 text-sm text-muted">{f.description}</p>
-                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {items.map((f) => {
+                    // « Gratuit » = prix explicite à 0 ; `null` = prix masqué (sur demande).
+                    const gratuit = f.price !== null && !Number(f.price);
+                    return (
+                      <article key={f.id} className="card-soft flex flex-col p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <h4 className="font-heading font-semibold">{f.title}</h4>
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-0.5 text-sm font-bold ${
+                              gratuit ? "bg-green-100 text-green-700" : "text-accent"
+                            }`}
+                          >
+                            {f.price === null ? "Prix sur demande" : gratuit ? "Gratuit" : fmtPrix(f.price)}
+                          </span>
+                        </div>
+                        {f.description && (
+                          <p className="mt-2 line-clamp-3 text-sm text-muted">{f.description}</p>
+                        )}
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-                  {f.deja_inscrit && (
-                    <span className="rounded-sm bg-brand/10 px-2 py-0.5 text-brand-deep">
-                      Vous y êtes inscrit
-                    </span>
-                  )}
-                  {f.au_panier && (
-                    <span className="rounded-sm bg-paper px-2 py-0.5">Déjà au panier</span>
-                  )}
-                  {f.places_restantes !== null && f.places_restantes !== undefined && (
-                    <span>{f.places_restantes} place(s) restante(s)</span>
-                  )}
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                          {f.deja_inscrit && (
+                            <span className="rounded-sm bg-brand/10 px-2 py-0.5 text-brand-deep">
+                              Vous y êtes inscrit
+                            </span>
+                          )}
+                          {f.au_panier && (
+                            <span className="rounded-sm bg-paper px-2 py-0.5">Déjà au panier</span>
+                          )}
+                          {f.places_restantes !== null && f.places_restantes !== undefined && (
+                            <span>{f.places_restantes} place(s) restante(s)</span>
+                          )}
+                        </div>
+
+                        {ouvert === f.id ? (
+                          <ChoixParticipants
+                            formation={f}
+                            busy={busy}
+                            onAnnuler={() => setOuvert(null)}
+                            onValider={(p, moi) => ajouter(f, p, moi)}
+                          />
+                        ) : (
+                          <button
+                            className={`mt-4 w-full justify-center sm:w-auto ${gratuit ? "btn-brand" : "btn-accent"}`}
+                            onClick={() => setOuvert(f.id)}
+                          >
+                            <i className={`bx ${gratuit ? "bx-check-circle" : "bx-cart-add"} mr-1`} />
+                            {gratuit ? "S’inscrire gratuitement" : "S’inscrire / Payer"}
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
-
-                {ouvert === f.id ? (
-                  <ChoixParticipants
-                    formation={f}
-                    busy={busy}
-                    onAnnuler={() => setOuvert(null)}
-                    onValider={(p, moi) => ajouter(f, p, moi)}
-                  />
-                ) : (
-                  <button className="btn-outline-brand mt-4" onClick={() => setOuvert(f.id)}>
-                    <i className="bx bx-cart-add mr-1" /> Inscrire quelqu’un
-                  </button>
-                )}
-              </article>
+              </div>
             ))}
           </div>
         )}

@@ -13,6 +13,9 @@ export default function ChatWidget() {
   // Le widget est monté dans le layout racine (commun FR/EN) : on déduit la
   // langue de l'URL pour ne pas afficher du français sur le site anglais.
   const WELCOME = pathname?.startsWith("/en") ? WELCOME_EN : WELCOME_FR;
+  // Espace apprenant : une barre de navigation basse occupe le bas sur mobile.
+  // On surélève la bulle pour ne pas la chevaucher (desktop = position normale).
+  const onLearner = pathname?.includes("/mon-espace") ?? false;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: WELCOME }]);
   const [input, setInput] = useState("");
@@ -44,7 +47,9 @@ export default function ChatWidget() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Assistant HBC-RH"
-        className="fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-hbc-lg transition-transform hover:scale-105"
+        className={`fixed right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-hbc-lg transition-transform hover:scale-105 ${
+          onLearner ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-5" : "bottom-5"
+        }`}
       >
         <i className={`bx ${open ? "bx-x" : "bx-message-dots"} text-3xl`} />
       </button>

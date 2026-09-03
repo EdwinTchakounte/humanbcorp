@@ -157,6 +157,10 @@ class Section(Abstract):
         CONTACT = "contact", "Contact"
         CTA = "cta", "Appel à l'action"
         RICHTEXT = "richtext", "Texte riche"
+        # Bloc de tuiles alimenté EN DIRECT par le catalogue : une box par
+        # catégorie réellement présente dans les formations publiées. Contrairement
+        # à `services` (cartes saisies à la main), rien à tenir à jour ici.
+        CATEGORIES = "categories", "Formations par catégorie (en direct)"
 
     page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name="sections")
     type = models.CharField(max_length=20, choices=Type.choices, default=Type.RICHTEXT)

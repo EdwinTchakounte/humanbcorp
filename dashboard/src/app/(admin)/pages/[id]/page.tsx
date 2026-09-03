@@ -8,6 +8,10 @@ import { useToast } from "@/components/Toast";
 import SectionEditor from "@/components/SectionEditor";
 import type { Page, Section } from "@/lib/types";
 
+// URL publique de la vitrine : sert le lien « Voir sur le site » pour vérifier
+// d'un clic que la page (et ses images) s'affichent bien côté public.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:4401";
+
 export default function PageEditor({ params }: { params: { id: string } }) {
   const toast = useToast();
   const id = params.id;
@@ -45,7 +49,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
         method: "PATCH",
         body: {
           title: page.title, title_en: page.title_en, nav_label: page.nav_label,
-          nav_label_en: page.nav_label_en, show_in_nav: page.show_in_nav,
+          nav_label_en: page.nav_label_en,
           meta_title: page.meta_title, meta_title_en: page.meta_title_en,
           meta_description: page.meta_description, meta_description_en: page.meta_description_en,
         },
@@ -69,6 +73,23 @@ export default function PageEditor({ params }: { params: { id: string } }) {
     } catch {
       setPage((p) => (p ? { ...p, is_active: prev } : p));
       toast.error("Impossible de changer la publication de la page.");
+    }
+  }
+
+  // Présence au menu : bascule indépendante de la publication, enregistrée tout
+  // de suite. Auparavant cette option était enfouie dans l'accordéon « Réglages &
+  // SEO » replié par défaut : on publiait la page sans jamais voir la case, d'où
+  // « page visible mais absente du menu ». Elle est désormais à côté de la
+  // publication.
+  async function toggleNav(v: boolean) {
+    if (!page) return;
+    const prev = page.show_in_nav;
+    setPage((p) => (p ? { ...p, show_in_nav: v } : p));
+    try {
+      await api(`/cms/pages/${page.id}/`, { method: "PATCH", body: { show_in_nav: v } });
+    } catch {
+      setPage((p) => (p ? { ...p, show_in_nav: prev } : p));
+      toast.error("Impossible de changer la présence au menu.");
     }
   }
 
@@ -108,7 +129,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-2 flex flex-wrap items-center gap-3">
         <Link href="/" className="btn-ghost">
           <i className="bx bx-arrow-back" />
         </Link>
@@ -116,12 +137,34 @@ export default function PageEditor({ params }: { params: { id: string } }) {
           <h1 className="text-2xl">{page.title}</h1>
           <p className="text-sm text-muted">/{page.slug === "accueil" ? "" : page.slug}</p>
         </div>
+        <a
+          href={`${SITE_URL}${page.slug === "accueil" ? "" : `/${page.slug}`}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-ghost"
+          title="Ouvrir la page sur le site public"
+        >
+          <i className="bx bx-link-external" /> Voir sur le site
+        </a>
+        {/* Deux bascules DISTINCTES : « Publiée » rend la page accessible sur le
+            site ; « Dans le menu » l'ajoute à la barre de navigation. Une page
+            peut être publiée sans figurer au menu, et inversement. */}
         <Toggle
           checked={page.is_active}
           onChange={togglePublish}
           label={page.is_active ? "Publiée" : "Brouillon"}
         />
+        <Toggle
+          checked={page.show_in_nav}
+          onChange={toggleNav}
+          label={page.show_in_nav ? "Dans le menu" : "Hors menu"}
+        />
       </div>
+      <p className="mb-6 text-xs text-muted">
+        <strong>Publiée</strong> : la page est accessible sur le site (par son URL et son contenu).{" "}
+        <strong>Dans le menu</strong> : elle apparaît en plus dans la barre de navigation.{" "}
+        Les changements de contenu ou d&apos;image se reflètent sur le site en une minute environ.
+      </p>
 
       {/* Métadonnées de la page */}
       <div className="card mb-6">
@@ -144,10 +187,6 @@ export default function PageEditor({ params }: { params: { id: string } }) {
               <TextArea label="Meta description (FR)" value={page.meta_description} onChange={(v) => setP("meta_description", v)} rows={2} />
               <TextArea label="Meta description (EN)" value={page.meta_description_en} onChange={(v) => setP("meta_description_en", v)} rows={2} />
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={page.show_in_nav} onChange={(e) => setP("show_in_nav", e.target.checked)} />
-              Afficher dans le menu
-            </label>
             <div className="flex justify-end">
               <button className="btn-brand" onClick={saveMeta} disabled={savingMeta || !metaDirty}>
                 {savingMeta ? "Enregistrement…" : metaDirty ? "Enregistrer" : "Enregistré"}

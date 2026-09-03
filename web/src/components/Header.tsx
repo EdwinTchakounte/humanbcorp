@@ -14,6 +14,11 @@ const T = {
 // Liens statiques vers des routes applicatives (hors CMS) : catalogue, carrières…
 type StaticLink = { fr: string; en: string; href: string };
 
+// Routes « espace » (application, pas vitrine) : la barre marketing y laisse la
+// place au chrome d'espace (header interne + barre de navigation basse) rendu par
+// LearnerSpace. Même liste que ConditionalFooter.
+const ESPACE_PREFIXES = ["/mon-espace"];
+
 // Regroupement en 4 points max (déroulants).
 const GROUPS: {
   fr: string;
@@ -75,6 +80,15 @@ export default function Header({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Dans l'espace apprenant, la barre marketing disparaît au profit du chrome
+  // d'espace (rendu par LearnerSpace). Le test vient APRÈS les hooks — les
+  // appeler conditionnellement casserait leur ordre — mais AVANT le calcul du
+  // menu vitrine, inutile ici.
+  const dansEspace = ESPACE_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith("/en" + p)
+  );
+  if (dansEspace) return null;
+
   const bySlug = (slug: string) => nav.find((n) => n.slug === slug);
   const href = (slug: string) => (slug === "accueil" ? prefix || "/" : `${prefix}/${slug}`);
   // Liens statiques (catalogue, carrières…) : préfixés par la langue, sinon le
@@ -86,6 +100,26 @@ export default function Header({
 
   const toggleLangHref =
     lang === "en" ? pathname.replace(/^\/en/, "") || "/" : pathname === "/" ? "/en" : `/en${pathname}`;
+
+  // Pages du CMS non prévues par les entrées ci-dessus.
+  //
+  // La barre était une liste EN DUR : créer une page dans le dashboard et la
+  // rendre visible (`show_in_nav`) ne la faisait apparaître nulle part — elle
+  // n'était liée que depuis le pied de page. On ajoute ici ce que le CMS déclare
+  // et que la barre ne couvre pas déjà. Au-delà de deux, elles passent sous
+  // « Plus » : c'est la largeur de la barre qui décide, pas le nombre de pages.
+  const slugsCouverts = new Set(
+    GROUPS.flatMap((g) => [
+      g.slug,
+      ...(g.children ?? []),
+      // Les liens statiques comptent aussi (ex. /blog existe comme page CMS ET
+      // comme route) : sans ça une page apparaîtrait deux fois.
+      ...(g.extra ?? []).map((x) => x.href.split("/").filter(Boolean)[0]),
+    ]).filter(Boolean) as string[]
+  );
+  const pagesLibres = nav.filter((n) => !slugsCouverts.has(n.slug));
+  const pagesInline = pagesLibres.length <= 2 ? pagesLibres : [];
+  const pagesRepliees = pagesLibres.length > 2 ? pagesLibres : [];
 
   return (
     <header
@@ -167,6 +201,32 @@ export default function Header({
               </div>
             );
           })}
+          {pagesInline.map((n) => (
+            <Link key={n.slug} href={href(n.slug)} data-active={isActive(n.slug)} className="nav-link">
+              {n.nav_label}
+            </Link>
+          ))}
+          {pagesRepliees.length > 0 && (
+            <div className="group relative">
+              <button className="nav-link flex items-center gap-1 group-hover:text-accent">
+                {lang === "en" ? "More" : "Plus"}
+                <i className="bx bx-chevron-down text-base transition-transform group-hover:rotate-180" />
+              </button>
+              <div className="invisible absolute right-0 top-full min-w-[210px] translate-y-1 rounded-xl border border-line bg-white p-2 opacity-0 shadow-hbc transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                {pagesRepliees.map((n) => (
+                  <Link
+                    key={n.slug}
+                    href={href(n.slug)}
+                    className={`block rounded-lg px-3 py-2 text-sm ${
+                      isActive(n.slug) ? "bg-brand-soft text-accent" : "text-brand-deep hover:bg-brand-soft"
+                    }`}
+                  >
+                    {n.nav_label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           <Link
             href={toggleLangHref}
             className="ml-1 rounded-md border border-line px-3 py-1 font-heading text-xs font-semibold text-brand-deep transition-colors hover:border-brand hover:text-brand"
@@ -276,6 +336,18 @@ export default function Header({
               </div>
             );
           })}
+          {pagesLibres.map((n) => (
+            <Link
+              key={n.slug}
+              href={href(n.slug)}
+              onClick={() => setOpen(false)}
+              className={`flex items-center rounded-xl px-4 py-3 font-heading font-semibold transition-colors ${
+                isActive(n.slug) ? "bg-brand-soft text-accent" : "text-brand-deep hover:bg-brand-soft/60"
+              }`}
+            >
+              {n.nav_label}
+            </Link>
+          ))}
         </nav>
 
         <div className="shrink-0 border-t border-hairline px-4 py-4 pb-safe">

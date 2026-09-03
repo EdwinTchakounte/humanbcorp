@@ -263,9 +263,16 @@ export interface LearnerFormation {
 export interface MySpace {
   learner: { name: string; email: string };
   formations: LearnerFormation[];
+  // Agenda agrégé : toutes les séances de toutes les formations, pour l'onglet
+  // « Calendrier ». Chaque créneau porte la formation dont il relève.
+  agenda: AgendaEvent[];
   // URL d'abonnement iCalendar : collée dans Google Agenda, elle synchronise
   // les séances et suit leurs déplacements.
   agenda_url: string;
+}
+export interface AgendaEvent extends ScheduleEvent {
+  publication_id: number;
+  publication_title: string;
 }
 export interface QuizOption {
   id: number;

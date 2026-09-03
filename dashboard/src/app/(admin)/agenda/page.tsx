@@ -22,8 +22,9 @@ function toLocalInput(iso: string) {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
-type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; publication: string; seance: string };
-const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", publication: "", seance: "" };
+type Draft = { id?: number; title: string; description: string; start_time: string; end_time: string; publication: string; seance: string; apprenants: number[]; formateurs: number[] };
+const EMPTY: Draft = { title: "", description: "", start_time: "", end_time: "", publication: "", seance: "", apprenants: [], formateurs: [] };
+type Membre = { id: number; name: string; email: string };
 
 const MEETING_TYPE_OPTIONS = [
   { value: "0", label: "Google Meet" },
@@ -31,6 +32,58 @@ const MEETING_TYPE_OPTIONS = [
   { value: "2", label: "Présentiel" },
 ];
 type MeetDraft = { id?: number; event: string; m_type: string; link_url: string };
+
+/** Sélecteur de membres en chips : rien de coché = tout le monde. */
+function MembreSelect({
+  titre,
+  membres,
+  selection,
+  onChange,
+}: {
+  titre: string;
+  membres: Membre[];
+  selection: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const tous = selection.length === 0;
+  const toggle = (id: number) =>
+    onChange(selection.includes(id) ? selection.filter((x) => x !== id) : [...selection, id]);
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-xs font-semibold text-brand-deep">{titre}</span>
+        <span className="text-[11px] text-muted">
+          {tous ? "Tout le monde" : `${selection.length} sélectionné(s)`}
+          {!tous && (
+            <button type="button" onClick={() => onChange([])} className="ml-2 font-medium text-accent">
+              tout
+            </button>
+          )}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {membres.map((m) => {
+          const on = selection.includes(m.id);
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => toggle(m.id)}
+              title={m.email}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${
+                on
+                  ? "border-accent bg-accent text-white"
+                  : "border-line bg-white text-brand-deep hover:border-brand"
+              }`}
+            >
+              {on && <i className="bx bx-check" />} {m.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function AgendaPage() {
   const { isAdmin, canWrite } = useAuth();
@@ -52,6 +105,17 @@ export default function AgendaPage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [parts, setParts] = useState<{ event: EventItem; list: { id: number; name: string; email: string }[] } | null>(null);
+  // Membres sélectionnables (apprenants + formateurs) de la session choisie, pour
+  // le ciblage d'un créneau (Point 4). Rechargés quand la session change.
+  const [membres, setMembres] = useState<{ apprenants: Membre[]; formateurs: Membre[] }>({ apprenants: [], formateurs: [] });
+  // Duplication d'un créneau (Point 5) : même date/heure, jour ou semaine suivante.
+  const [dup, setDup] = useState<{
+    source: EventItem;
+    quand: "meme" | "jour" | "semaine" | "date";
+    repetitions: string;
+    start_time: string;
+    end_time: string;
+  } | null>(null);
 
   async function showParticipants(e: EventItem) {
     setParts({ event: e, list: [] });
@@ -120,6 +184,27 @@ export default function AgendaPage() {
     };
   }, [draft?.publication, pubs]);
 
+  // Membres de la session choisie : liste des apprenants confirmés + formateurs
+  // parmi lesquels cocher tout ou partie. Session vide → pas de ciblage possible.
+  useEffect(() => {
+    const pubId = draft?.publication;
+    if (!pubId) {
+      setMembres({ apprenants: [], formateurs: [] });
+      return;
+    }
+    let annule = false;
+    api<{ apprenants: Membre[]; formateurs: Membre[] }>(
+      `/modules/events/session-membres/?publication=${pubId}`
+    )
+      .then((m) => {
+        if (!annule) setMembres(m ?? { apprenants: [], formateurs: [] });
+      })
+      .catch(() => setMembres({ apprenants: [], formateurs: [] }));
+    return () => {
+      annule = true;
+    };
+  }, [draft?.publication]);
+
   useEffect(() => {
     load().finally(() => setLoading(false));
   }, []);
@@ -148,6 +233,8 @@ export default function AgendaPage() {
       end_time: toLocalInput(e.end_time),
       publication: e.publication_id ? String(e.publication_id) : "",
       seance: e.seance ? String(e.seance) : "",
+      apprenants: e.apprenants ?? [],
+      formateurs: e.formateurs ?? [],
     });
   }
 
@@ -167,6 +254,9 @@ export default function AgendaPage() {
         end_time: new Date(draft.end_time).toISOString(),
         publication: draft.publication ? Number(draft.publication) : null,
         seance: draft.seance ? Number(draft.seance) : null,
+        // Vides = toute la cohorte / tous les formateurs (cas courant).
+        apprenants: draft.apprenants,
+        formateurs: draft.formateurs,
       };
       if (draft.id) await api(`/modules/events/${draft.id}/`, { method: "PATCH", body });
       else await api("/modules/events/", { method: "POST", body });
@@ -183,6 +273,32 @@ export default function AgendaPage() {
     if (!confirm(`Supprimer l'événement « ${e.title} » ?`)) return;
     await api(`/modules/events/${e.id}/`, { method: "DELETE" });
     setEvents((xs) => xs.filter((x) => x.id !== e.id));
+  }
+
+  function openDup(e: EventItem) {
+    setErr("");
+    // Défaut : la semaine suivante, une fois — le cas le plus courant.
+    setDup({ source: e, quand: "semaine", repetitions: "1", start_time: toLocalInput(e.start_time), end_time: toLocalInput(e.end_time) });
+  }
+  async function dupliquer() {
+    if (!dup) return;
+    setSaving(true);
+    setErr("");
+    try {
+      const body =
+        dup.quand === "date"
+          ? { start_time: new Date(dup.start_time).toISOString(), end_time: new Date(dup.end_time).toISOString() }
+          : dup.quand === "meme"
+          ? { decalage: "aucun" }
+          : { decalage: dup.quand, repetitions: Number(dup.repetitions) || 1 };
+      await api(`/modules/events/${dup.source.id}/dupliquer/`, { method: "POST", body });
+      await load();
+      setDup(null);
+    } catch (e) {
+      setErr(String(e).slice(0, 200));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -281,6 +397,9 @@ export default function AgendaPage() {
                         <>
                           <button onClick={() => openEdit(e)} className="btn-ghost" title="Éditer">
                             <i className="bx bx-edit" />
+                          </button>
+                          <button onClick={() => openDup(e)} className="btn-ghost" title="Dupliquer ce créneau">
+                            <i className="bx bx-copy" />
                           </button>
                           <button onClick={() => del(e)} className="btn-danger" title="Supprimer">
                             <i className="bx bx-trash" />
@@ -412,6 +531,29 @@ export default function AgendaPage() {
                 Le programme de cette session n&apos;a pas encore de séance.
               </p>
             )}
+
+            {/* Ciblage (Point 4) : cocher tout ou partie. Rien de coché = tout le
+                monde — le cas courant d'une séance ordinaire. */}
+            {draft.publication && (membres.apprenants.length > 0 || membres.formateurs.length > 0) && (
+              <div className="space-y-3 rounded-lg border border-line bg-brand-soft/20 p-3">
+                {membres.apprenants.length > 0 && (
+                  <MembreSelect
+                    titre="Apprenants concernés"
+                    membres={membres.apprenants}
+                    selection={draft.apprenants}
+                    onChange={(ids) => setDraft({ ...draft, apprenants: ids })}
+                  />
+                )}
+                {membres.formateurs.length > 0 && (
+                  <MembreSelect
+                    titre="Formateurs concernés"
+                    membres={membres.formateurs}
+                    selection={draft.formateurs}
+                    onChange={(ids) => setDraft({ ...draft, formateurs: ids })}
+                  />
+                )}
+              </div>
+            )}
             {err && <p className="text-sm text-red-600">{err}</p>}
             {!isAdmin && (
               <p className="text-xs text-muted">
@@ -492,6 +634,77 @@ export default function AgendaPage() {
                 ))}
               </ul>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Modale duplication (Point 5) */}
+      <Modal
+        open={dup !== null}
+        title={dup ? `Dupliquer — ${dup.source.title}` : ""}
+        onClose={() => setDup(null)}
+        footer={
+          <>
+            <button onClick={() => setDup(null)} className="btn-ghost">Annuler</button>
+            <button onClick={dupliquer} disabled={saving} className="btn-brand">
+              {saving ? "Duplication…" : "Dupliquer"}
+            </button>
+          </>
+        }
+      >
+        {dup && (
+          <div className="space-y-3">
+            <p className="rounded-lg bg-brand-soft/40 p-3 text-xs text-muted">
+              La copie reprend <strong>tout</strong> : session, séance, rendez-vous visio,
+              ainsi que les apprenants et formateurs déjà sélectionnés. Seules les dates changent.
+            </p>
+            {(
+              [
+                { v: "semaine", label: "La semaine suivante", aide: "Même jour, même heure, +7 jours." },
+                { v: "jour", label: "Le jour suivant", aide: "Même heure, +1 jour." },
+                { v: "meme", label: "Aux mêmes date et heure", aide: "Un second créneau identique." },
+                { v: "date", label: "À une date précise", aide: "Vous choisissez le début et la fin." },
+              ] as const
+            ).map((o) => (
+              <label
+                key={o.v}
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
+                  dup.quand === o.v ? "border-accent bg-brand-soft/40" : "border-line hover:border-brand/50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="dup-quand"
+                  checked={dup.quand === o.v}
+                  onChange={() => setDup({ ...dup, quand: o.v })}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-brand-deep">{o.label}</span>
+                  <span className="block text-xs text-muted">{o.aide}</span>
+                </span>
+              </label>
+            ))}
+            {(dup.quand === "jour" || dup.quand === "semaine") && (
+              <TextField
+                label={`Nombre de copies (1 à 52) — ${dup.quand === "jour" ? "jours consécutifs" : "semaines consécutives"}`}
+                value={dup.repetitions}
+                onChange={(v) => setDup({ ...dup, repetitions: v.replace(/\D/g, "") })}
+              />
+            )}
+            {dup.quand === "date" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted">Début</label>
+                  <input type="datetime-local" className="input" value={dup.start_time} onChange={(e) => setDup({ ...dup, start_time: e.target.value })} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted">Fin</label>
+                  <input type="datetime-local" className="input" value={dup.end_time} onChange={(e) => setDup({ ...dup, end_time: e.target.value })} />
+                </div>
+              </div>
+            )}
+            {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
         )}
       </Modal>

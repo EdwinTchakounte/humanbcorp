@@ -44,6 +44,20 @@ def is_teacher(user):
     return user.groups.filter(name__iexact="Teacher").exists()
 
 
+# Groupe **Manager** : au-delà du formateur, il peut définir les formations et les
+# événements rattachés, jusqu'au suivi des apprenants. Il ne touche NI au contenu
+# du site (CMS), NI aux réglages plateforme (audit, monitoring, RH) — c'est un
+# pilote pédagogique, pas un super-admin.
+MANAGER_GROUP = "Manager"
+
+
+def is_manager(user):
+    """Vrai si membre du groupe « Manager »."""
+    if not (user and user.is_authenticated):
+        return False
+    return user.groups.filter(name__iexact=MANAGER_GROUP).exists()
+
+
 # Groupe marquant un **apprenant** (a souscrit à une formation). Simple étiquette :
 # il ne confère aucun accès dashboard (module_is_accessible le renvoie à False),
 # il sert à distinguer un apprenant d'un membre du staff au login et à orienter
@@ -99,11 +113,11 @@ def has_app_write(user, app_label):
 #   périmètre restreint à leurs formations affecté au niveau des querysets.
 MODULES = [
     {"key": "cms",         "label": "Contenu du site",       "icon": "bx-layout",       "native": True,  "path": "/",        "admin_only": True},
-    {"key": "agenda",      "label": "Agenda & Événements",   "icon": "bx-calendar",     "native": True,  "path": "/agenda",  "app": "calendarapp", "teacher": True},
-    {"key": "formations",  "label": "Formations",            "icon": "bx-book",         "native": True,  "path": "/formations", "app": "lessonapp", "teacher": True},
-    {"key": "suivi",       "label": "Suivi apprenants",      "icon": "bx-line-chart",   "native": True,  "path": "/suivi",   "teacher": True},
-    {"key": "publications","label": "Publications",          "icon": "bx-news",         "native": True,  "path": "/publications", "app": "contents"},
-    {"key": "inscriptions","label": "Inscriptions & Paniers","icon": "bx-cart",         "native": True,  "path": "/inscriptions", "app": "bucket"},
+    {"key": "agenda",      "label": "Agenda & Événements",   "icon": "bx-calendar",     "native": True,  "path": "/agenda",  "app": "calendarapp", "teacher": True, "manager": True},
+    {"key": "formations",  "label": "Formations",            "icon": "bx-book",         "native": True,  "path": "/formations", "app": "lessonapp", "teacher": True, "manager": True},
+    {"key": "suivi",       "label": "Suivi apprenants",      "icon": "bx-line-chart",   "native": True,  "path": "/suivi",   "teacher": True, "manager": True},
+    {"key": "publications","label": "Publications",          "icon": "bx-news",         "native": True,  "path": "/publications", "app": "contents", "manager": True},
+    {"key": "inscriptions","label": "Inscriptions & Paniers","icon": "bx-cart",         "native": True,  "path": "/inscriptions", "app": "bucket", "manager": True},
     {"key": "paiements",   "label": "Paiements",             "icon": "bx-credit-card",  "native": True,  "path": "/paiements", "app": "paiement"},
     {"key": "messagerie",  "label": "Messagerie",            "icon": "bx-chat",         "native": True,  "path": "/messagerie", "app": "chat"},
     # RH / recrutement : outil PLATEFORME du super-admin, hors espaces (non-tenant).
@@ -127,6 +141,11 @@ def module_is_accessible(user, module):
         return is_admin(user)
     if is_admin(user):
         return True
+    # Manager (pilote pédagogique) : périmètre aux modules « manager »
+    # (formations/agenda/suivi/publications/inscriptions), testé avant Teacher
+    # car un compte peut cumuler les deux et le Manager est plus large.
+    if is_manager(user):
+        return bool(module.get("manager"))
     # Formateur (auteur limité) : périmètre STRICT aux modules « teacher »
     # (formations/agenda/suivi), indépendamment des permissions Django héritées
     # du groupe Teacher — on ne veut pas lui exposer paiements/inscriptions/etc.
@@ -149,6 +168,8 @@ def module_can_write(user, module):
         return is_admin(user)
     if is_admin(user):
         return True
+    if is_manager(user):
+        return bool(module.get("manager"))
     if is_teacher(user):
         return bool(module.get("teacher"))
     app = module.get("app")
@@ -185,6 +206,7 @@ def profile_payload(user):
         "full_name": (user.get_full_name() or user.username),
         "email": user.email,
         "is_admin": is_admin(user),
+        "is_manager": is_manager(user),
         "is_teacher": is_teacher(user),
         "is_recruiter": is_recruiter(user),
         "is_staff": user.is_staff,

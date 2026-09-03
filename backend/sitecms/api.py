@@ -62,6 +62,7 @@ from .serializers import (
     CardSerializer,
     ContactSerializer,
     MediaAssetSerializer,
+    media_usages,
     NavItemSerializer,
     PagePublicSerializer,
     PageSerializer,
@@ -400,6 +401,26 @@ class MediaAssetViewSet(_BaseCmsViewSet):
     serializer_class = MediaAssetSerializer
     queryset = MediaAsset.objects.filter(is_deleted=False).order_by("order", "-created_at")
 
+    def destroy(self, request, *args, **kwargs):
+        """Supprimer une image utilisée vide silencieusement logos, blocs, etc.
+        (toutes les FK sont en SET_NULL). On avertit donc, et on exige une
+        confirmation explicite (`?force=true`) quand l'image sert quelque part.
+        """
+        media = self.get_object()
+        usages = media_usages(media)
+        if usages and request.query_params.get("force") != "true":
+            total = sum(u["count"] for u in usages)
+            return Response(
+                {
+                    "detail": f"Cette image est utilisée à {total} endroit(s). "
+                              "Confirmez pour la supprimer (les emplacements seront vidés).",
+                    "usages": usages,
+                    "requires_confirmation": True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 class ArticleViewSet(_BaseCmsViewSet):
     serializer_class = ArticleSerializer
@@ -587,13 +608,180 @@ class EventViewSet(_ModuleViewSet):
             self.request.user, Publication.objects.filter(pk=publication_id).first()
         )
 
+    def _assert_peut_planifier(self, publication):
+        """Le régime de planification de la cohorte autorise-t-il ce compte ?
+
+        Deuxième barrière, distincte du périmètre : `_assert_event_theme_access`
+        répond « cette cohorte est-elle la sienne ? », celle-ci répond « dans
+        cette cohorte, a-t-il le droit de POSER un créneau ? ». Une cohorte dont
+        le plan est arrêté par l'administration est en lecture seule pour son
+        propre formateur (cf. `Publication.peut_planifier`).
+
+        Un créneau sans cohorte est un rendez-vous personnel : son auteur en
+        dispose librement, il n'engage personne d'autre.
+        """
+        from rest_framework.exceptions import PermissionDenied
+
+        if publication is None:
+            return
+        if not publication.peut_planifier(self.request.user):
+            raise PermissionDenied(
+                "Le calendrier de cette session est arrêté par l'administration : "
+                "vous pouvez le consulter, pas le modifier."
+            )
+
     def perform_create(self, serializer):
         self._assert_event_theme_access(serializer)
+        pub_id = serializer.validated_data.get("publication")
+        self._assert_peut_planifier(
+            Publication.objects.filter(pk=pub_id).first() if pub_id else None
+        )
         serializer.save(user=serializer.validated_data.get("user") or self.request.user)
 
     def perform_update(self, serializer):
         self._assert_event_theme_access(serializer)
+        # On contrôle la cohorte d'où vient le créneau ET celle où il va.
+        deja = serializer.instance.publication_set.first()
+        self._assert_peut_planifier(deja)
+        pub_id = serializer.validated_data.get("publication")
+        if pub_id:
+            self._assert_peut_planifier(Publication.objects.filter(pk=pub_id).first())
         serializer.save()
+
+    @action(detail=False, methods=["get"], url_path="session-membres")
+    def session_membres(self, request):
+        """Membres sélectionnables d'une session (`?publication=<id>`).
+
+        Alimente l'UI de création d'événement : la liste des apprenants
+        confirmés et des formateurs animateurs de la cohorte, parmi lesquels
+        cocher tout ou partie (Point 4). Sans sélection = toute la cohorte.
+        """
+        from contents.models import Publication
+        from bucket.models import Inscription
+
+        pub_id = request.query_params.get("publication")
+        pub = Publication.objects.filter(pk=pub_id).first() if pub_id else None
+        if not pub:
+            return Response({"apprenants": [], "formateurs": []})
+        # Périmètre : on ne divulgue les membres que d'une cohorte accessible.
+        _assert_publication_access(request.user, pub)
+
+        def fiche(u):
+            return {"id": u.id, "name": u.get_full_name() or u.first_name or u.username, "email": u.email}
+
+        seen, apprenants = set(), []
+        for ins in (
+            Inscription.objects.filter(publication=pub, status=Inscription.CONFIRMED, is_deleted=False)
+            .select_related("participant").order_by("participant__first_name")
+        ):
+            u = ins.participant
+            if not u or u.id in seen:
+                continue
+            seen.add(u.id)
+            apprenants.append(fiche(u))
+        formateurs = [fiche(u) for u in pub.instructors.all().order_by("first_name")]
+        return Response({"apprenants": apprenants, "formateurs": formateurs})
+
+    @action(detail=True, methods=["post"], url_path="dupliquer")
+    def dupliquer(self, request, pk=None):
+        """Duplique un créneau en conservant session, séance, apprenants,
+        formateurs et rendez-vous visio (Point 5).
+
+        Trois façons de choisir les dates :
+          - `start_time`(+`end_time`) : dates explicites, une copie ;
+          - `decalage`=`aucun` : copie à l'identique (même date/heure) ;
+          - `decalage`=`jour`|`semaine` (+`repetitions` ou `jusqu_au`) : série
+            décalée d'un jour / d'une semaine.
+        """
+        from datetime import timedelta
+        from django.db import transaction
+        from django.utils.dateparse import parse_datetime
+        from rest_framework.exceptions import ValidationError
+        from calendarapp.models import Meeting
+
+        MAX_COPIES = 52
+        source = self.get_object()
+        pub = source.publication_set.first()
+        _assert_publication_access(request.user, pub)  # même périmètre qu'une création
+        self._assert_peut_planifier(pub)  # et même régime de planification
+        d = request.data or {}
+
+        def _date(brut):
+            val = parse_datetime(str(brut or ""))
+            if val is not None and timezone.is_naive(val):
+                val = timezone.make_aware(val, timezone.get_current_timezone())
+            return val
+
+        if d.get("start_time"):
+            debut = _date(d.get("start_time"))
+            fin = _date(d.get("end_time"))
+            if debut is None:
+                raise ValidationError({"start_time": "Date de début invalide."})
+            if fin is None:
+                fin = debut + (source.end_time - source.start_time)
+            if fin <= debut:
+                raise ValidationError({"end_time": "La fin doit suivre le début."})
+            creneaux = [(debut, fin)]
+        else:
+            pas_nom = (d.get("decalage") or "").strip().lower()
+            if pas_nom in ("", "aucun"):
+                decalages = [timedelta(0)]
+            elif pas_nom in ("jour", "semaine"):
+                pas = timedelta(days=1 if pas_nom == "jour" else 7)
+                if d.get("jusqu_au"):
+                    limite = _date(d.get("jusqu_au"))
+                    if limite is None:
+                        raise ValidationError({"jusqu_au": "Date invalide."})
+                    decalages, courant, garde = [], source.start_time + pas, 0
+                    while courant <= limite and garde < MAX_COPIES:
+                        decalages.append(courant - source.start_time)
+                        courant += pas
+                        garde += 1
+                    if not decalages:
+                        raise ValidationError({"jusqu_au": "Cette date ne laisse la place à aucune copie."})
+                else:
+                    try:
+                        n = int(d.get("repetitions") or 1)
+                    except (TypeError, ValueError):
+                        raise ValidationError({"repetitions": "Nombre attendu."})
+                    if not 1 <= n <= MAX_COPIES:
+                        raise ValidationError({"repetitions": f"Entre 1 et {MAX_COPIES}."})
+                    decalages = [pas * (i + 1) for i in range(n)]
+            else:
+                raise ValidationError({"decalage": "Valeurs admises : aucun, jour, semaine."})
+            creneaux = [(source.start_time + e, source.end_time + e) for e in decalages]
+
+        apprenants = list(source.apprenants.all())
+        formateurs = list(source.formateurs.all())
+        rdv = list(Meeting.objects.filter(event=source, is_deleted=False))
+        copies = []
+        with transaction.atomic():
+            for debut_copie, fin_copie in creneaux:
+                copie = Event.objects.create(
+                    user=source.user,
+                    title=source.title,
+                    description=source.description,
+                    start_time=debut_copie,
+                    end_time=fin_copie,
+                    seance=source.seance,
+                )
+                if apprenants:
+                    copie.apprenants.set(apprenants)
+                if formateurs:
+                    copie.formateurs.set(formateurs)
+                if pub is not None:
+                    pub.events.add(copie)
+                for m in rdv:
+                    Meeting.objects.create(event=copie, m_type=m.m_type, link_url=m.link_url)
+                copies.append(copie)
+
+        return Response(
+            {
+                "detail": f"{len(copies)} créneau(x) créé(s).",
+                "events": self.get_serializer(copies, many=True).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get"], url_path="participants")
     def participants(self, request, pk=None):

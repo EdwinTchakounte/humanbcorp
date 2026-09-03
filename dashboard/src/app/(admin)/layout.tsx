@@ -87,7 +87,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 profile?.is_admin ? "bg-accent/10 text-accent" : "bg-brand-soft text-brand"
               }`}
             >
-              {profile?.is_admin ? "Administrateur" : profile?.is_teacher ? "Formateur" : "Apprenant"}
+              {profile?.is_admin
+                ? "Administrateur"
+                : profile?.is_manager
+                ? "Manager"
+                : profile?.is_teacher
+                ? "Formateur"
+                : "Apprenant"}
             </span>
           </div>
         </header>

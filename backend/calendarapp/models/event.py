@@ -47,10 +47,64 @@ class Event(Abstract):
         "lessonapp.Seance", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="creneaux",
     )
-    
-    
-     
+
+    # --- Destinataires du créneau -----------------------------------------
+    # Vides = TOUTE la cohorte rattachée / tous les animateurs de la session.
+    # C'est le cas courant — une séance ordinaire concerne le groupe entier — et
+    # on ne veut pas obliger à cocher trente cases pour l'exprimer. Renseignés,
+    # ces champs RESTREIGNENT : seuls ces apprenants voient le créneau dans leur
+    # espace / agenda, et seuls ces formateurs sont concernés. Cela couvre le
+    # rattrapage, l'oral individuel, le demi-groupe.
+    apprenants = models.ManyToManyField(
+        User, blank=True, related_name="creneaux_cibles",
+        help_text="Vide = tous les apprenants inscrits à la session.",
+    )
+    formateurs = models.ManyToManyField(
+        User, blank=True, related_name="creneaux_animes",
+        help_text="Vide = tous les formateurs qui animent la session.",
+    )
+
     objects = EventManager()
+
+    # --- Résolution des destinataires --------------------------------------
+    def publication(self):
+        """La cohorte rattachée à ce créneau (reverse du M2M `Publication.events`)."""
+        return self.publication_set.first()
+
+    def apprenants_cibles(self):
+        """Apprenants réellement concernés : la sélection, sinon toute la cohorte.
+
+        Toujours passer par ici plutôt que de relire `Inscription` directement :
+        c'est le seul endroit qui applique la restriction, et l'oublier
+        exposerait un créneau de demi-groupe à toute la promotion.
+        """
+        from bucket.models import Inscription
+
+        choisis = self.apprenants.all()
+        if choisis.exists():
+            return choisis.order_by("first_name", "username")
+        pub = self.publication()
+        if pub is None:
+            return User.objects.none()
+        return (
+            User.objects.filter(
+                inscription__publication=pub,
+                inscription__status=Inscription.CONFIRMED,
+                inscription__is_deleted=False,
+            )
+            .distinct()
+            .order_by("first_name", "username")
+        )
+
+    def formateurs_cibles(self):
+        """Formateurs concernés : la sélection, sinon les animateurs de la session."""
+        choisis = self.formateurs.all()
+        if choisis.exists():
+            return choisis.order_by("first_name", "username")
+        pub = self.publication()
+        if pub is None:
+            return User.objects.none()
+        return pub.instructors.all().order_by("first_name", "username")
 
     def __str__(self):
         return self.title

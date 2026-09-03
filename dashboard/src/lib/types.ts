@@ -1,6 +1,6 @@
 export type SectionType =
   | "hero" | "stats" | "about" | "services" | "gallery"
-  | "milestone" | "features" | "contact" | "cta" | "richtext";
+  | "milestone" | "features" | "contact" | "cta" | "richtext" | "categories";
 
 export interface Media {
   id: number;
@@ -13,6 +13,8 @@ export interface Media {
   height: number | null;
   order: number;
   is_active: boolean;
+  /** Où l'image est utilisée (blocs, cartes, pages, articles, réglages). */
+  usages?: { label: string; count: number }[];
 }
 
 export interface Card {
@@ -108,6 +110,7 @@ export interface Profile {
   full_name: string;
   email: string;
   is_admin: boolean;
+  is_manager?: boolean;
   is_teacher?: boolean;
   is_recruiter?: boolean;
   is_staff: boolean;
@@ -138,6 +141,14 @@ export interface EventItem {
   publication_id: number | null;
   publication_title: string | null;
   participants_count: number;
+  // Ciblage : ids sélectionnés (vides = toute la cohorte / tous les formateurs),
+  // + détails et booléens « tous » pour l'affichage.
+  apprenants?: number[];
+  formateurs?: number[];
+  apprenants_detail?: { id: number; name: string; email: string }[];
+  formateurs_detail?: { id: number; name: string; email: string }[];
+  tous_apprenants?: boolean;
+  tous_formateurs?: boolean;
   // Séance du programme couverte par ce créneau (« la séance 3 a lieu le 12 mars »).
   seance: number | null;
   seance_title?: string | null;
@@ -393,6 +404,7 @@ export const SECTION_TYPES: { value: SectionType; label: string }[] = [
   { value: "stats", label: "Statistiques" },
   { value: "about", label: "À propos" },
   { value: "services", label: "Services / cartes" },
+  { value: "categories", label: "Formations par catégorie (en direct)" },
   { value: "features", label: "Pourquoi nous / atouts" },
   { value: "gallery", label: "Galerie" },
   { value: "milestone", label: "Chiffres-clés" },

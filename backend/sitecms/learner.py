@@ -349,13 +349,18 @@ def acces_expire(inscription) -> bool:
     return fin is not None and timezone.now() > fin
 
 
-def build_schedule(publication):
+def build_schedule(publication, user=None):
     """Planning d'une **cohorte** : ses créneaux d'agenda et leurs visios.
 
     Le calendrier appartient à l'offre vendue (`Publication.events`), pas au
     programme (`Theme`) : deux sessions d'une même formation ont chacune leurs
     dates. Le rattachement historique par `EventTheme` faisait voir à chaque
     apprenant le planning de toutes les autres sessions, liens visio compris.
+
+    Quand `user` est fourni, on filtre au **ciblage** : un créneau restreint à
+    certains apprenants (`Event.apprenants`) ne remonte qu'à ceux-là. Vide = tout
+    le monde. C'est ce qui rend le demi-groupe / rattrapage / oral individuel
+    invisible aux autres.
     """
     from calendarapp.models import Meeting
 
@@ -363,8 +368,15 @@ def build_schedule(publication):
         publication.events.filter(is_deleted=False, is_active=True)
         .exclude(is_test=True)  # is_test est nullable : exclude() couvre NULL et False
         .select_related("seance")
+        .prefetch_related("apprenants")
         .order_by("start_time")
     )
+    if user is not None:
+        events = [
+            ev for ev in events
+            # `all()` sur le prefetch : pas de requête par créneau.
+            if not ev.apprenants.all() or any(a.id == user.id for a in ev.apprenants.all())
+        ]
     # Une seule requête pour toutes les visios, au lieu d'une par créneau.
     meetings = {}
     for m in Meeting.objects.filter(event__in=events, is_deleted=False):
@@ -417,11 +429,17 @@ def _space_payload(request, user):
     )
     seen = set()
     formations = []
+    agenda = []  # tous les créneaux, toutes formations confondues (onglet Calendrier)
     for ins in inscriptions:
         pub = ins.publication
         if not pub or pub.id in seen:
             continue
         seen.add(pub.id)
+        # Agenda agrégé : on rattache chaque créneau à sa formation pour que
+        # l'apprenant sache, dans un calendrier unique, de quelle formation
+        # relève chaque séance.
+        for ev in build_schedule(pub, user):
+            agenda.append({**ev, "publication_id": pub.id, "publication_title": pub.title})
         # L'offre expirée reste listée (l'apprenant doit comprendre pourquoi elle
         # est fermée) mais son contenu n'est plus servi — cf. `my_formation`.
         fin = pub.fin_acces(depuis=ins.created_at)
@@ -460,6 +478,9 @@ def _space_payload(request, user):
             "has_account": user.has_usable_password(),
         },
         "formations": formations,
+        # Agenda agrégé, trié par date : alimente l'onglet « Calendrier » qui
+        # réunit les séances de toutes les formations en un seul endroit.
+        "agenda": sorted(agenda, key=lambda e: e["start_time"] or ""),
         # URL d'abonnement : l'apprenant la colle dans son agenda et ses séances
         # s'y synchronisent, y compris quand on les déplace.
         "agenda_url": learner_calendar_url(user),
@@ -503,7 +524,7 @@ def _formation_payload(request, user, publication_id):
         "publication_id": pub.id,
         "title": pub.title,
         "description": pub.description,
-        "schedule": build_schedule(pub),
+        "schedule": build_schedule(pub, user),
         "themes": themes,
     }, status.HTTP_200_OK
 

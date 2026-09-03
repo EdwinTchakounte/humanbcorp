@@ -3,6 +3,7 @@ import Hero from "@/components/sections/Hero";
 import Stats from "@/components/sections/Stats";
 import About from "@/components/sections/About";
 import Services from "@/components/sections/Services";
+import Categories from "@/components/sections/Categories";
 import Gallery from "@/components/sections/Gallery";
 import Milestone from "@/components/sections/Milestone";
 import Contact from "@/components/sections/Contact";
@@ -20,6 +21,8 @@ export default function SectionRenderer({ section }: { section: Section }) {
       return <About section={section} />;
     case "services":
       return <Services section={section} />;
+    case "categories":
+      return <Categories section={section} />;
     case "features":
       return <Services section={section} />;
     case "gallery":

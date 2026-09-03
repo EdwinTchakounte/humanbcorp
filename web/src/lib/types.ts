@@ -1,6 +1,6 @@
 export type SectionType =
   | "hero" | "stats" | "about" | "services" | "gallery"
-  | "milestone" | "features" | "contact" | "cta" | "richtext";
+  | "milestone" | "features" | "contact" | "cta" | "richtext" | "categories";
 
 export interface Media {
   id: number;

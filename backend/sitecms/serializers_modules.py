@@ -31,6 +31,12 @@ class EventSerializer(serializers.ModelSerializer):
     # Séance couverte : le contenu vient du programme, la date de la cohorte.
     seance_title = serializers.CharField(source="seance.title", read_only=True)
     seance_order = serializers.IntegerField(source="seance.order", read_only=True)
+    # Ciblage : listes brutes d'ids (écriture) + détails et booléens « tous »
+    # (lecture) pour l'UI. Vides = toute la cohorte / tous les animateurs.
+    apprenants_detail = serializers.SerializerMethodField()
+    formateurs_detail = serializers.SerializerMethodField()
+    tous_apprenants = serializers.SerializerMethodField()
+    tous_formateurs = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -39,12 +45,35 @@ class EventSerializer(serializers.ModelSerializer):
             "is_test", "is_active", "user", "user_name", "created_at",
             "publication", "publication_id", "publication_title", "participants_count",
             "seance", "seance_title", "seance_order",
+            "apprenants", "formateurs",
+            "apprenants_detail", "formateurs_detail",
+            "tous_apprenants", "tous_formateurs",
         ]
         read_only_fields = ["created_at", "user_name"]
         extra_kwargs = {
             "user": {"required": False},
             "description": {"required": False, "allow_blank": True},
+            "apprenants": {"required": False},
+            "formateurs": {"required": False},
         }
+
+    def _detail(self, users):
+        return [
+            {"id": u.id, "name": u.get_full_name() or u.username, "email": u.email}
+            for u in users
+        ]
+
+    def get_apprenants_detail(self, obj):
+        return self._detail(obj.apprenants.all())
+
+    def get_formateurs_detail(self, obj):
+        return self._detail(obj.formateurs.all())
+
+    def get_tous_apprenants(self, obj):
+        return not obj.apprenants.exists()
+
+    def get_tous_formateurs(self, obj):
+        return not obj.formateurs.exists()
 
     def validate(self, attrs):
         # Une séance n'a de sens que si la cohorte vend bien le programme qui la
@@ -66,7 +95,50 @@ class EventSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"seance": "Cette séance n'appartient pas au programme vendu par la session."}
             )
+        self._valider_ciblage(attrs)
         return attrs
+
+    def _valider_ciblage(self, attrs):
+        """Les personnes cochées doivent appartenir à la session ciblée.
+
+        Sans ce contrôle, cocher un id quelconque ferait remonter le nom et
+        l'e-mail de n'importe quel compte dans `apprenants_detail` — le ciblage
+        deviendrait un annuaire. On vérifie donc l'appartenance réelle.
+        """
+        apprenants = attrs.get("apprenants")
+        formateurs = attrs.get("formateurs")
+        if not apprenants and not formateurs:
+            return
+        pub_id = attrs.get("publication")
+        if pub_id is None and self.instance is not None:
+            deja = self.instance.publication_set.first()
+            pub_id = deja.id if deja else None
+        if pub_id is None:
+            raise serializers.ValidationError(
+                {"apprenants": "Rattachez d'abord ce créneau à une session pour cibler des personnes."}
+            )
+        from contents.models import Publication
+        from bucket.models import Inscription
+
+        pub = Publication.objects.filter(pk=pub_id).first()
+        if pub is None:
+            raise serializers.ValidationError({"publication": "Session introuvable."})
+        if apprenants:
+            inscrits = set(
+                Inscription.objects.filter(
+                    publication=pub, status=Inscription.CONFIRMED, is_deleted=False
+                ).values_list("participant_id", flat=True)
+            )
+            if any(u.id not in inscrits for u in apprenants):
+                raise serializers.ValidationError(
+                    {"apprenants": "Un apprenant sélectionné n'est pas inscrit à cette session."}
+                )
+        if formateurs:
+            animateurs = set(pub.instructors.values_list("id", flat=True))
+            if any(u.id not in animateurs for u in formateurs):
+                raise serializers.ValidationError(
+                    {"formateurs": "Un formateur sélectionné n'anime pas cette session."}
+                )
 
     def _publication(self, obj):
         # Reverse du M2M `Publication.events` (sans related_name).
@@ -337,6 +409,8 @@ class PublicationSerializer(serializers.ModelSerializer):
             "children_count", "events_count", "image", "image_url",
             "mode", "date_debut", "date_fin", "capacite", "acces_duree_mois",
             "places_restantes", "instructors", "instructors_detail",
+            # Régime de planification de l'agenda (qui pose les créneaux).
+            "agenda_planification",
             # Bascules d'affichage de la fiche publique et du flyer de partage.
             "show_price", "show_dates", "show_places", "show_categorie",
         ]

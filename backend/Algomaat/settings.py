@@ -405,9 +405,11 @@ if SENTRY_DSN:
 from datetime import timedelta
 
 REST_FRAMEWORK = {
+    # Classes instrumentées : mêmes règles d'auth, + relevé du temps de session
+    # (apps_coop.audit, Point 10). Aucun changement d'accès.
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "apps_coop.audit.auth.JWTAvecSuivi",
+        "apps_coop.audit.auth.SessionAvecSuivi",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",

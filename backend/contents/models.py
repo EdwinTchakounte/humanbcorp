@@ -87,6 +87,56 @@ class Publication(models.Model):
         "auth.User", blank=True, related_name="sessions_animees"
     )
 
+    # --- Régime de planification de l'agenda (RBAC, Point 8) ---------------
+    # Qui peut poser/déplacer les créneaux de CETTE session. Trois régimes :
+    #   - ADMIN     : l'administration fixe le plan ; formateur + apprenant
+    #                 CONSULTENT et rejoignent (ex. cours de répétition) ;
+    #   - FORMATEUR : les formateurs animateurs planifient (défaut historique) ;
+    #   - APPRENANT : formateurs ET apprenants inscrits planifient leur module.
+    PLAN_ADMIN = "admin"
+    PLAN_FORMATEUR = "formateur"
+    PLAN_APPRENANT = "apprenant"
+    PLANIFICATION_CHOICES = (
+        (PLAN_ADMIN, "Administration seule (formateurs et apprenants consultent)"),
+        (PLAN_FORMATEUR, "Formateurs de la session"),
+        (PLAN_APPRENANT, "Formateurs et apprenants de la session"),
+    )
+    # Défaut = FORMATEUR : comportement en vigueur avant ce champ (l'agenda était
+    # ouvert à tout formateur). Basculer le défaut retirerait un droit à des
+    # cohortes existantes.
+    agenda_planification = models.CharField(
+        "Qui planifie l'agenda", max_length=12,
+        choices=PLANIFICATION_CHOICES, default=PLAN_FORMATEUR,
+    )
+
+    def peut_planifier(self, user):
+        """Ce compte peut-il créer/modifier un créneau de cette cohorte ?
+
+        Point de décision UNIQUE : l'API dashboard s'y réfère. Le régime est une
+        borne haute — il ouvre un droit à un rôle, jamais un droit que le rôle
+        n'a pas (un apprenant d'une autre cohorte reste dehors).
+        """
+        from sitecms.roles import is_admin, is_manager, is_teacher
+
+        if not (user and getattr(user, "is_authenticated", False)):
+            return False
+        # Administration et pilotage planifient toujours (régime ADMIN vu de
+        # l'autre côté).
+        if is_admin(user) or is_manager(user):
+            return True
+        if self.agenda_planification == self.PLAN_ADMIN:
+            return False
+        if is_teacher(user):
+            return self.instructors.filter(pk=user.pk).exists()
+        if self.agenda_planification == self.PLAN_APPRENANT:
+            from bucket.models import Inscription
+
+            return Inscription.objects.filter(
+                publication=self, participant=user,
+                status=Inscription.CONFIRMED, is_deleted=False,
+            ).exists()
+        return False
+
     # --- Champs affichés sur la fiche publique et le flyer de partage ------
     # Le responsable choisit ce qu'il montre : un champ désactivé disparaît de
     # la page ET du flyer, dont la composition se resserre.

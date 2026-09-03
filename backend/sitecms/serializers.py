@@ -14,12 +14,36 @@ from .models import Article, Card, MediaAsset, Page, Section, SiteSettings
 # ---------------------------------------------------------------------------
 # Média
 # ---------------------------------------------------------------------------
+def media_usages(media):
+    """Où cette image sert-elle ? Une entrée par famille d'usage, avec le compte.
+
+    Sert deux choses : afficher un repère dans la médiathèque (« utilisée dans 2
+    blocs »), et avertir avant une suppression — une image qu'on croit inutilisée
+    l'est rarement, et toutes les FK sont en SET_NULL (la suppression viderait
+    silencieusement logos, images de blocs, etc.).
+    """
+    reglages = SiteSettings.objects.filter(pk=1)
+    familles = [
+        ("Blocs de page", Section.objects.filter(bg_image=media, is_deleted=False).count()),
+        ("Cartes", Card.objects.filter(image=media, is_deleted=False).count()),
+        ("Pages (image de partage)", Page.objects.filter(og_image=media, is_deleted=False).count()),
+        ("Articles", Article.objects.filter(cover=media, is_deleted=False).count()),
+        ("Réglages du site", (
+            reglages.filter(logo=media).count()
+            + reglages.filter(logo_white=media).count()
+            + reglages.filter(default_og_image=media).count()
+        )),
+    ]
+    return [{"label": label, "count": n} for label, n in familles if n]
+
+
 class MediaAssetSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
+    usages = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaAsset
-        fields = ["id", "title", "url", "alt", "caption", "tags", "width", "height", "order", "is_active"]
+        fields = ["id", "title", "url", "alt", "caption", "tags", "width", "height", "order", "is_active", "usages"]
 
     def get_url(self, obj):
         if not obj.image:
@@ -27,6 +51,9 @@ class MediaAssetSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         url = obj.image.url
         return request.build_absolute_uri(url) if request else url
+
+    def get_usages(self, obj):
+        return media_usages(obj)
 
 
 # ---------------------------------------------------------------------------

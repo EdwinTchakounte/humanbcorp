@@ -15,6 +15,7 @@ import {
   type SubmitQuizResponse,
 } from "@/lib/api";
 import Souscrire from "./Souscrire";
+import ImageZoom from "@/components/ui/ImageZoom";
 
 const SEANCE_TYPE: Record<number, string> = { 0: "Théorie", 1: "Pratique", 2: "Exercice" };
 const DOC_TYPE: Record<number, string> = { 1: "Cours", 2: "Exercice", 3: "Réponse", 4: "Correction" };
@@ -286,9 +287,12 @@ function QuizBlock({
             </p>
             {q.description && <p className="mb-2 text-sm text-muted">{q.description}</p>}
             {q.image && (
-              // Illustration de l'énoncé.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={q.image} alt="" className="mb-3 max-h-64 w-auto rounded-lg border border-line/70" />
+              // Illustration de l'énoncé. Agrandissable : un extrait de texte ou
+              // un graphique bridé à 256 px de haut n'est pas lisible, et on ne
+              // peut pas répondre à ce qu'on ne déchiffre pas.
+              <div className="mb-3">
+                <ImageZoom src={q.image} alt="" className="max-h-64 w-auto rounded-lg border border-line/70" />
+              </div>
             )}
 
             {q.kind === 5 ? (
@@ -460,12 +464,12 @@ function QuizBlock({
                     else if (r.selected_option_ids.includes(o.id)) ring = "border-red-400 ring-2 ring-red-300/50";
                   }
                   return (
+                    <div key={o.id} className="relative">
                     <button
                       type="button"
-                      key={o.id}
                       disabled={locked}
                       onClick={() => toggle(q.id, o.id, isCheckbox)}
-                      className={`relative overflow-hidden rounded-xl border-2 bg-white text-left transition disabled:cursor-default ${ring}`}
+                      className={`relative block w-full overflow-hidden rounded-xl border-2 bg-white text-left transition disabled:cursor-default ${ring}`}
                     >
                       {o.image && (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -485,6 +489,15 @@ function QuizBlock({
                         )}
                       </span>
                     </button>
+                    {/* Loupe SÉPARÉE du bouton de sélection : regarder de plus près
+                        ne doit pas cocher l'option, et on ne peut pas imbriquer
+                        deux boutons. */}
+                    {o.image && (
+                      <span className="absolute right-1.5 top-1.5 z-10">
+                        <ImageZoom src={o.image} alt={o.title} legende={o.title} declencheur="loupe" />
+                      </span>
+                    )}
+                    </div>
                   );
                 })}
               </div>
@@ -1101,7 +1114,7 @@ export default function LearnerSpace({
   const [openId, setOpenId] = useState<number | null>(null);
   const [content, setContent] = useState<MyFormation | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
-  const [onglet, setOnglet] = useState<"formations" | "souscrire">("formations");
+  const [onglet, setOnglet] = useState<"formations" | "calendrier" | "souscrire">("formations");
 
   // Clé primitive stable pour les effets (l'objet `session` change d'identité à
   // chaque rendu, mais son contenu — token magique ou JWT — non).
@@ -1263,6 +1276,7 @@ export default function LearnerSpace({
         {(
           [
             ["formations", "Mes formations", "bx-book-open"],
+            ["calendrier", "Calendrier", "bx-calendar"],
             ["souscrire", "S’inscrire", "bx-cart-add"],
           ] as const
         ).map(([id, label, icon]) => {
@@ -1297,6 +1311,64 @@ export default function LearnerSpace({
 
       {onglet === "souscrire" ? (
         <Souscrire session={session} onChangement={rechargerEspace} />
+      ) : onglet === "calendrier" ? (
+        <div className="space-y-5">
+          <div>
+            <h2 className="flex items-center gap-2 text-2xl">
+              <i className="bx bx-calendar text-brand" /> Mon calendrier
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Toutes les séances de vos formations, réunies ici. Rejoignez en ligne
+              d’un clic quand un lien est partagé.
+            </p>
+          </div>
+          {space.agenda.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line bg-paper/60 p-8 text-center">
+              <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-2xl text-brand">
+                <i className="bx bx-calendar-x" />
+              </span>
+              <p className="text-sm text-muted">
+                Aucune séance planifiée pour l’instant. Elles apparaîtront ici dès
+                qu’un formateur ou l’administration les programme.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {space.agenda.map((ev) => {
+                const link = ev.meetings.find((m) => m.link_url)?.link_url;
+                const shown = ev.meetings.find((m) => m.link_url) ?? ev.meetings[0];
+                return (
+                  <li
+                    key={ev.id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line/70 bg-white px-4 py-3 text-sm"
+                  >
+                    <span className="font-medium text-ink">{ev.seance_title || ev.title}</span>
+                    <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+                      {ev.publication_title}
+                    </span>
+                    <span className="text-muted">{fmtDateTime(ev.start_time)}</span>
+                    {shown && (
+                      <span className="rounded-full bg-brand-soft/60 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                        {MEET_TYPE[shown.m_type] ?? ""}
+                      </span>
+                    )}
+                    {link && (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 font-semibold text-white transition hover:brightness-110"
+                      >
+                        <i className="bx bx-video" /> Rejoindre
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <AbonnementAgenda url={space.agenda_url} />
+        </div>
       ) : (
         <>
       {space.formations.length === 0 ? (
@@ -1422,6 +1494,7 @@ export default function LearnerSpace({
         {(
           [
             ["formations", "Formations", "bx-book-open"],
+            ["calendrier", "Calendrier", "bx-calendar"],
             ["souscrire", "S’inscrire", "bx-cart-add"],
           ] as const
         ).map(([id, label, icon]) => {

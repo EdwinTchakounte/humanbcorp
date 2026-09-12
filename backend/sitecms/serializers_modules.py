@@ -76,6 +76,11 @@ class EventSerializer(serializers.ModelSerializer):
         return not obj.formateurs.exists()
 
     def validate(self, attrs):
+        # Le ciblage se valide TOUJOURS, indépendamment de la séance : un créneau
+        # ciblé n'a pas forcément de séance (rattrapage, oral, demi-groupe), et
+        # placer ce contrôle après le court-circuit « pas de séance » le rendait
+        # inopérant dans le cas le plus courant.
+        self._valider_ciblage(attrs)
         # Une séance n'a de sens que si la cohorte vend bien le programme qui la
         # contient : sinon on daterait la séance d'une autre formation.
         seance = attrs.get("seance", getattr(self.instance, "seance", None))
@@ -95,7 +100,6 @@ class EventSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"seance": "Cette séance n'appartient pas au programme vendu par la session."}
             )
-        self._valider_ciblage(attrs)
         return attrs
 
     def _valider_ciblage(self, attrs):

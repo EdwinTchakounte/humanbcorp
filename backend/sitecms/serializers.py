@@ -38,12 +38,22 @@ def media_usages(media):
 
 
 class MediaAssetSerializer(serializers.ModelSerializer):
+    # Le fichier lui-même, en écriture (multipart). Sans ce champ, l'upload du
+    # dashboard était silencieusement ignoré : l'objet se créait, mais SANS
+    # image (`url` restait null, la vignette n'affichait rien). La lecture passe
+    # par `url` (SerializerMethodField), donc `image` est write-only.
+    image = serializers.ImageField(required=False, write_only=True)
     url = serializers.SerializerMethodField()
     usages = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaAsset
-        fields = ["id", "title", "url", "alt", "caption", "tags", "width", "height", "order", "is_active", "usages"]
+        fields = ["id", "title", "image", "url", "alt", "caption", "tags", "width", "height", "order", "is_active", "usages"]
+        # `is_active` en lecture seule : à l'upload (multipart), un BooleanField
+        # absent est traité comme False par DRF, ce qui créait des images
+        # inactives. On garde le défaut du modèle (True) — il n'y a de toute
+        # façon pas d'UI pour désactiver une image.
+        read_only_fields = ["is_active"]
 
     def get_url(self, obj):
         if not obj.image:
